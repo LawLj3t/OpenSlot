@@ -8,7 +8,8 @@ Nền tảng săn các khung giờ dịch vụ còn trống với ưu đãi sát
 
 - Khách hàng: đăng ký, đăng nhập, khám phá/lọc slot, giữ chỗ, QR/PIN check-in, xem và hủy lịch.
 - Đối tác: cập nhật hồ sơ, tạo địa điểm/dịch vụ, tạo và phát hành slot, check-in rồi hoàn tất dịch vụ.
-- Quản trị viên: dashboard vận hành, duyệt/tạm khóa đối tác, khóa/mở người dùng và xử lý báo cáo.
+- Manager: dashboard vận hành, duyệt/tạm khóa đối tác, theo dõi tài khoản, kiểm duyệt dịch vụ/slot và xử lý báo cáo.
+- Quản trị viên: quản lý toàn hệ thống và cấp/thu hồi quyền Manager.
 - Hệ thống: thông báo trong app, tìm kiếm theo từ khóa/khu vực, bản đồ thật và sắp xếp theo khoảng cách hiện tại.
 - Quy tắc chống lạm dụng: đóng booking trước giờ bắt đầu 15 phút; một khách tối đa 3 booking deal còn hiệu lực/ngày; hủy sát giờ/no-show nhận strike; sau 3 strike trong 30 ngày bị khóa đặt chỗ 7 ngày; chống overbooking bằng optimistic concurrency.
 
@@ -45,6 +46,7 @@ Truy cập frontend tại `http://127.0.0.1:5173`, Swagger tại `http://127.0.0
 | --- | --- | --- |
 | Customer | `customer@openslot.local` | `Customer@12345` |
 | Provider | `provider@openslot.local` | `Provider@12345` |
+| Manager | `manager@openslot.local` | `Manager@12345` |
 | Admin | `admin@openslot.local` | `Admin@12345` |
 
 Các tài khoản này chỉ được tạo khi môi trường là Development hoặc `SeedDemoData=true`. Không bật seed demo cho sản phẩm thật.

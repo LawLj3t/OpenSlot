@@ -23,6 +23,7 @@ public static class DbInitializer
 
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         var admin = await EnsureUserAsync(userManager, "admin@openslot.local", "OpenSlot Admin", "Admin@12345", RoleNames.Admin);
+        _ = await EnsureUserAsync(userManager, "manager@openslot.local", "OpenSlot Manager", "Manager@12345", RoleNames.Manager);
         var providerUser = await EnsureUserAsync(userManager, "provider@openslot.local", "OpenSlot Partner", "Provider@12345", RoleNames.Provider);
         _ = await EnsureUserAsync(userManager, "customer@openslot.local", "Lâm Demo", "Customer@12345", RoleNames.Customer);
 

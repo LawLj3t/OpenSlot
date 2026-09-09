@@ -55,7 +55,7 @@ public sealed class ReportsController(AppDbContext db) : ControllerBase
         return Created(string.Empty, new { report.Id, report.Status });
     }
 
-    [Authorize(Roles = RoleNames.Admin)]
+    [Authorize(Roles = RoleNames.ManagerOrAdmin)]
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] ReportStatus? status, CancellationToken cancellationToken)
     {
@@ -64,7 +64,7 @@ public sealed class ReportsController(AppDbContext db) : ControllerBase
         return Ok(await query.OrderByDescending(x => x.CreatedAtUtc).Select(x => new { x.Id, x.TargetType, x.TargetId, x.Reason, x.Status, x.CreatedAtUtc, reporterName = x.ReporterUser.DisplayName, reporterEmail = x.ReporterUser.Email }).ToListAsync(cancellationToken));
     }
 
-    [Authorize(Roles = RoleNames.Admin)]
+    [Authorize(Roles = RoleNames.ManagerOrAdmin)]
     [HttpPost("{id:guid}/resolve")]
     public async Task<IActionResult> Resolve(Guid id, ResolveReportRequest request, CancellationToken cancellationToken)
     {

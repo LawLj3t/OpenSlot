@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,22 +11,49 @@ using OpenSlot.Api.Infrastructure;
 
 namespace OpenSlot.Api.Controllers;
 
-[Authorize(Roles = RoleNames.Admin)]
+[Authorize(Roles = RoleNames.ManagerOrAdmin)]
 [ApiController]
 [Route("api/admin")]
-public sealed class AdminController(AppDbContext db) : ControllerBase
+public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser> userManager) : ControllerBase
 {
     [HttpGet("users")]
-    public async Task<IActionResult> Users(CancellationToken cancellationToken) => Ok(await db.Users.AsNoTracking()
-        .OrderByDescending(x => x.CreatedAtUtc)
-        .Select(x => new { x.Id, x.DisplayName, x.Email, x.IsSuspended, x.StrikeCount, x.BookingSuspendedUntilUtc, x.CreatedAtUtc })
-        .ToListAsync(cancellationToken));
+    public async Task<IActionResult> Users(CancellationToken cancellationToken)
+    {
+        var users = await db.Users.AsNoTracking()
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+        var response = new List<object>(users.Count);
+        foreach (var user in users)
+        {
+            var roles = await userManager.GetRolesAsync(user);
+            response.Add(new
+            {
+                user.Id,
+                user.DisplayName,
+                user.Email,
+                user.IsSuspended,
+                user.StrikeCount,
+                user.BookingSuspendedUntilUtc,
+                user.CreatedAtUtc,
+                Roles = roles.OrderBy(role => role).ToArray()
+            });
+        }
+        return Ok(response);
+    }
 
     [HttpPost("users/{userId}/suspend")]
     public Task<IActionResult> SuspendUser(string userId, CancellationToken cancellationToken) => SetUserSuspended(userId, true, cancellationToken);
 
     [HttpPost("users/{userId}/restore")]
     public Task<IActionResult> RestoreUser(string userId, CancellationToken cancellationToken) => SetUserSuspended(userId, false, cancellationToken);
+
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpPost("users/{userId}/grant-manager")]
+    public Task<IActionResult> GrantManager(string userId, CancellationToken cancellationToken) => SetManagerRole(userId, true, cancellationToken);
+
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpPost("users/{userId}/revoke-manager")]
+    public Task<IActionResult> RevokeManager(string userId, CancellationToken cancellationToken) => SetManagerRole(userId, false, cancellationToken);
 
     [HttpGet("dashboard")]
     public async Task<IActionResult> Dashboard(CancellationToken cancellationToken)
@@ -135,8 +163,71 @@ public sealed class AdminController(AppDbContext db) : ControllerBase
         var user = await db.Users.SingleOrDefaultAsync(x => x.Id == userId, cancellationToken)
             ?? throw new ApiException("Không tìm thấy người dùng.", StatusCodes.Status404NotFound);
         if (user.Id == User.FindFirstValue(ClaimTypes.NameIdentifier)) throw new ApiException("Admin không thể tự khóa tài khoản đang đăng nhập.");
+        var targetRoles = await userManager.GetRolesAsync(user);
+        if (targetRoles.Contains(RoleNames.Admin)) throw new ApiException("Không thể khóa tài khoản Admin.", StatusCodes.Status403Forbidden);
+        if (!User.IsInRole(RoleNames.Admin) && targetRoles.Contains(RoleNames.Manager))
+        {
+            throw new ApiException("Manager không thể khóa tài khoản Manager khác.", StatusCodes.Status403Forbidden);
+        }
         user.IsSuspended = suspended;
         db.AuditLogs.Add(new() { ActorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier), Action = suspended ? "user.suspended" : "user.restored", EntityType = "ApplicationUser", EntityId = user.Id });
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    private async Task<IActionResult> SetManagerRole(string userId, bool grant, CancellationToken cancellationToken)
+    {
+        var user = await db.Users.SingleOrDefaultAsync(x => x.Id == userId, cancellationToken)
+            ?? throw new ApiException("Không tìm thấy người dùng.", StatusCodes.Status404NotFound);
+        if (user.Id == User.FindFirstValue(ClaimTypes.NameIdentifier)) throw new ApiException("Admin không thể tự thay đổi quyền của chính mình.");
+
+        var roles = await userManager.GetRolesAsync(user);
+        if (roles.Contains(RoleNames.Admin)) throw new ApiException("Không thể thay đổi quyền Manager của Admin.", StatusCodes.Status409Conflict);
+        if (grant && roles.Contains(RoleNames.Provider)) throw new ApiException("Tài khoản Provider không thể đồng thời là Manager.", StatusCodes.Status409Conflict);
+        if (grant && roles.Contains(RoleNames.Manager)) throw new ApiException("Tài khoản này đã là Manager.", StatusCodes.Status409Conflict);
+        if (!grant && !roles.Contains(RoleNames.Manager)) throw new ApiException("Tài khoản này không phải Manager.", StatusCodes.Status409Conflict);
+
+        IdentityResult result;
+        if (grant)
+        {
+            result = await userManager.AddToRoleAsync(user, RoleNames.Manager);
+            if (!result.Succeeded)
+            {
+                throw new ApiException("Không thể cập nhật quyền Manager: " + string.Join(" ", result.Errors.Select(error => error.Description)));
+            }
+            if (roles.Contains(RoleNames.Customer))
+            {
+                result = await userManager.RemoveFromRoleAsync(user, RoleNames.Customer);
+                if (!result.Succeeded)
+                {
+                    await userManager.RemoveFromRoleAsync(user, RoleNames.Manager);
+                    throw new ApiException("Không thể chuyển tài khoản sang Manager: " + string.Join(" ", result.Errors.Select(error => error.Description)));
+                }
+            }
+        }
+        else
+        {
+            result = roles.Contains(RoleNames.Customer)
+                ? IdentityResult.Success
+                : await userManager.AddToRoleAsync(user, RoleNames.Customer);
+            if (!result.Succeeded)
+            {
+                throw new ApiException("Không thể chuyển tài khoản về Customer: " + string.Join(" ", result.Errors.Select(error => error.Description)));
+            }
+            result = await userManager.RemoveFromRoleAsync(user, RoleNames.Manager);
+        }
+        if (!result.Succeeded)
+        {
+            throw new ApiException("Không thể cập nhật quyền Manager: " + string.Join(" ", result.Errors.Select(error => error.Description)));
+        }
+
+        db.AuditLogs.Add(new()
+        {
+            ActorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
+            Action = grant ? "user.manager-granted" : "user.manager-revoked",
+            EntityType = "ApplicationUser",
+            EntityId = user.Id
+        });
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();
     }

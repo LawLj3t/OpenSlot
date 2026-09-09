@@ -151,6 +151,7 @@ export type AdminUser = {
   strikeCount: number
   bookingSuspendedUntilUtc: string | null
   createdAtUtc: string
+  roles: string[]
 }
 
 export type AdminService = {
