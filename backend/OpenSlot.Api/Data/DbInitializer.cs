@@ -56,9 +56,9 @@ public static class DbInitializer
         }
 
         var categories = await db.Categories.ToDictionaryAsync(x => x.Slug, cancellationToken);
-        var sportsVenue = new Venue { ProviderProfileId = provider.Id, Name = "Campus Court", AddressLine = "Khu thể thao demo, Quận 9", District = "Thủ Đức", City = "Hồ Chí Minh", Latitude = 10.8412, Longitude = 106.8099 };
-        var beautyVenue = new Venue { ProviderProfileId = provider.Id, Name = "Glow Studio", AddressLine = "Đường Lê Văn Việt, Quận 9", District = "Thủ Đức", City = "Hồ Chí Minh", Latitude = 10.8458, Longitude = 106.8069 };
-        var workspaceVenue = new Venue { ProviderProfileId = provider.Id, Name = "Focus Hub", AddressLine = "Đường Võ Chí Công, Quận 9", District = "Thủ Đức", City = "Hồ Chí Minh", Latitude = 10.8297, Longitude = 106.8052 };
+        var sportsVenue = new Venue { ProviderProfileId = provider.Id, Name = "Campus Court", AddressLine = "Khu thể thao Cầu Giấy", District = "Cầu Giấy", City = "Hà Nội", Latitude = 21.0290, Longitude = 105.7900 };
+        var beautyVenue = new Venue { ProviderProfileId = provider.Id, Name = "Glow Studio", AddressLine = "Đường Nguyễn Chí Thanh", District = "Đống Đa", City = "Hà Nội", Latitude = 21.0227, Longitude = 105.8139 };
+        var workspaceVenue = new Venue { ProviderProfileId = provider.Id, Name = "Focus Hub", AddressLine = "Đường Trần Duy Hưng", District = "Cầu Giấy", City = "Hà Nội", Latitude = 21.0079, Longitude = 105.7994 };
 
         var servicesToSeed = new[]
         {

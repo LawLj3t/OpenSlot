@@ -7,7 +7,7 @@ public sealed class Venue
     public string Name { get; set; } = string.Empty;
     public string AddressLine { get; set; } = string.Empty;
     public string District { get; set; } = string.Empty;
-    public string City { get; set; } = "Ho Chi Minh City";
+    public string City { get; set; } = "Hà Nội";
     public double Latitude { get; set; }
     public double Longitude { get; set; }
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
