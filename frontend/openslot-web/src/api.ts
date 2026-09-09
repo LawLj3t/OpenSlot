@@ -7,15 +7,27 @@ export type GeocodedLocation = {
   label: string
   latitude: number
   longitude: number
+  district?: string
+  city?: string
 }
 
 type NominatimResult = {
   display_name: string
   lat: string
   lon: string
+  address?: {
+    suburb?: string
+    city_district?: string
+    district?: string
+    county?: string
+    city?: string
+    town?: string
+    municipality?: string
+    state?: string
+  }
 }
 
-const geocodeCacheKey = 'openslot-geocoding-cache-v1'
+const geocodeCacheKey = 'openslot-geocoding-cache-v2'
 
 function readGeocodeCache(): Record<string, GeocodedLocation> {
   try { return JSON.parse(localStorage.getItem(geocodeCacheKey) ?? '{}') as Record<string, GeocodedLocation> }
@@ -28,13 +40,19 @@ async function geocodeLocation(query: string): Promise<GeocodedLocation | null> 
   const cache = readGeocodeCache()
   if (cache[normalized]) return cache[normalized]
 
-  const params = new URLSearchParams({ q: `${query.trim()}, Việt Nam`, format: 'jsonv2', limit: '1', countrycodes: 'vn', 'accept-language': 'vi' })
+  const params = new URLSearchParams({ q: `${query.trim()}, Việt Nam`, format: 'jsonv2', limit: '1', countrycodes: 'vn', addressdetails: '1', 'accept-language': 'vi' })
   const response = await fetch(`${geocodingBase}/search?${params}`, { headers: { Accept: 'application/json' } })
   if (!response.ok) throw new Error('Không thể xác định địa điểm lúc này.')
   const [result] = await response.json() as NominatimResult[]
   if (!result) return null
 
-  const location = { label: result.display_name, latitude: Number(result.lat), longitude: Number(result.lon) }
+  const location = {
+    label: result.display_name,
+    latitude: Number(result.lat),
+    longitude: Number(result.lon),
+    district: result.address?.suburb ?? result.address?.city_district ?? result.address?.district ?? result.address?.county,
+    city: result.address?.city ?? result.address?.town ?? result.address?.municipality ?? result.address?.state,
+  }
   cache[normalized] = location
   localStorage.setItem(geocodeCacheKey, JSON.stringify(cache))
   return location
