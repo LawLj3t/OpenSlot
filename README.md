@@ -2,6 +2,8 @@
 
 Nền tảng săn các khung giờ dịch vụ còn trống với ưu đãi sát giờ. Đồ án cá nhân được xây dựng cho kỳ thực tập tại VNPT.
 
+**Demo trực tiếp:** [openslot-9rrq.onrender.com](https://openslot-9rrq.onrender.com)
+
 ## Chức năng chính
 
 - Khách hàng: đăng ký, đăng nhập, khám phá/lọc slot, giữ chỗ, QR/PIN check-in, xem và hủy lịch.
