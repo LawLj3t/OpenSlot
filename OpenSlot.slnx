@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/backend/">
+    <Project Path="backend/OpenSlot.Api/OpenSlot.Api.csproj" />
+    <Project Path="backend/OpenSlot.Tests/OpenSlot.Tests.csproj" />
+  </Folder>
+</Solution>

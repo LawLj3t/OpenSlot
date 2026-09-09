@@ -1,0 +1,25 @@
+# .NET build artifacts
+**/bin/
+**/obj/
+
+# Node and frontend build artifacts
+**/node_modules/
+**/dist/
+
+# Local configuration and secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# IDE and OS files
+.vs/
+.vscode/
+*.user
+*.suo
+Thumbs.db
+Desktop.ini
+
+# SQLite runtime database
+*.db
+*.db-shm
+*.db-wal
