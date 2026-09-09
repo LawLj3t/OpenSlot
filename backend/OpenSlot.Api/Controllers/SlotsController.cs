@@ -44,7 +44,11 @@ public sealed class SlotsController(AppDbContext db) : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(district))
         {
-            query = query.Where(x => EF.Functions.Like(x.ServiceOffering.Venue.District, $"%{district.Trim()}%"));
+            var location = $"%{district.Trim()}%";
+            query = query.Where(x => EF.Functions.Like(x.ServiceOffering.Venue.District, location) ||
+                                     EF.Functions.Like(x.ServiceOffering.Venue.City, location) ||
+                                     EF.Functions.Like(x.ServiceOffering.Venue.AddressLine, location) ||
+                                     EF.Functions.Like(x.ServiceOffering.Venue.Name, location));
         }
 
         if (!string.IsNullOrWhiteSpace(q))

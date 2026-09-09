@@ -1,6 +1,44 @@
 import type { AdminDashboard, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, DealSlot, MyProviderProfile, Notification, ProviderProfile, ProviderService, ProviderSlot, ProviderVenue, Report, Session } from './types'
 
 const apiBase = import.meta.env.VITE_API_URL ?? '/api'
+const geocodingBase = import.meta.env.VITE_GEOCODING_URL ?? 'https://nominatim.openstreetmap.org'
+
+export type GeocodedLocation = {
+  label: string
+  latitude: number
+  longitude: number
+}
+
+type NominatimResult = {
+  display_name: string
+  lat: string
+  lon: string
+}
+
+const geocodeCacheKey = 'openslot-geocoding-cache-v1'
+
+function readGeocodeCache(): Record<string, GeocodedLocation> {
+  try { return JSON.parse(localStorage.getItem(geocodeCacheKey) ?? '{}') as Record<string, GeocodedLocation> }
+  catch { return {} }
+}
+
+async function geocodeLocation(query: string): Promise<GeocodedLocation | null> {
+  const normalized = query.trim().toLocaleLowerCase('vi-VN')
+  if (!normalized) return null
+  const cache = readGeocodeCache()
+  if (cache[normalized]) return cache[normalized]
+
+  const params = new URLSearchParams({ q: `${query.trim()}, Việt Nam`, format: 'jsonv2', limit: '1', countrycodes: 'vn', 'accept-language': 'vi' })
+  const response = await fetch(`${geocodingBase}/search?${params}`, { headers: { Accept: 'application/json' } })
+  if (!response.ok) throw new Error('Không thể xác định địa điểm lúc này.')
+  const [result] = await response.json() as NominatimResult[]
+  if (!result) return null
+
+  const location = { label: result.display_name, latitude: Number(result.lat), longitude: Number(result.lon) }
+  cache[normalized] = location
+  localStorage.setItem(geocodeCacheKey, JSON.stringify(cache))
+  return location
+}
 
 async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
   const headers = new Headers(init.headers)
@@ -18,6 +56,7 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
 export const api = {
   categories: () => request<Category[]>('/categories'),
   slots: (query = '') => request<DealSlot[]>(`/slots${query}`),
+  geocodeLocation,
   slot: (id: string) => request<DealSlot>(`/slots/${id}`),
   login: (email: string, password: string) => request<Session>('/auth/login', {
     method: 'POST', body: JSON.stringify({ email, password }),
