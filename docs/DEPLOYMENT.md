@@ -37,6 +37,17 @@ Kiểm tra `http://localhost:8080/health`, sau đó mở `http://localhost:8080`
 
 Nếu host miễn phí không có persistent volume, app vẫn chạy nhưng dữ liệu phát sinh có thể mất khi container restart; seed demo sẽ tạo lại dữ liệu mẫu. Đây là hạn chế chấp nhận được cho buổi review, không phù hợp sản phẩm thật.
 
+## Render Free (cấu hình sẵn)
+
+File `render.yaml` ở thư mục gốc khai báo một Docker Web Service miễn phí:
+
+- Build toàn bộ frontend và backend bằng `Dockerfile`.
+- Lắng nghe tại port `10000`, health check ở `/health`.
+- Tự sinh `Jwt__Key`, không lưu secret trong Git.
+- Bật dữ liệu demo và đặt SQLite tại `/tmp/openslot.db`.
+
+Trên Render Dashboard, chọn **New > Blueprint**, kết nối repository, chọn file `render.yaml` và xác nhận deploy. Gói Free có thể ngủ khi không có truy cập; lần mở đầu tiên sau khi ngủ sẽ chậm hơn. Vì filesystem miễn phí không bền vững, dữ liệu mới có thể reset nhưng dữ liệu mẫu sẽ tự khôi phục.
+
 ## Production thật
 
 - Đặt `SeedDemoData=false`.

@@ -76,12 +76,18 @@ docker run --rm -p 8080:8080 `
   openslot
 ```
 
-Truy cập `http://localhost:8080`. Với bản public để mentor xem, cần một dịch vụ host container và volume lưu `/data`.
+Truy cập `http://localhost:8080`.
+
+## Deploy miễn phí lên Render
+
+Repository có sẵn `render.yaml` để tạo một Web Service Docker gói Free. Trên Render, chọn **New > Blueprint**, kết nối repository này rồi deploy. Render tự sinh `Jwt__Key`, chạy health check tại `/health` và cung cấp một URL `onrender.com`.
+
+Bản review miễn phí dùng SQLite tại `/tmp/openslot.db`. Dữ liệu phát sinh có thể bị xóa khi instance khởi động lại, nhưng `SeedDemoData=true` sẽ tự tạo lại tài khoản và dữ liệu mẫu. Cấu hình này chỉ dành cho mentor/giám khảo trải nghiệm, không dành cho production thật.
 
 ## Lưu ý trước khi deploy
 
 - Khi deploy, đặt ít nhất `Jwt__Key` (chuỗi ngẫu nhiên tối thiểu 32 bytes) và `ConnectionStrings__OpenSlotDb` qua biến môi trường hoặc secret manager. Key development chỉ nằm trong `appsettings.Development.json`.
-- Tắt seed tài khoản demo ở production.
+- Tắt seed tài khoản demo khi triển khai sản phẩm thật.
 - SQLite phù hợp demo/mentor review. Khi có nhiều người dùng, chuyển sang SQL Server hoặc PostgreSQL.
 
 ## Tài liệu bàn giao

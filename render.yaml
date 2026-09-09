@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: openslot-lawlj3et
+    runtime: docker
+    plan: free
+    autoDeployTrigger: commit
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://+:10000
+      - key: SeedDemoData
+        value: "true"
+      - key: ConnectionStrings__OpenSlotDb
+        value: Data Source=/tmp/openslot.db
+      - key: Jwt__Key
+        generateValue: true
