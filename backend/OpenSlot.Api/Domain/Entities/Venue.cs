@@ -14,4 +14,5 @@ public sealed class Venue
 
     public ProviderProfile ProviderProfile { get; set; } = null!;
     public ICollection<ServiceOffering> ServiceOfferings { get; set; } = new List<ServiceOffering>();
+    public ICollection<BookableResource> Resources { get; set; } = new List<BookableResource>();
 }

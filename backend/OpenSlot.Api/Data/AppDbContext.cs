@@ -10,6 +10,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<ProviderProfile> ProviderProfiles => Set<ProviderProfile>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Venue> Venues => Set<Venue>();
+    public DbSet<BookableResource> BookableResources => Set<BookableResource>();
     public DbSet<ServiceOffering> ServiceOfferings => Set<ServiceOffering>();
     public DbSet<DealSlot> DealSlots => Set<DealSlot>();
     public DbSet<Booking> Bookings => Set<Booking>();
@@ -62,11 +63,23 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasIndex(x => new { x.VenueId, x.CategoryId, x.IsActive });
         });
 
+        builder.Entity<BookableResource>(entity =>
+        {
+            entity.Property(x => x.Name).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.ResourceType).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Code).HasMaxLength(60);
+            entity.Property(x => x.FloorOrZone).HasMaxLength(100);
+            entity.Property(x => x.PositionDescription).HasMaxLength(255);
+            entity.HasIndex(x => new { x.VenueId, x.IsActive });
+            entity.HasIndex(x => new { x.VenueId, x.Code }).IsUnique();
+        });
+
         builder.Entity<DealSlot>(entity =>
         {
             entity.Property(x => x.ConcurrencyToken).IsConcurrencyToken();
             entity.HasIndex(x => new { x.Status, x.StartAtUtc });
             entity.HasIndex(x => new { x.ServiceOfferingId, x.StartAtUtc });
+            entity.HasIndex(x => new { x.BookableResourceId, x.StartAtUtc });
         });
 
         builder.Entity<Booking>(entity =>

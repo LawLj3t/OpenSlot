@@ -32,6 +32,7 @@ public sealed class BookingsController(AppDbContext db, IBookingService bookingS
         var bookings = await db.Bookings
             .AsNoTracking()
             .Include(x => x.DealSlot).ThenInclude(x => x.ServiceOffering).ThenInclude(x => x.Venue)
+            .Include(x => x.DealSlot).ThenInclude(x => x.BookableResource)
             .Where(x => x.CustomerUserId == UserId)
             .OrderByDescending(x => x.DealSlot.StartAtUtc)
             .Select(x => new BookingListItem(
@@ -40,6 +41,8 @@ public sealed class BookingsController(AppDbContext db, IBookingService bookingS
                 x.Status,
                 x.DealSlot.ServiceOffering.Name,
                 x.DealSlot.ServiceOffering.Venue.Name,
+                x.DealSlot.BookableResource != null ? x.DealSlot.BookableResource.Name : null,
+                x.DealSlot.BookableResource != null ? x.DealSlot.BookableResource.Code : null,
                 x.DealSlot.StartAtUtc,
                 x.DealSlot.EndAtUtc,
                 x.DealSlot.DealPriceVnd,

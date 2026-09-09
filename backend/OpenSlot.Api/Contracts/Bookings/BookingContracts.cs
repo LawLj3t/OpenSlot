@@ -29,6 +29,8 @@ public sealed record BookingListItem(
     BookingStatus Status,
     string ServiceName,
     string VenueName,
+    string? ResourceName,
+    string? ResourceCode,
     DateTime StartAtUtc,
     DateTime EndAtUtc,
     long DealPriceVnd,

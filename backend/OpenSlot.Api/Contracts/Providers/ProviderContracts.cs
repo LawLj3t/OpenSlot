@@ -29,3 +29,14 @@ public sealed class UpsertServiceRequest
     [Range(1, 100_000_000)] public long BasePriceVnd { get; init; }
     [Url, MaxLength(500)] public string? ImageUrl { get; init; }
 }
+
+public sealed class UpsertBookableResourceRequest
+{
+    public Guid VenueId { get; init; }
+    [Required, MinLength(2), MaxLength(120)] public string Name { get; init; } = string.Empty;
+    [Required, MinLength(2), MaxLength(80)] public string ResourceType { get; init; } = string.Empty;
+    [MaxLength(60)] public string? Code { get; init; }
+    [MaxLength(100)] public string? FloorOrZone { get; init; }
+    [MaxLength(255)] public string? PositionDescription { get; init; }
+    [Range(1, 100)] public int MaxCapacity { get; init; }
+}

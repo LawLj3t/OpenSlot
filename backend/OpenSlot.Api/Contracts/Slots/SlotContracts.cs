@@ -8,6 +8,9 @@ public sealed class CreateDealSlotRequest
     [Required]
     public Guid ServiceOfferingId { get; init; }
 
+    [Required]
+    public Guid BookableResourceId { get; init; }
+
     public DateTime StartAtUtc { get; init; }
     public DateTime EndAtUtc { get; init; }
     public DateTime BookingOpensAtUtc { get; init; }
@@ -29,6 +32,9 @@ public sealed record DealSlotListItem(
     string CategoryName,
     string CategorySlug,
     string VenueName,
+    string? ResourceName,
+    string? ResourceCode,
+    string? ResourceLocation,
     string District,
     string City,
     double Latitude,
@@ -51,6 +57,9 @@ public sealed record DealSlotDetails(
     string CategoryName,
     string CategorySlug,
     string VenueName,
+    string? ResourceName,
+    string? ResourceCode,
+    string? ResourceLocation,
     string AddressLine,
     string District,
     string City,

@@ -53,6 +53,7 @@ public static class DbInitializer
 
         if (await db.ServiceOfferings.AnyAsync(cancellationToken))
         {
+            await EnsureResourcesForExistingDataAsync(db, cancellationToken);
             return;
         }
 
@@ -60,6 +61,11 @@ public static class DbInitializer
         var sportsVenue = new Venue { ProviderProfileId = provider.Id, Name = "Campus Court", AddressLine = "Khu thể thao Cầu Giấy", District = "Cầu Giấy", City = "Hà Nội", Latitude = 21.0290, Longitude = 105.7900 };
         var beautyVenue = new Venue { ProviderProfileId = provider.Id, Name = "Glow Studio", AddressLine = "Đường Nguyễn Chí Thanh", District = "Đống Đa", City = "Hà Nội", Latitude = 21.0227, Longitude = 105.8139 };
         var workspaceVenue = new Venue { ProviderProfileId = provider.Id, Name = "Focus Hub", AddressLine = "Đường Trần Duy Hưng", District = "Cầu Giấy", City = "Hà Nội", Latitude = 21.0079, Longitude = 105.7994 };
+        var sportsResource = new BookableResource { Venue = sportsVenue, Name = "Sân số 1", ResourceType = "Sân cầu lông", Code = "S1", FloorOrZone = "Khu A", PositionDescription = "Gần quầy lễ tân", MaxCapacity = 1 };
+        var beautyResource = new BookableResource { Venue = beautyVenue, Name = "Ghế gội số 2", ResourceType = "Ghế dịch vụ", Code = "G2", FloorOrZone = "Tầng 1", PositionDescription = "Khu gội đầu", MaxCapacity = 1 };
+        var workspaceResource = new BookableResource { Venue = workspaceVenue, Name = "Bàn C-08", ResourceType = "Bàn làm việc", Code = "C08", FloorOrZone = "Tầng 3", PositionDescription = "Khu yên tĩnh", MaxCapacity = 4 };
+
+        db.BookableResources.AddRange(sportsResource, beautyResource, workspaceResource);
 
         var servicesToSeed = new[]
         {
@@ -72,9 +78,9 @@ public static class DbInitializer
 
         var now = DateTime.UtcNow;
         db.DealSlots.AddRange(
-            CreateDemoSlot(servicesToSeed[0], now.AddHours(3), 60, 180_000, 99_000, 1),
-            CreateDemoSlot(servicesToSeed[1], now.AddHours(4), 45, 150_000, 79_000, 2),
-            CreateDemoSlot(servicesToSeed[2], now.AddHours(5), 120, 100_000, 49_000, 4));
+            CreateDemoSlot(servicesToSeed[0], sportsResource, now.AddHours(3), 60, 180_000, 99_000, 1),
+            CreateDemoSlot(servicesToSeed[1], beautyResource, now.AddHours(4), 45, 150_000, 79_000, 1),
+            CreateDemoSlot(servicesToSeed[2], workspaceResource, now.AddHours(5), 120, 100_000, 49_000, 4));
         db.AuditLogs.Add(new AuditLog { ActorUserId = admin.Id, Action = "seed.created", EntityType = "DemoData", EntityId = "initial" });
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -100,9 +106,50 @@ public static class DbInitializer
         return user;
     }
 
-    private static DealSlot CreateDemoSlot(ServiceOffering service, DateTime startAtUtc, int durationMinutes, long originalPriceVnd, long dealPriceVnd, int capacity) => new()
+    private static async Task EnsureResourcesForExistingDataAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
+        var venuesWithoutResources = await db.Venues
+            .Where(x => !x.Resources.Any())
+            .ToListAsync(cancellationToken);
+        foreach (var venue in venuesWithoutResources)
+        {
+            db.BookableResources.Add(new BookableResource
+            {
+                VenueId = venue.Id,
+                Name = "Khu vực chung",
+                ResourceType = "Không gian chung",
+                Code = "DEFAULT",
+                MaxCapacity = 100
+            });
+        }
+        if (venuesWithoutResources.Count > 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        var slotsWithoutResource = await db.DealSlots
+            .Include(x => x.ServiceOffering)
+            .Where(x => x.BookableResourceId == null)
+            .ToListAsync(cancellationToken);
+        if (slotsWithoutResource.Count == 0) return;
+
+        var defaultResources = await db.BookableResources
+            .Where(x => x.Code == "DEFAULT")
+            .ToDictionaryAsync(x => x.VenueId, cancellationToken);
+        foreach (var slot in slotsWithoutResource)
+        {
+            if (defaultResources.TryGetValue(slot.ServiceOffering.VenueId, out var resource))
+            {
+                slot.BookableResourceId = resource.Id;
+            }
+        }
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static DealSlot CreateDemoSlot(ServiceOffering service, BookableResource resource, DateTime startAtUtc, int durationMinutes, long originalPriceVnd, long dealPriceVnd, int capacity) => new()
     {
         ServiceOfferingId = service.Id,
+        BookableResource = resource,
         StartAtUtc = startAtUtc,
         EndAtUtc = startAtUtc.AddMinutes(durationMinutes),
         BookingOpensAtUtc = DateTime.UtcNow.AddMinutes(-5),

@@ -1,4 +1,4 @@
-import type { AdminDashboard, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, DealSlot, MyProviderProfile, Notification, ProviderProfile, ProviderService, ProviderSlot, ProviderVenue, Report, Session } from './types'
+import type { AdminDashboard, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, DealSlot, MyProviderProfile, Notification, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, Report, Session } from './types'
 
 const apiBase = import.meta.env.VITE_API_URL ?? '/api'
 const geocodingBase = import.meta.env.VITE_GEOCODING_URL ?? 'https://nominatim.openstreetmap.org'
@@ -114,7 +114,10 @@ export const api = {
   providerProfile: (token: string) => request<MyProviderProfile>('/provider/profile', {}, token),
   updateProviderProfile: (payload: object, token: string) => request<void>('/provider/profile', { method: 'PUT', body: JSON.stringify(payload) }, token),
   providerVenues: (token: string) => request<ProviderVenue[]>('/provider/venues', {}, token),
+  providerResources: (token: string) => request<ProviderResource[]>('/provider/resources', {}, token),
   createProviderVenue: (payload: object, token: string) => request('/provider/venues', { method: 'POST', body: JSON.stringify(payload) }, token),
+  createProviderResource: (payload: object, token: string) => request('/provider/resources', { method: 'POST', body: JSON.stringify(payload) }, token),
+  deactivateProviderResource: (resourceId: string, token: string) => request<void>(`/provider/resources/${resourceId}/deactivate`, { method: 'POST' }, token),
   createProviderService: (payload: object, token: string) => request('/provider/services', { method: 'POST', body: JSON.stringify(payload) }, token),
   createProviderSlot: (payload: object, token: string) => request('/provider/slots', { method: 'POST', body: JSON.stringify(payload) }, token),
   publishProviderSlot: (slotId: string, token: string) => request(`/provider/slots/${slotId}/publish`, { method: 'POST' }, token),

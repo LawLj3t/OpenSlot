@@ -7,6 +7,7 @@ public sealed class DealSlot
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid ServiceOfferingId { get; set; }
+    public Guid? BookableResourceId { get; set; }
     public DateTime StartAtUtc { get; set; }
     public DateTime EndAtUtc { get; set; }
     public DateTime BookingOpensAtUtc { get; set; }
@@ -25,5 +26,6 @@ public sealed class DealSlot
     public Guid ConcurrencyToken { get; set; } = Guid.NewGuid();
 
     public ServiceOffering ServiceOffering { get; set; } = null!;
+    public BookableResource? BookableResource { get; set; }
     public ICollection<Booking> Bookings { get; set; } = new List<Booking>();
 }

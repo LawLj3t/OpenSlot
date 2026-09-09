@@ -11,6 +11,9 @@ export type DealSlot = {
   categoryName: string
   categorySlug: string
   venueName: string
+  resourceName: string | null
+  resourceCode: string | null
+  resourceLocation: string | null
   district: string
   city: string
   latitude: number
@@ -44,6 +47,8 @@ export type Booking = {
   status: number
   serviceName: string
   venueName: string
+  resourceName: string | null
+  resourceCode: string | null
   startAtUtc: string
   endAtUtc: string
   dealPriceVnd: number
@@ -62,9 +67,23 @@ export type BookingConfirmation = {
 export type ProviderService = {
   id: string
   name: string
+  venueId: string
   venueName: string
   defaultDurationMinutes: number
   basePriceVnd: number
+}
+
+export type ProviderResource = {
+  id: string
+  venueId: string
+  venueName: string
+  name: string
+  resourceType: string
+  code: string | null
+  floorOrZone: string | null
+  positionDescription: string | null
+  maxCapacity: number
+  isActive: boolean
 }
 
 export type ProviderVenue = {
@@ -89,6 +108,8 @@ export type ProviderSlot = {
   id: string
   serviceName: string
   venueName: string
+  resourceName: string
+  resourceCode: string | null
   startAtUtc: string
   endAtUtc: string
   bookingOpensAtUtc: string

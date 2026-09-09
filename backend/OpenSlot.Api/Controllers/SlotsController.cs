@@ -30,6 +30,7 @@ public sealed class SlotsController(AppDbContext db) : ControllerBase
             .Include(x => x.ServiceOffering)
             .ThenInclude(x => x.Venue)
             .ThenInclude(x => x.ProviderProfile)
+            .Include(x => x.BookableResource)
             .Where(x => x.Status == DealSlotStatus.Published &&
                         x.ServiceOffering.IsActive &&
                         x.ServiceOffering.Venue.ProviderProfile.Status == ProviderStatus.Approved &&
@@ -79,6 +80,7 @@ public sealed class SlotsController(AppDbContext db) : ControllerBase
             .AsNoTracking()
             .Include(x => x.ServiceOffering).ThenInclude(x => x.Category)
             .Include(x => x.ServiceOffering).ThenInclude(x => x.Venue).ThenInclude(x => x.ProviderProfile)
+            .Include(x => x.BookableResource)
             .SingleOrDefaultAsync(x => x.Id == id &&
                                        x.ServiceOffering.IsActive &&
                                        x.ServiceOffering.Venue.ProviderProfile.Status == ProviderStatus.Approved &&
@@ -93,6 +95,9 @@ public sealed class SlotsController(AppDbContext db) : ControllerBase
             slot.ServiceOffering.Category.Name,
             slot.ServiceOffering.Category.Slug,
             slot.ServiceOffering.Venue.Name,
+            slot.BookableResource?.Name,
+            slot.BookableResource?.Code,
+            ResourceLocation(slot.BookableResource),
             slot.ServiceOffering.Venue.AddressLine,
             slot.ServiceOffering.Venue.District,
             slot.ServiceOffering.Venue.City,
@@ -121,6 +126,9 @@ public sealed class SlotsController(AppDbContext db) : ControllerBase
             slot.ServiceOffering.Category.Name,
             slot.ServiceOffering.Category.Slug,
             slot.ServiceOffering.Venue.Name,
+            slot.BookableResource?.Name,
+            slot.BookableResource?.Code,
+            ResourceLocation(slot.BookableResource),
             slot.ServiceOffering.Venue.District,
             slot.ServiceOffering.Venue.City,
             slot.ServiceOffering.Venue.Latitude,
@@ -135,6 +143,10 @@ public sealed class SlotsController(AppDbContext db) : ControllerBase
             slot.Status,
             distanceKm);
     }
+
+    private static string? ResourceLocation(Domain.Entities.BookableResource? resource) => resource is null
+        ? null
+        : string.Join(" · ", new[] { resource.FloorOrZone, resource.PositionDescription }.Where(x => !string.IsNullOrWhiteSpace(x)));
 
     private static double CalculateDistance(double fromLatitude, double fromLongitude, double toLatitude, double toLongitude)
     {

@@ -7,11 +7,11 @@ Nền tảng săn các khung giờ dịch vụ còn trống với ưu đãi sát
 ## Chức năng chính
 
 - Khách hàng: đăng ký, đăng nhập, khám phá/lọc slot, giữ chỗ, QR/PIN check-in, xem và hủy lịch.
-- Đối tác: cập nhật hồ sơ, tạo địa điểm/dịch vụ, tạo và phát hành slot, check-in rồi hoàn tất dịch vụ.
+- Đối tác: cập nhật hồ sơ, tạo địa điểm, khai báo sân/bàn/ghế/phòng có thể đặt, tạo dịch vụ và phát hành slot đúng đơn vị; check-in rồi hoàn tất dịch vụ.
 - Manager: dashboard vận hành, duyệt/tạm khóa đối tác, theo dõi tài khoản, kiểm duyệt dịch vụ/slot và xử lý báo cáo.
 - Quản trị viên: quản lý toàn hệ thống và cấp/thu hồi quyền Manager.
 - Hệ thống: thông báo trong app, tìm kiếm theo từ khóa/khu vực, bản đồ thật và sắp xếp theo khoảng cách hiện tại.
-- Quy tắc chống lạm dụng: đóng booking trước giờ bắt đầu 15 phút; một khách tối đa 3 booking deal còn hiệu lực/ngày; hủy sát giờ/no-show nhận strike; sau 3 strike trong 30 ngày bị khóa đặt chỗ 7 ngày; chống overbooking bằng optimistic concurrency.
+- Quy tắc chống lạm dụng: đóng booking trước giờ bắt đầu 15 phút; một khách tối đa 3 booking deal còn hiệu lực/ngày; hủy sát giờ/no-show nhận strike; sau 3 strike trong 30 ngày bị khóa đặt chỗ 7 ngày; không cho hai slot trùng giờ trên cùng sân/bàn/ghế/phòng; chống overbooking bằng optimistic concurrency.
 
 ## Công nghệ
 
@@ -64,7 +64,7 @@ npm run lint
 npm run build
 ```
 
-Kết quả QA hiện tại: backend 8/8 unit test đạt, frontend build và lint sạch. Luồng tranh chỗ cuối đã được kiểm thử đồng thời: đúng một request nhận `201`, request còn lại nhận `409`.
+Kết quả QA hiện tại: backend 9/9 unit test đạt, frontend build và lint sạch. Luồng tranh chỗ cuối đã được kiểm thử đồng thời: đúng một request nhận `201`, request còn lại nhận `409`.
 
 ## Chạy bằng Docker
 

@@ -29,6 +29,7 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
             {
                 x.Id,
                 x.Name,
+                x.VenueId,
                 venueName = x.Venue.Name,
                 x.DefaultDurationMinutes,
                 x.BasePriceVnd
@@ -43,6 +44,7 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
         var slots = await db.DealSlots
             .AsNoTracking()
             .Include(x => x.ServiceOffering).ThenInclude(x => x.Venue).ThenInclude(x => x.ProviderProfile)
+            .Include(x => x.BookableResource)
             .Where(x => x.ServiceOffering.Venue.ProviderProfile.UserId == UserId)
             .OrderByDescending(x => x.StartAtUtc)
             .Select(x => new
@@ -50,6 +52,8 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
                 x.Id,
                 serviceName = x.ServiceOffering.Name,
                 venueName = x.ServiceOffering.Venue.Name,
+                resourceName = x.BookableResource != null ? x.BookableResource.Name : "Chưa xác định",
+                resourceCode = x.BookableResource != null ? x.BookableResource.Code : null,
                 x.StartAtUtc,
                 x.EndAtUtc,
                 x.BookingOpensAtUtc,
@@ -79,13 +83,19 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
             ?? throw new ApiException("Không tìm thấy dịch vụ.", StatusCodes.Status404NotFound);
 
         EnsureProviderOwnsService(service, UserId);
-        if (await db.DealSlots.AnyAsync(x => x.ServiceOfferingId == request.ServiceOfferingId && x.Status != DealSlotStatus.Cancelled && x.Status != DealSlotStatus.Expired && x.StartAtUtc < request.EndAtUtc && x.EndAtUtc > request.StartAtUtc, cancellationToken))
+        var resource = await GetResourceForService(request.BookableResourceId, service, cancellationToken);
+        if (request.Capacity > resource.MaxCapacity)
         {
-            throw new ApiException("Khung giờ này bị trùng với một slot đang tồn tại.", StatusCodes.Status409Conflict);
+            throw new ApiException($"Số chỗ không thể vượt quá sức chứa {resource.MaxCapacity} của {resource.Name}.");
+        }
+        if (await db.DealSlots.AnyAsync(x => x.BookableResourceId == request.BookableResourceId && x.Status != DealSlotStatus.Cancelled && x.Status != DealSlotStatus.Expired && x.StartAtUtc < request.EndAtUtc && x.EndAtUtc > request.StartAtUtc, cancellationToken))
+        {
+            throw new ApiException("Đơn vị này đã có slot trùng trong khung giờ đã chọn.", StatusCodes.Status409Conflict);
         }
         var slot = new DealSlot
         {
             ServiceOfferingId = request.ServiceOfferingId,
+            BookableResourceId = resource.Id,
             StartAtUtc = request.StartAtUtc,
             EndAtUtc = request.EndAtUtc,
             BookingOpensAtUtc = request.BookingOpensAtUtc,
@@ -106,9 +116,15 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
     {
         var slot = await db.DealSlots
             .Include(x => x.ServiceOffering).ThenInclude(x => x.Venue).ThenInclude(x => x.ProviderProfile)
+            .Include(x => x.BookableResource)
             .SingleOrDefaultAsync(x => x.Id == slotId, cancellationToken)
             ?? throw new ApiException("Không tìm thấy slot.", StatusCodes.Status404NotFound);
         EnsureProviderOwnsService(slot.ServiceOffering, UserId);
+
+        if (slot.BookableResource is null || !slot.BookableResource.IsActive)
+        {
+            throw new ApiException("Slot phải gắn với một đơn vị đặt chỗ đang hoạt động.");
+        }
 
         if (slot.ServiceOffering.Venue.ProviderProfile.Status != ProviderStatus.Approved)
         {
@@ -138,7 +154,7 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
     {
         var validationError = SlotPolicy.Validate(request, DateTime.UtcNow);
         if (validationError is not null) throw new ApiException(validationError);
-        var slot = await db.DealSlots.Include(x => x.ServiceOffering).ThenInclude(x => x.Venue).ThenInclude(x => x.ProviderProfile)
+        var slot = await db.DealSlots.Include(x => x.ServiceOffering).ThenInclude(x => x.Venue).ThenInclude(x => x.ProviderProfile).Include(x => x.BookableResource)
             .SingleOrDefaultAsync(x => x.Id == slotId, cancellationToken)
             ?? throw new ApiException("Không tìm thấy slot.", StatusCodes.Status404NotFound);
         EnsureProviderOwnsService(slot.ServiceOffering, UserId);
@@ -149,11 +165,17 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
             .SingleOrDefaultAsync(x => x.Id == request.ServiceOfferingId, cancellationToken)
             ?? throw new ApiException("Không tìm thấy dịch vụ.");
         EnsureProviderOwnsService(service, UserId);
-        if (await db.DealSlots.AnyAsync(x => x.Id != slotId && x.ServiceOfferingId == request.ServiceOfferingId && x.Status != DealSlotStatus.Cancelled && x.Status != DealSlotStatus.Expired && x.StartAtUtc < request.EndAtUtc && x.EndAtUtc > request.StartAtUtc, cancellationToken))
+        var resource = await GetResourceForService(request.BookableResourceId, service, cancellationToken);
+        if (request.Capacity > resource.MaxCapacity)
         {
-            throw new ApiException("Khung giờ này bị trùng với một slot đang tồn tại.", StatusCodes.Status409Conflict);
+            throw new ApiException($"Số chỗ không thể vượt quá sức chứa {resource.MaxCapacity} của {resource.Name}.");
+        }
+        if (await db.DealSlots.AnyAsync(x => x.Id != slotId && x.BookableResourceId == request.BookableResourceId && x.Status != DealSlotStatus.Cancelled && x.Status != DealSlotStatus.Expired && x.StartAtUtc < request.EndAtUtc && x.EndAtUtc > request.StartAtUtc, cancellationToken))
+        {
+            throw new ApiException("Đơn vị này đã có slot trùng trong khung giờ đã chọn.", StatusCodes.Status409Conflict);
         }
         slot.ServiceOfferingId = request.ServiceOfferingId;
+        slot.BookableResourceId = resource.Id;
         slot.StartAtUtc = request.StartAtUtc;
         slot.EndAtUtc = request.EndAtUtc;
         slot.BookingOpensAtUtc = request.BookingOpensAtUtc;
@@ -189,6 +211,17 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
         {
             throw new ApiException("Bạn không có quyền quản lý dịch vụ này.", StatusCodes.Status403Forbidden);
         }
+    }
+
+    private async Task<BookableResource> GetResourceForService(Guid resourceId, ServiceOffering service, CancellationToken cancellationToken)
+    {
+        var resource = await db.BookableResources.SingleOrDefaultAsync(x => x.Id == resourceId && x.IsActive, cancellationToken)
+            ?? throw new ApiException("Không tìm thấy đơn vị đặt chỗ đang hoạt động.", StatusCodes.Status404NotFound);
+        if (resource.VenueId != service.VenueId)
+        {
+            throw new ApiException("Đơn vị đặt chỗ phải thuộc cùng địa điểm với dịch vụ.");
+        }
+        return resource;
     }
 
     private AuditLog CreateAudit(string action, string entityType, string entityId) => new()
