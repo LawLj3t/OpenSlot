@@ -2,7 +2,7 @@
 
 Nền tảng săn các khung giờ dịch vụ còn trống với ưu đãi sát giờ. Đồ án cá nhân được xây dựng cho kỳ thực tập tại VNPT.
 
-**Demo trực tiếp:** [openslot-9rrq.onrender.com](https://openslot-9rrq.onrender.com)
+**Demo trực tiếp:** [openslot-vn.onrender.com](https://openslot-vn.onrender.com)
 
 ## Chức năng chính
 
