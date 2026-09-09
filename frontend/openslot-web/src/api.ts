@@ -34,6 +34,16 @@ function readGeocodeCache(): Record<string, GeocodedLocation> {
   catch { return {} }
 }
 
+function toGeocodedLocation(result: NominatimResult): GeocodedLocation {
+  return {
+    label: result.display_name,
+    latitude: Number(result.lat),
+    longitude: Number(result.lon),
+    district: result.address?.suburb ?? result.address?.city_district ?? result.address?.district ?? result.address?.county,
+    city: result.address?.city ?? result.address?.town ?? result.address?.municipality ?? result.address?.state,
+  }
+}
+
 async function geocodeLocation(query: string): Promise<GeocodedLocation | null> {
   const normalized = query.trim().toLocaleLowerCase('vi-VN')
   if (!normalized) return null
@@ -46,14 +56,25 @@ async function geocodeLocation(query: string): Promise<GeocodedLocation | null> 
   const [result] = await response.json() as NominatimResult[]
   if (!result) return null
 
-  const location = {
-    label: result.display_name,
-    latitude: Number(result.lat),
-    longitude: Number(result.lon),
-    district: result.address?.suburb ?? result.address?.city_district ?? result.address?.district ?? result.address?.county,
-    city: result.address?.city ?? result.address?.town ?? result.address?.municipality ?? result.address?.state,
-  }
+  const location = toGeocodedLocation(result)
   cache[normalized] = location
+  localStorage.setItem(geocodeCacheKey, JSON.stringify(cache))
+  return location
+}
+
+async function reverseGeocodeLocation(latitude: number, longitude: number): Promise<GeocodedLocation | null> {
+  const cacheKey = `reverse:${latitude.toFixed(6)},${longitude.toFixed(6)}`
+  const cache = readGeocodeCache()
+  if (cache[cacheKey]) return cache[cacheKey]
+
+  const params = new URLSearchParams({ lat: String(latitude), lon: String(longitude), format: 'jsonv2', zoom: '18', addressdetails: '1', 'accept-language': 'vi' })
+  const response = await fetch(`${geocodingBase}/reverse?${params}`, { headers: { Accept: 'application/json' } })
+  if (!response.ok) throw new Error('Không thể xác định địa chỉ lúc này.')
+  const result = await response.json() as NominatimResult
+  if (!result?.display_name) return null
+
+  const location = toGeocodedLocation(result)
+  cache[cacheKey] = location
   localStorage.setItem(geocodeCacheKey, JSON.stringify(cache))
   return location
 }
@@ -75,6 +96,7 @@ export const api = {
   categories: () => request<Category[]>('/categories'),
   slots: (query = '') => request<DealSlot[]>(`/slots${query}`),
   geocodeLocation,
+  reverseGeocodeLocation,
   slot: (id: string) => request<DealSlot>(`/slots/${id}`),
   login: (email: string, password: string) => request<Session>('/auth/login', {
     method: 'POST', body: JSON.stringify({ email, password }),
