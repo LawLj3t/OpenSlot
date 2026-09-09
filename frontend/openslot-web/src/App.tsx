@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css'
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { api } from './api'
+import type { GeocodedLocation } from './api'
 import type { AdminDashboard, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, DealSlot, MyProviderProfile, Notification, ProviderProfile, ProviderService, ProviderSlot, ProviderVenue, Report, Session } from './types'
 import './App.css'
 
@@ -17,7 +18,7 @@ const popularServiceSearches = ['Sân cầu lông', 'Sân bóng đá', 'Sân ten
 const priceSuggestions = ['49000', '79000', '99000', '120000', '150000', '180000', '200000', '250000', '300000', '500000']
 const durationSuggestions = ['30', '45', '60', '90', '120']
 const capacitySuggestions = ['1', '2', '4', '6', '8', '10', '20']
-const venueNameSuggestions = ['Chi nhánh trung tâm', 'Cơ sở Cầu Giấy', 'Cơ sở Đống Đa', 'Campus Court', 'Glow Studio', 'Focus Hub']
+const venueNameSuggestions = ['Sân cầu lông ABC', 'Salon Minh Anh', 'Coffee Study', 'Campus Court', 'Glow Studio', 'Focus Hub']
 const addressSuggestions = ['Trần Duy Hưng, Hà Nội', 'Nguyễn Chí Thanh, Hà Nội', 'Cầu Giấy, Hà Nội', 'Đống Đa, Hà Nội', 'Hai Bà Trưng, Hà Nội']
 const descriptionSuggestions = ['Ưu đãi cho khung giờ còn trống trong ngày', 'Không gian sạch sẽ, đầy đủ tiện nghi', 'Phù hợp cho khách đặt lịch sát giờ']
 const normalizeSearch = (value: string) => value.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('vi-VN').trim()
@@ -149,8 +150,41 @@ function ProviderProfileForm({ profile, token, onDone, onError }: { profile: MyP
 }
 
 function VenueForm({ token, onDone, onError }: { token: string; onDone: () => void; onError: (message: string) => void }) {
-  const [name, setName] = useState(''); const [addressLine, setAddressLine] = useState(''); const [saving, setSaving] = useState(false); const submit = async (event: React.FormEvent) => { event.preventDefault(); setSaving(true); try { const location = await api.geocodeLocation(addressLine); if (!location) { onError('Không tìm thấy địa chỉ. Hãy nhập rõ số nhà, đường/phường và tỉnh thành.'); return }; await api.createProviderVenue({ name, addressLine: addressLine.trim(), district: location.district ?? location.city ?? 'Khu vực chưa xác định', city: location.city ?? 'Việt Nam', latitude: location.latitude, longitude: location.longitude }, token); onDone() } catch (e) { onError(e instanceof Error ? e.message : 'Không thể thêm địa điểm.') } finally { setSaving(false) } }
-  return <form className="provider-form catalog-form" onSubmit={submit}><h3>Thêm địa điểm</h3><label>Tên địa điểm<input required minLength={2} list="venue-name-suggestions" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ví dụ: Cơ sở Cầu Giấy" /></label><label>Địa chỉ cụ thể<input required minLength={5} name="street-address" autoComplete="street-address" list="address-suggestions" value={addressLine} onChange={(e) => setAddressLine(e.target.value)} placeholder="Số nhà, đường/phường, tỉnh thành" /></label><datalist id="venue-name-suggestions">{venueNameSuggestions.map((value) => <option value={value} key={value} />)}</datalist><datalist id="address-suggestions">{addressSuggestions.map((value) => <option value={value} key={value} />)}</datalist><button disabled={saving} className="btn btn-primary rounded-pill">{saving ? 'Đang xác định địa chỉ...' : 'Lưu địa điểm'}</button><small>OpenSlot tự xác định khu vực và tọa độ từ địa chỉ bằng OpenStreetMap.</small></form>
+  const [name, setName] = useState('')
+  const [addressLine, setAddressLine] = useState('')
+  const [previewLocation, setPreviewLocation] = useState<GeocodedLocation | null>(null)
+  const [resolving, setResolving] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [lookupError, setLookupError] = useState('')
+  const resolveAddress = async () => {
+    const requestedAddress = addressLine.trim()
+    if (requestedAddress.length < 5) { setLookupError('Hãy nhập địa chỉ cụ thể trước khi xem trên bản đồ.'); return null }
+    setResolving(true); setLookupError('')
+    try {
+      const location = await api.geocodeLocation(requestedAddress)
+      if (!location) { setPreviewLocation(null); setLookupError('Không tìm thấy địa chỉ. Hãy thêm số nhà, đường/phường và tỉnh thành.'); return null }
+      setPreviewLocation(location)
+      return location
+    } catch {
+      setPreviewLocation(null); setLookupError('Dịch vụ bản đồ đang bận. Hãy thử lại sau ít phút.'); return null
+    } finally { setResolving(false) }
+  }
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault(); setSaving(true)
+    try {
+      const location = previewLocation ?? await resolveAddress()
+      if (!location) { onError('Không thể lưu vì chưa xác định được vị trí trên bản đồ.'); return }
+      await api.createProviderVenue({ name, addressLine: addressLine.trim(), district: location.district ?? location.city ?? 'Khu vực chưa xác định', city: location.city ?? 'Việt Nam', latitude: location.latitude, longitude: location.longitude }, token)
+      onDone()
+    } catch (e) { onError(e instanceof Error ? e.message : 'Không thể thêm địa điểm.') } finally { setSaving(false) }
+  }
+  const updateAddress = (value: string) => { setAddressLine(value); setPreviewLocation(null); setLookupError('') }
+  return <form className="provider-form catalog-form venue-form" onSubmit={submit}><h3>Thêm địa điểm</h3><label>Tên địa điểm<input required minLength={2} list="venue-name-suggestions" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ví dụ: Sân cầu lông ABC" /></label><label>Địa chỉ cụ thể<input required minLength={5} name="street-address" autoComplete="street-address" list="address-suggestions" value={addressLine} onChange={(e) => updateAddress(e.target.value)} placeholder="Số nhà, đường/phường, tỉnh thành" /></label><div className="venue-form-actions"><button type="button" disabled={resolving || saving} onClick={resolveAddress} className="btn btn-outline-primary rounded-pill">{resolving ? 'Đang tìm vị trí...' : 'Xem trên bản đồ'}</button><button disabled={saving || resolving} className="btn btn-primary rounded-pill">{saving ? 'Đang lưu...' : 'Lưu địa điểm'}</button></div><datalist id="venue-name-suggestions">{venueNameSuggestions.map((value) => <option value={value} key={value} />)}</datalist><datalist id="address-suggestions">{addressSuggestions.map((value) => <option value={value} key={value} />)}</datalist>{lookupError && <div className="venue-map-error">{lookupError}</div>}{previewLocation && <VenueLocationPreviewMap location={previewLocation} venueName={name || 'Địa điểm mới'} /> }<small>Nhấn “Xem trên bản đồ” để kiểm tra marker trước khi lưu. OpenSlot lấy tọa độ từ OpenStreetMap.</small></form>
+}
+
+function VenueLocationPreviewMap({ location, venueName }: { location: GeocodedLocation; venueName: string }) {
+  const point: [number, number] = [location.latitude, location.longitude]
+  return <section className="venue-map-preview"><div className="venue-map-heading"><div><b><i className="bi bi-geo-alt-fill" /> Vị trí được tìm thấy</b><span>{location.label}</span></div><small>{location.district ?? location.city ?? 'Việt Nam'}</small></div><MapContainer key={`${location.latitude}-${location.longitude}`} center={point} zoom={16} scrollWheelZoom className="leaflet-map"><TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" /><CircleMarker center={point} radius={12} pathOptions={{ color: '#ffffff', weight: 3, fillColor: '#ee7158', fillOpacity: 1 }}><Popup><b>{venueName}</b><br />{location.label}</Popup></CircleMarker></MapContainer></section>
 }
 
 function ServiceForm({ token, venues, categories, onDone, onError }: { token: string; venues: ProviderVenue[]; categories: Category[]; onDone: () => void; onError: (message: string) => void }) {
