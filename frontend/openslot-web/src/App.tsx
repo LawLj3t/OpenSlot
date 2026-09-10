@@ -111,8 +111,25 @@ function Fact({ icon, label, value }: { icon: string; label: string; value: stri
 
 function AuthPage({ mode, onAuthenticated }: { mode: 'login' | 'register'; onAuthenticated: (session: Session) => void }) {
   const navigate = useNavigate(); const [displayName, setDisplayName] = useState(''); const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState(''); const [loading, setLoading] = useState(false)
-  const submit = async (event: React.FormEvent) => { event.preventDefault(); setError(''); setLoading(true); try { const session = mode === 'login' ? await api.login(email, password) : await api.register(displayName, email, password); onAuthenticated(session); navigate('/') } catch (e) { setError(e instanceof Error ? e.message : 'Không thể tiếp tục.') } finally { setLoading(false) } }
-  return <div className="auth-page"><section className="auth-pitch"><NavLink to="/" className="brand"><span className="brand-mark"><i className="bi bi-lightning-charge-fill" /></span>Open<span>Slot</span></NavLink><div><p className="eyebrow">Tận hưởng thông minh</p><h1>Khoảnh khắc trống<br />cũng đáng giá.</h1><p>Chọn dịch vụ đúng nơi, đúng thời điểm, đúng ngân sách.</p></div><div className="quote"><i className="bi bi-quote" /> Đừng để một khung giờ tốt bị bỏ trống.</div></section><section className="auth-form-wrap"><form onSubmit={submit} className="auth-form"><p className="eyebrow">{mode === 'login' ? 'Chào mừng trở lại' : 'Tạo tài khoản miễn phí'}</p><h1>{mode === 'login' ? 'Đăng nhập OpenSlot' : 'Bắt đầu săn slot'}</h1>{mode === 'register' && <label>Họ và tên<input required value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Nguyễn Văn A" /></label>}<label>Email<input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ban@email.com" /></label><label>Mật khẩu<input required minLength={8} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Tối thiểu 8 ký tự" /></label>{error && <div className="alert alert-danger">{error}</div>}<button disabled={loading} className="btn btn-primary rounded-pill py-3">{loading ? 'Đang xử lý...' : mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'} <i className="bi bi-arrow-right" /></button><p className="switch-auth">{mode === 'login' ? <>Chưa có tài khoản? <NavLink to="/register">Đăng ký</NavLink></> : <>Đã có tài khoản? <NavLink to="/login">Đăng nhập</NavLink></>}</p><div className="demo-login"><b>Demo nhanh</b><span>customer@openslot.local / Customer@12345</span></div></form></section></div>
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setError('')
+    if (mode === 'register' && !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}/.test(password)) {
+      setError('Mật khẩu cần tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và số.')
+      return
+    }
+    setLoading(true)
+    try {
+      const session = mode === 'login' ? await api.login(email, password) : await api.register(displayName, email, password)
+      onAuthenticated(session)
+      navigate('/')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể tiếp tục.')
+    } finally {
+      setLoading(false)
+    }
+  }
+  return <div className="auth-page"><section className="auth-pitch"><NavLink to="/" className="brand"><span className="brand-mark"><i className="bi bi-lightning-charge-fill" /></span>Open<span>Slot</span></NavLink><div><p className="eyebrow">Tận hưởng thông minh</p><h1>Khoảnh khắc trống<br />cũng đáng giá.</h1><p>Chọn dịch vụ đúng nơi, đúng thời điểm, đúng ngân sách.</p></div><div className="quote"><i className="bi bi-quote" /> Đừng để một khung giờ tốt bị bỏ trống.</div></section><section className="auth-form-wrap"><form onSubmit={submit} className="auth-form"><p className="eyebrow">{mode === 'login' ? 'Chào mừng trở lại' : 'Tạo tài khoản miễn phí'}</p><h1>{mode === 'login' ? 'Đăng nhập OpenSlot' : 'Bắt đầu săn slot'}</h1>{mode === 'register' && <label>Họ và tên<input required value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Nguyễn Văn A" /></label>}<label>Email<input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ban@email.com" /></label><label>Mật khẩu<input required minLength={8} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Tối thiểu 8 ký tự" />{mode === 'register' && <small className="form-hint">Tối thiểu 8 ký tự, có chữ hoa, chữ thường và số.</small>}</label>{error && <div className="alert alert-danger">{error}</div>}<button disabled={loading} className="btn btn-primary rounded-pill py-3">{loading ? 'Đang xử lý...' : mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'} <i className="bi bi-arrow-right" /></button><p className="switch-auth">{mode === 'login' ? <>Chưa có tài khoản? <NavLink to="/register">Đăng ký</NavLink></> : <>Đã có tài khoản? <NavLink to="/login">Đăng nhập</NavLink></>}</p><div className="demo-login"><b>Demo nhanh</b><span>customer@openslot.local / Customer@12345</span></div></form></section></div>
 }
 
 function ProviderApplicationPage({ session, onAuthenticated }: { session: Session; onAuthenticated: (session: Session) => void }) {
