@@ -92,17 +92,21 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
       errors?: Array<{ code?: string; description?: string }> | Record<string, string[]>
     } | null
 
-    const identityErrors = Array.isArray(problem?.errors) ? problem.errors : []
-    const validationErrors = problem?.errors && !Array.isArray(problem.errors)
-      ? Object.values(problem.errors).flat()
-      : []
-    if (identityErrors.some((error) => error.code === 'DuplicateEmail' || error.code === 'DuplicateUserName')) {
+    const rawErrors = problem?.errors
+    const identityErrors = Array.isArray(rawErrors) ? rawErrors : []
+    const validationErrors = rawErrors && !Array.isArray(rawErrors) && typeof rawErrors === 'object'
+      ? rawErrors
+      : {}
+    if (validationErrors.ContactPhone?.length) {
+      throw new Error('Số điện thoại không hợp lệ, vui lòng nhập lại.')
+    }
+    if (identityErrors.find((error) => error.code === 'DuplicateEmail' || error.code === 'DuplicateUserName')) {
       throw new Error('Email này đã được sử dụng. Hãy đăng nhập hoặc dùng email khác.')
     }
-    if (identityErrors.some((error) => error.code?.startsWith('Password'))) {
+    if (identityErrors.find((error) => error.code?.startsWith('Password'))) {
       throw new Error('Mật khẩu cần tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và số.')
     }
-    throw new Error(problem?.detail ?? validationErrors[0] ?? problem?.title ?? identityErrors[0]?.description ?? 'Đã có lỗi xảy ra. Vui lòng thử lại.')
+    throw new Error(problem?.detail ?? Object.values(validationErrors).flat()[0] ?? problem?.title ?? identityErrors[0]?.description ?? 'Đã có lỗi xảy ra. Vui lòng thử lại.')
   }
   return response.status === 204 ? (undefined as T) : response.json() as Promise<T>
 }

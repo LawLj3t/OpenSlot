@@ -19,7 +19,7 @@ public sealed class ApplyForProviderRequest
     [Required, MinLength(2), MaxLength(160)]
     public string BusinessName { get; init; } = string.Empty;
 
-    [Required, RegularExpression(@"^0\d{9}$", ErrorMessage = "Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng số 0.")]
+    [Required, RegularExpression(@"^0\d{9}$", ErrorMessage = "Số điện thoại không hợp lệ, vui lòng nhập lại.")]
     public string ContactPhone { get; init; } = string.Empty;
 
     [MaxLength(2000)]
