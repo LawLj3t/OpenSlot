@@ -79,13 +79,6 @@ public sealed class AuthController(UserManager<ApplicationUser> userManager, IJw
             throw new ApiException("Không thể tạo quyền đối tác: " + string.Join(" ", addRoleResult.Errors.Select(x => x.Description)));
         }
 
-        var removeCustomerRoleResult = await userManager.RemoveFromRoleAsync(user, RoleNames.Customer);
-        if (!removeCustomerRoleResult.Succeeded)
-        {
-            await userManager.RemoveFromRoleAsync(user, RoleNames.Provider);
-            throw new ApiException("Không thể chuyển đổi vai trò tài khoản: " + string.Join(" ", removeCustomerRoleResult.Errors.Select(x => x.Description)));
-        }
-
         var profile = new ProviderProfile
         {
             UserId = user.Id,

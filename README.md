@@ -8,7 +8,8 @@ Nền tảng săn các khung giờ dịch vụ còn trống với ưu đãi sát
 
 - Khách hàng: đăng ký, đăng nhập, khám phá/lọc slot, giữ chỗ, QR/PIN check-in, xem và hủy lịch.
 - Đối tác: chủ cửa hàng tự nộp hồ sơ, cập nhật địa điểm, khai báo sân/bàn/ghế/phòng có thể đặt, tạo dịch vụ và phát hành slot đúng đơn vị; check-in rồi hoàn tất dịch vụ.
-- Manager: dashboard vận hành, duyệt/yêu cầu bổ sung/tạm khóa đối tác, quản lý danh mục chung, theo dõi tài khoản, kiểm duyệt dịch vụ/slot và xử lý báo cáo.
+- Đối tác: một tài khoản vẫn giữ quyền Khách hàng để đặt dịch vụ; người dùng chọn cổng Khách hàng hoặc Đối tác khi đăng nhập và có thể chuyển lại trong thanh điều hướng.
+- Manager: dashboard vận hành, duyệt/yêu cầu bổ sung/tạm khóa đối tác, xem chi tiết cửa hàng/địa điểm/đơn vị đặt/dịch vụ/slot, quản lý danh mục chung, theo dõi tài khoản, kiểm duyệt dịch vụ/slot và xử lý báo cáo.
 - Quản trị viên: quản lý toàn hệ thống và cấp/thu hồi quyền Manager.
 - Hệ thống: thông báo trong app, tìm kiếm theo từ khóa/khu vực, bản đồ thật và sắp xếp theo khoảng cách hiện tại.
 - Dữ liệu demo: 6 nhóm dịch vụ, 6 đối tác, 6 địa điểm, 12 đơn vị có thể đặt và 12 slot sát giờ tại Hà Nội.
@@ -65,7 +66,7 @@ Tên dịch vụ không gắn số phút. Provider khai báo **giờ bắt đầ
 
 ## Quy trình đối tác
 
-1. Customer đăng ký tài khoản rồi gửi hồ sơ cửa hàng để trở thành Provider.
+1. Customer đăng ký tài khoản rồi gửi hồ sơ cửa hàng để được **bổ sung** quyền Provider; cùng email đó vẫn đặt dịch vụ như Customer.
 2. Tài khoản Provider ở trạng thái **Chờ duyệt** có thể chuẩn bị hồ sơ, địa điểm, dịch vụ, đơn vị đặt và slot nháp.
 3. Manager duyệt, yêu cầu bổ sung hoặc tạm khóa hồ sơ. Chỉ Provider đã duyệt mới phát hành slot công khai.
 4. Manager quản lý danh mục chung; Provider tự khai báo dịch vụ cụ thể của cửa hàng.

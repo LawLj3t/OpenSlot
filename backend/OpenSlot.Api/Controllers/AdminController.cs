@@ -101,6 +101,86 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
         return Ok(providers);
     }
 
+    [HttpGet("providers/{providerId:guid}/detail")]
+    public async Task<IActionResult> GetProviderDetail(Guid providerId, CancellationToken cancellationToken)
+    {
+        var provider = await db.ProviderProfiles.AsNoTracking()
+            .Include(x => x.User)
+            .Include(x => x.Venues).ThenInclude(x => x.Resources)
+            .Include(x => x.Venues).ThenInclude(x => x.ServiceOfferings).ThenInclude(x => x.Category)
+            .Include(x => x.Venues).ThenInclude(x => x.ServiceOfferings).ThenInclude(x => x.DealSlots).ThenInclude(x => x.BookableResource)
+            .SingleOrDefaultAsync(x => x.Id == providerId, cancellationToken)
+            ?? throw new ApiException("Không tìm thấy đối tác.", StatusCodes.Status404NotFound);
+
+        var slots = provider.Venues.SelectMany(venue => venue.ServiceOfferings.SelectMany(service => service.DealSlots.Select(slot => new
+            {
+                slot.Id,
+                serviceName = service.Name,
+                categoryName = service.Category.Name,
+                venueName = venue.Name,
+                resourceName = slot.BookableResource?.Name,
+                resourceCode = slot.BookableResource?.Code,
+                slot.StartAtUtc,
+                slot.EndAtUtc,
+                slot.Capacity,
+                slot.ConfirmedBookingCount,
+                slot.DealPriceVnd,
+                slot.Status
+            })))
+            .OrderByDescending(slot => slot.StartAtUtc)
+            .Take(30)
+            .ToList();
+
+        return Ok(new
+        {
+            provider.Id,
+            provider.BusinessName,
+            provider.ContactPhone,
+            provider.Description,
+            provider.Status,
+            provider.CreatedAtUtc,
+            ownerName = provider.User.DisplayName,
+            ownerEmail = provider.User.Email,
+            summary = new
+            {
+                venueCount = provider.Venues.Count,
+                resourceCount = provider.Venues.Sum(venue => venue.Resources.Count),
+                serviceCount = provider.Venues.Sum(venue => venue.ServiceOfferings.Count),
+                publishedSlotCount = provider.Venues.SelectMany(venue => venue.ServiceOfferings).SelectMany(service => service.DealSlots).Count(slot => slot.Status is DealSlotStatus.Published or DealSlotStatus.SoldOut),
+                bookingCount = provider.Venues.SelectMany(venue => venue.ServiceOfferings).SelectMany(service => service.DealSlots).Sum(slot => slot.ConfirmedBookingCount)
+            },
+            venues = provider.Venues.OrderBy(venue => venue.Name).Select(venue => new
+            {
+                venue.Id,
+                venue.Name,
+                venue.AddressLine,
+                venue.District,
+                venue.City,
+                resources = venue.Resources.OrderBy(resource => resource.Name).Select(resource => new
+                {
+                    resource.Id,
+                    resource.Name,
+                    resource.ResourceType,
+                    resource.Code,
+                    resource.FloorOrZone,
+                    resource.PositionDescription,
+                    resource.MaxCapacity,
+                    resource.IsActive
+                })
+            }),
+            services = provider.Venues.SelectMany(venue => venue.ServiceOfferings.Select(service => new
+            {
+                service.Id,
+                service.Name,
+                categoryName = service.Category.Name,
+                venueName = venue.Name,
+                service.BasePriceVnd,
+                service.IsActive
+            })).OrderBy(service => service.Name),
+            slots
+        });
+    }
+
     [HttpGet("services")]
     public async Task<IActionResult> Services(CancellationToken cancellationToken) => Ok(await db.ServiceOfferings.AsNoTracking()
         .Include(x => x.Category).Include(x => x.Venue).ThenInclude(x => x.ProviderProfile)

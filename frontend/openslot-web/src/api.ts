@@ -1,4 +1,4 @@
-import type { AdminCategory, AdminDashboard, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, DealSlot, MyProviderProfile, Notification, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, Report, Session } from './types'
+import type { AdminCategory, AdminDashboard, AdminProviderDetail, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, DealSlot, MyProviderProfile, Notification, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, Report, Session } from './types'
 
 const apiBase = import.meta.env.VITE_API_URL ?? '/api'
 const geocodingBase = import.meta.env.VITE_GEOCODING_URL ?? 'https://nominatim.openstreetmap.org'
@@ -144,6 +144,7 @@ export const api = {
   checkIn: (publicCode: string, pin: string, token: string) => request<void>('/provider/check-ins', { method: 'POST', body: JSON.stringify({ publicCode, pin }) }, token),
   completeBooking: (publicCode: string, token: string) => request<void>(`/provider/check-ins/${encodeURIComponent(publicCode)}/complete`, { method: 'POST' }, token),
   adminProviders: (token: string, status?: number) => request<ProviderProfile[]>(`/admin/providers${status === undefined ? '' : `?status=${status}`}`, {}, token),
+  adminProviderDetail: (providerId: string, token: string) => request<AdminProviderDetail>(`/admin/providers/${providerId}/detail`, {}, token),
   adminDashboard: (token: string) => request<AdminDashboard>('/admin/dashboard', {}, token),
   adminUsers: (token: string) => request<AdminUser[]>('/admin/users', {}, token),
   adminServices: (token: string) => request<AdminService[]>('/admin/services', {}, token),

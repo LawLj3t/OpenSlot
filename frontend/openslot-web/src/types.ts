@@ -39,7 +39,10 @@ export type CurrentUser = {
 export type Session = {
   accessToken: string
   user: CurrentUser
+  activeRole?: PortalRole
 }
+
+export type PortalRole = 'Customer' | 'Provider' | 'Manager' | 'Admin'
 
 export type Booking = {
   id: string
@@ -129,6 +132,63 @@ export type ProviderProfile = {
   createdAtUtc: string
   ownerName: string
   ownerEmail: string
+}
+
+export type AdminProviderDetail = {
+  id: string
+  businessName: string
+  contactPhone: string
+  description: string | null
+  status: number
+  createdAtUtc: string
+  ownerName: string
+  ownerEmail: string
+  summary: {
+    venueCount: number
+    resourceCount: number
+    serviceCount: number
+    publishedSlotCount: number
+    bookingCount: number
+  }
+  venues: Array<{
+    id: string
+    name: string
+    addressLine: string
+    district: string
+    city: string
+    resources: Array<{
+      id: string
+      name: string
+      resourceType: string
+      code: string | null
+      floorOrZone: string | null
+      positionDescription: string | null
+      maxCapacity: number
+      isActive: boolean
+    }>
+  }>
+  services: Array<{
+    id: string
+    name: string
+    categoryName: string
+    venueName: string
+    basePriceVnd: number
+    isActive: boolean
+  }>
+  slots: Array<{
+    id: string
+    serviceName: string
+    categoryName: string
+    venueName: string
+    resourceName: string | null
+    resourceCode: string | null
+    startAtUtc: string
+    endAtUtc: string
+    capacity: number
+    confirmedBookingCount: number
+    dealPriceVnd: number
+    status: number
+  }>
 }
 
 export type Notification = {

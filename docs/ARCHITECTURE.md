@@ -34,7 +34,7 @@ SQLite + EF Core migrations
 ## Luồng chính
 
 1. Admin duyệt provider.
-2. Customer gửi hồ sơ trở thành Provider. Provider ở trạng thái Pending có thể chuẩn bị venue, đơn vị có thể đặt, service và slot nháp.
+2. Customer gửi hồ sơ để được bổ sung quyền Provider trên cùng email. Provider ở trạng thái Pending có thể chuẩn bị venue, đơn vị có thể đặt, service và slot nháp; khi cần, chủ cửa hàng chuyển về cổng Customer để đặt dịch vụ.
 3. Manager duyệt, yêu cầu bổ sung hoặc tạm khóa Provider. Chỉ Provider Approved phát hành slot; hệ thống kiểm tra giờ, giá, sức chứa và slot chồng lấn trên cùng đơn vị.
 4. Customer tìm theo từ khóa/khu vực/danh mục hoặc vị trí hiện tại, rồi đặt chỗ.
 5. Transaction và concurrency token bảo đảm không bán vượt sức chứa.

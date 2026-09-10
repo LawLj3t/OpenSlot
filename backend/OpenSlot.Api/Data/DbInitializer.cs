@@ -97,6 +97,7 @@ public static class DbInitializer
 
         var categories = await EnsureCategoriesAsync(db, cancellationToken);
         var providers = await EnsureProvidersAsync(db, userManager, cancellationToken);
+        await EnsureProviderUsersCanBookAsync(userManager);
         var venues = await EnsureVenuesAsync(db, providers, cancellationToken);
         var resources = await EnsureResourcesAsync(db, venues, cancellationToken);
         var serviceOfferings = await EnsureServicesAsync(db, venues, categories, cancellationToken);
@@ -149,6 +150,24 @@ public static class DbInitializer
         }
         await db.SaveChangesAsync(cancellationToken);
         return venues;
+    }
+
+    /// <summary>
+    /// A shop owner is still a normal customer when using a different portal.
+    /// This also repairs demo profiles created before the multi-role flow existed.
+    /// </summary>
+    private static async Task EnsureProviderUsersCanBookAsync(UserManager<ApplicationUser> userManager)
+    {
+        var providerUsers = await userManager.GetUsersInRoleAsync(RoleNames.Provider);
+        foreach (var user in providerUsers)
+        {
+            if (await userManager.IsInRoleAsync(user, RoleNames.Customer)) continue;
+            var result = await userManager.AddToRoleAsync(user, RoleNames.Customer);
+            if (!result.Succeeded)
+            {
+                throw new InvalidOperationException($"Could not grant customer access to provider {user.Email}: {string.Join(", ", result.Errors.Select(x => x.Description))}");
+            }
+        }
     }
 
     private static async Task<Dictionary<string, BookableResource>> EnsureResourcesAsync(AppDbContext db, IReadOnlyDictionary<string, Venue> venues, CancellationToken cancellationToken)

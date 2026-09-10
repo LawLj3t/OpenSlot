@@ -24,12 +24,12 @@ Nhấn mạnh điểm khác website đặt lịch: đây là marketplace đa d�
 - Mở trang chủ, chỉ 6 nhóm dịch vụ và 12 slot từ nhiều đối tác; lọc một danh mục và tìm theo từ khóa.
 - Bấm định vị để sắp xếp theo khoảng cách; chuyển sang bản đồ OpenStreetMap.
 - Mở chi tiết slot, chỉ giá gốc/giá deal, giờ đóng booking và số chỗ còn.
-- Đăng nhập Customer và giữ chỗ; chỉ QR, public code và PIN.
+- Ở trang đăng nhập, chọn cổng **Khách hàng** rồi đăng nhập Customer và giữ chỗ; chỉ QR, public code và PIN.
 - Mở “Lịch của tôi” và trung tâm thông báo.
 
 ### 3. Provider operations (2 phút)
 
-- Đăng nhập Provider.
+- Ở trang đăng nhập, chọn cổng **Đối tác** rồi đăng nhập Provider. Từ thanh điều hướng, chọn **Khám phá & đặt chỗ** để thấy cùng tài khoản vẫn dùng được giao diện Customer.
 - Có thể mở mục **Đăng ký cửa hàng** bằng tài khoản Customer để gửi một hồ sơ mới; Manager sẽ thấy trạng thái **Chờ duyệt**.
 - Chỉ khu “Hồ sơ, địa điểm và đơn vị đặt”; tạo mới được trực tiếp từ UI.
 - Tạo slot nháp bằng giờ bắt đầu/kết thúc thực tế, giá deal nhỏ hơn giá gốc, sau đó phát hành.
@@ -39,7 +39,7 @@ Nếu slot demo chưa đến cửa sổ check-in, giải thích backend cố ý 
 
 ### 4. Manager/Admin và moderation (1.5 phút)
 
-- Đăng nhập Manager để chỉ dashboard số người dùng, slot, booking, tỷ lệ lấp đầy và no-show; duyệt một Provider chờ duyệt, thêm danh mục mới hoặc yêu cầu Provider bổ sung hồ sơ. Sau đó vào Admin để chỉ quyền cấp/thu hồi Manager.
+- Ở trang đăng nhập, chọn cổng **Manager** để chỉ dashboard số người dùng, slot, booking, tỷ lệ lấp đầy và no-show; mở một đối tác để xem chi tiết cửa hàng, địa điểm, đơn vị đặt, dịch vụ và slot; duyệt một Provider chờ duyệt, thêm danh mục mới hoặc yêu cầu Provider bổ sung hồ sơ. Sau đó vào cổng Admin để chỉ quyền cấp/thu hồi Manager.
 - Duyệt/khóa provider.
 - Khóa/mở tài khoản người dùng.
 - Từ Customer gửi báo cáo một slot, quay lại Admin xử lý báo cáo.
