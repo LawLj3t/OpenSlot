@@ -89,17 +89,20 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
     const problem = await response.json().catch(() => null) as {
       detail?: string
       title?: string
-      errors?: Array<{ code?: string; description?: string }>
+      errors?: Array<{ code?: string; description?: string }> | Record<string, string[]>
     } | null
 
-    const identityErrors = problem?.errors ?? []
+    const identityErrors = Array.isArray(problem?.errors) ? problem.errors : []
+    const validationErrors = problem?.errors && !Array.isArray(problem.errors)
+      ? Object.values(problem.errors).flat()
+      : []
     if (identityErrors.some((error) => error.code === 'DuplicateEmail' || error.code === 'DuplicateUserName')) {
       throw new Error('Email này đã được sử dụng. Hãy đăng nhập hoặc dùng email khác.')
     }
     if (identityErrors.some((error) => error.code?.startsWith('Password'))) {
       throw new Error('Mật khẩu cần tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và số.')
     }
-    throw new Error(problem?.detail ?? problem?.title ?? identityErrors[0]?.description ?? 'Đã có lỗi xảy ra. Vui lòng thử lại.')
+    throw new Error(problem?.detail ?? validationErrors[0] ?? problem?.title ?? identityErrors[0]?.description ?? 'Đã có lỗi xảy ra. Vui lòng thử lại.')
   }
   return response.status === 204 ? (undefined as T) : response.json() as Promise<T>
 }
