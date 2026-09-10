@@ -69,7 +69,6 @@ export type ProviderService = {
   name: string
   venueId: string
   venueName: string
-  defaultDurationMinutes: number
   basePriceVnd: number
 }
 

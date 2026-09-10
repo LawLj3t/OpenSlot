@@ -25,7 +25,6 @@ public sealed class UpsertServiceRequest
     public int CategoryId { get; init; }
     [Required, MinLength(2), MaxLength(160)] public string Name { get; init; } = string.Empty;
     [MaxLength(2000)] public string? Description { get; init; }
-    [Range(15, 1440)] public int DefaultDurationMinutes { get; init; }
     [Range(1, 100_000_000)] public long BasePriceVnd { get; init; }
     [Url, MaxLength(500)] public string? ImageUrl { get; init; }
 }

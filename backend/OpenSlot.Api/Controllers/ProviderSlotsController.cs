@@ -31,7 +31,6 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
                 x.Name,
                 x.VenueId,
                 venueName = x.Venue.Name,
-                x.DefaultDurationMinutes,
                 x.BasePriceVnd
             })
             .ToListAsync(cancellationToken);

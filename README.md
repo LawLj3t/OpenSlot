@@ -11,6 +11,7 @@ Nền tảng săn các khung giờ dịch vụ còn trống với ưu đãi sát
 - Manager: dashboard vận hành, duyệt/tạm khóa đối tác, theo dõi tài khoản, kiểm duyệt dịch vụ/slot và xử lý báo cáo.
 - Quản trị viên: quản lý toàn hệ thống và cấp/thu hồi quyền Manager.
 - Hệ thống: thông báo trong app, tìm kiếm theo từ khóa/khu vực, bản đồ thật và sắp xếp theo khoảng cách hiện tại.
+- Dữ liệu demo: 6 nhóm dịch vụ, 6 đối tác, 6 địa điểm, 12 đơn vị có thể đặt và 12 slot sát giờ tại Hà Nội.
 - Quy tắc chống lạm dụng: đóng booking trước giờ bắt đầu 15 phút; một khách tối đa 3 booking deal còn hiệu lực/ngày; hủy sát giờ/no-show nhận strike; sau 3 strike trong 30 ngày bị khóa đặt chỗ 7 ngày; không cho hai slot trùng giờ trên cùng sân/bàn/ghế/phòng; chống overbooking bằng optimistic concurrency.
 
 ## Công nghệ
@@ -45,11 +46,22 @@ Truy cập frontend tại `http://127.0.0.1:5173`, Swagger tại `http://127.0.0
 | Vai trò | Email | Mật khẩu |
 | --- | --- | --- |
 | Customer | `customer@openslot.local` | `Customer@12345` |
-| Provider | `provider@openslot.local` | `Provider@12345` |
+| Provider – Campus Active | `provider@openslot.local` | `Provider@12345` |
+| Provider – Glow Wellness | `beauty@openslot.local` | `Beauty@12345` |
+| Provider – Focus Hub | `workspace@openslot.local` | `Workspace@12345` |
+| Provider – Frame Lab | `creative@openslot.local` | `Creative@12345` |
+| Provider – Play Loft | `entertainment@openslot.local` | `Entertainment@12345` |
+| Provider – Care Express | `utility@openslot.local` | `Utility@12345` |
 | Manager | `manager@openslot.local` | `Manager@12345` |
 | Admin | `admin@openslot.local` | `Admin@12345` |
 
 Các tài khoản này chỉ được tạo khi môi trường là Development hoặc `SeedDemoData=true`. Không bật seed demo cho sản phẩm thật.
+
+## Catalog demo
+
+Sáu nhóm dịch vụ gồm Thể thao, Làm đẹp, Không gian làm việc, Sáng tạo, Giải trí và Tiện ích. Mỗi nhóm có một Provider riêng cùng các đơn vị đặt cụ thể như sân cầu lông, bàn nail, phòng họp, studio, phòng karaoke hoặc máy giặt.
+
+Tên dịch vụ không gắn số phút. Provider khai báo **giờ bắt đầu và giờ kết thúc cho từng slot thực tế**, nên cùng một dịch vụ có thể có các khung trống khác nhau.
 
 ## Bản đồ
 

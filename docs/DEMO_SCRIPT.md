@@ -2,12 +2,13 @@
 
 ## Chuẩn bị
 
-Chạy API và frontend theo README. Mở ba cửa sổ ẩn danh hoặc ba profile trình duyệt để giữ đồng thời ba tài khoản:
+Chạy API và frontend theo README. Mở các profile trình duyệt riêng để giữ đồng thời các tài khoản:
 
 | Vai trò | Email | Mật khẩu |
 | --- | --- | --- |
 | Customer | `customer@openslot.local` | `Customer@12345` |
 | Provider | `provider@openslot.local` | `Provider@12345` |
+| Manager | `manager@openslot.local` | `Manager@12345` |
 | Admin | `admin@openslot.local` | `Admin@12345` |
 
 ## Trình bày
@@ -20,7 +21,7 @@ Nhấn mạnh điểm khác website đặt lịch: đây là marketplace đa d�
 
 ### 2. Customer discovery (2 phút)
 
-- Mở trang chủ, lọc một danh mục và tìm theo từ khóa.
+- Mở trang chủ, chỉ 6 nhóm dịch vụ và 12 slot từ nhiều đối tác; lọc một danh mục và tìm theo từ khóa.
 - Bấm định vị để sắp xếp theo khoảng cách; chuyển sang bản đồ OpenStreetMap.
 - Mở chi tiết slot, chỉ giá gốc/giá deal, giờ đóng booking và số chỗ còn.
 - Đăng nhập Customer và giữ chỗ; chỉ QR, public code và PIN.
@@ -29,15 +30,15 @@ Nhấn mạnh điểm khác website đặt lịch: đây là marketplace đa d�
 ### 3. Provider operations (2 phút)
 
 - Đăng nhập Provider.
-- Chỉ khu “Hồ sơ, địa điểm và dịch vụ”; tạo mới được trực tiếp từ UI.
-- Tạo slot nháp với giá deal nhỏ hơn giá gốc, sau đó phát hành.
+- Chỉ khu “Hồ sơ, địa điểm và đơn vị đặt”; tạo mới được trực tiếp từ UI.
+- Tạo slot nháp bằng giờ bắt đầu/kết thúc thực tế, giá deal nhỏ hơn giá gốc, sau đó phát hành.
 - Dùng public code và PIN của Customer để check-in, rồi bấm “Hoàn tất”.
 
 Nếu slot demo chưa đến cửa sổ check-in, giải thích backend cố ý chặn check-in ngoài khoảng từ 15 phút trước đến 15 phút sau giờ bắt đầu.
 
-### 4. Admin và moderation (1.5 phút)
+### 4. Manager/Admin và moderation (1.5 phút)
 
-- Đăng nhập Admin, chỉ dashboard số người dùng, slot, booking, tỷ lệ lấp đầy và no-show.
+- Đăng nhập Manager để chỉ dashboard số người dùng, slot, booking, tỷ lệ lấp đầy và no-show; sau đó vào Admin để chỉ quyền cấp/thu hồi Manager.
 - Duyệt/khóa provider.
 - Khóa/mở tài khoản người dùng.
 - Từ Customer gửi báo cáo một slot, quay lại Admin xử lý báo cáo.
@@ -52,4 +53,4 @@ Nếu slot demo chưa đến cửa sổ check-in, giải thích backend cố ý 
 
 ## Câu kết
 
-“MVP đã chạy trọn ba luồng Customer–Provider–Admin. Bước phát triển tiếp theo là thanh toán/hoàn tiền, đánh giá hai chiều, đồng bộ lịch provider và chuyển SQLite sang PostgreSQL khi có tải thật.”
+"MVP đã chạy trọn bốn luồng Customer–Provider–Manager–Admin. Bước phát triển tiếp theo là thanh toán/hoàn tiền, đánh giá hai chiều, đồng bộ lịch provider và chuyển SQLite sang PostgreSQL khi có tải thật."
