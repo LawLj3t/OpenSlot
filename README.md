@@ -6,7 +6,7 @@ Nền tảng săn các khung giờ dịch vụ còn trống với ưu đãi sát
 
 ## Chức năng chính
 
-- Khách hàng: đăng ký, đăng nhập, khám phá/lọc slot, giữ chỗ, QR/PIN check-in, xem và hủy lịch.
+- Khách hàng: đăng ký, đăng nhập, khám phá/lọc slot, thanh toán demo qua QR VietinBank trước khi giữ chỗ, QR/PIN check-in, xem và hủy lịch.
 - Đối tác: chủ cửa hàng tự nộp hồ sơ, cập nhật địa điểm, khai báo sân/bàn/ghế/phòng có thể đặt, tạo dịch vụ và phát hành slot đúng đơn vị; check-in rồi hoàn tất dịch vụ.
 - Đối tác: một tài khoản vẫn giữ quyền Khách hàng để đặt dịch vụ; người dùng chọn cổng Khách hàng hoặc Đối tác khi đăng nhập và có thể chuyển lại trong thanh điều hướng.
 - Manager: dashboard vận hành, duyệt/yêu cầu bổ sung/tạm khóa đối tác, xem chi tiết cửa hàng/địa điểm/đơn vị đặt/dịch vụ/slot, quản lý danh mục chung, theo dõi tài khoản, kiểm duyệt dịch vụ/slot và xử lý báo cáo.
@@ -14,6 +14,10 @@ Nền tảng săn các khung giờ dịch vụ còn trống với ưu đãi sát
 - Hệ thống: thông báo trong app, tìm kiếm theo từ khóa/khu vực, bản đồ thật và sắp xếp theo khoảng cách hiện tại.
 - Dữ liệu demo: 6 nhóm dịch vụ, 6 đối tác, 6 địa điểm, 12 đơn vị có thể đặt và 12 slot sát giờ tại Hà Nội.
 - Quy tắc chống lạm dụng: đóng booking trước giờ bắt đầu 15 phút; một khách tối đa 3 booking deal còn hiệu lực/ngày; hủy sát giờ/no-show nhận strike; sau 3 strike trong 30 ngày bị khóa đặt chỗ 7 ngày; không cho hai slot trùng giờ trên cùng sân/bàn/ghế/phòng; chống overbooking bằng optimistic concurrency.
+
+## Thanh toán demo
+
+Luồng khách hàng là chọn slot → quét QR VietinBank → chọn “Tôi đã thanh toán” → hệ thống mới tạo booking và hiện trong “Lịch của tôi”. Đây là mô phỏng giao diện cho đồ án; hệ thống chưa kết nối ngân hàng hoặc tự xác thực giao dịch thực tế.
 
 ## Công nghệ
 
