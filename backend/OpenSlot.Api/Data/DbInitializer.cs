@@ -21,6 +21,18 @@ public static class DbInitializer
         new("creative", "Sáng tạo", "camera"), new("entertainment", "Giải trí", "joystick"), new("utilities", "Tiện ích", "tools")
     };
 
+    // Free Unsplash photos for the demo catalogue. The URLs stay remote so the
+    // app does not bundle third-party photography into the repository.
+    private static readonly IReadOnlyDictionary<string, string> CategoryImageUrls = new Dictionary<string, string>
+    {
+        ["sports"] = "https://images.unsplash.com/photo-1775993167284-8e6a6e56ab69?auto=format&fit=crop&fm=jpg&q=80&w=1200",
+        ["beauty"] = "https://images.unsplash.com/photo-1781450090585-1a511b7066d9?auto=format&fit=crop&fm=jpg&q=80&w=1200",
+        ["workspace"] = "https://images.unsplash.com/photo-1772723822651-d2161754d61b?auto=format&fit=crop&fm=jpg&q=80&w=1200",
+        ["creative"] = "https://images.unsplash.com/photo-1782274265689-4f10a91d4abb?auto=format&fit=crop&fm=jpg&q=80&w=1200",
+        ["entertainment"] = "https://images.unsplash.com/photo-1704040686294-9c1878cf5c7d?auto=format&fit=crop&fm=jpg&q=80&w=1200",
+        ["utilities"] = "https://images.unsplash.com/photo-1760788780087-a723989f93dc?auto=format&fit=crop&fm=jpg&q=80&w=1200"
+    };
+
     private static readonly ProviderSeed[] ProviderSeeds =
     {
         new("provider@openslot.local", "Campus Active", "Provider@12345", "Campus Active", "0901000001", "Đối tác thể thao với các sân trống theo giờ tại Cầu Giấy."),
@@ -193,7 +205,7 @@ public static class DbInitializer
             var venue = venues[seed.VenueName]; var acceptedNames = new[] { seed.Name }.Concat(seed.LegacyNames ?? []).ToArray();
             var service = await db.ServiceOfferings.FirstOrDefaultAsync(x => x.VenueId == venue.Id && acceptedNames.Contains(x.Name), cancellationToken);
             if (service is null) { service = new ServiceOffering { VenueId = venue.Id }; db.ServiceOfferings.Add(service); }
-            service.CategoryId = categories[seed.CategorySlug].Id; service.Name = seed.Name; service.Description = seed.Description; service.BasePriceVnd = seed.BasePriceVnd; service.IsActive = true;
+            service.CategoryId = categories[seed.CategorySlug].Id; service.Name = seed.Name; service.Description = seed.Description; service.BasePriceVnd = seed.BasePriceVnd; service.ImageUrl = CategoryImageUrls[seed.CategorySlug]; service.IsActive = true;
             services.Add(seed.Name, service);
         }
         await db.SaveChangesAsync(cancellationToken);

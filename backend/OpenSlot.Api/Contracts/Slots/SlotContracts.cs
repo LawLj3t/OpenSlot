@@ -29,6 +29,7 @@ public sealed class CreateDealSlotRequest
 public sealed record DealSlotListItem(
     Guid Id,
     string ServiceName,
+    string? ImageUrl,
     string CategoryName,
     string CategorySlug,
     string VenueName,

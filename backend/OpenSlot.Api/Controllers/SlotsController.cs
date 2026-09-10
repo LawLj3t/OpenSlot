@@ -123,6 +123,7 @@ public sealed class SlotsController(AppDbContext db) : ControllerBase
         return new DealSlotListItem(
             slot.Id,
             slot.ServiceOffering.Name,
+            slot.ServiceOffering.ImageUrl,
             slot.ServiceOffering.Category.Name,
             slot.ServiceOffering.Category.Slug,
             slot.ServiceOffering.Venue.Name,

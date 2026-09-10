@@ -8,6 +8,7 @@ export type Category = {
 export type DealSlot = {
   id: string
   serviceName: string
+  imageUrl: string | null
   categoryName: string
   categorySlug: string
   venueName: string

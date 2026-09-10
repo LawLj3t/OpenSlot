@@ -64,6 +64,10 @@ Sáu nhóm dịch vụ gồm Thể thao, Làm đẹp, Không gian làm việc, S
 
 Tên dịch vụ không gắn số phút. Provider khai báo **giờ bắt đầu và giờ kết thúc cho từng slot thực tế**, nên cùng một dịch vụ có thể có các khung trống khác nhau.
 
+## Ảnh minh họa demo
+
+Các thẻ dịch vụ và trang chi tiết dùng ảnh minh họa theo nhóm dịch vụ. Ảnh được tải trực tiếp từ Unsplash theo giấy phép của nguồn, không sao chép ảnh Pinterest hay lưu ảnh bên thứ ba vào repository. Nguồn đã chọn: [thể thao](https://unsplash.com/photos/indoor-badminton-court-with-blue-walls-and-floor-R3S6YdeHA6A), [làm đẹp](https://unsplash.com/photos/a-modern-hair-salon-interior-with-stylish-chairs-and-mirrors-_Fy7Kq0w6OI), [không gian làm việc](https://unsplash.com/photos/coworking-space-interior-with-pink-sofa-and-plants-6Z5BezrEsEk), [sáng tạo](https://unsplash.com/photos/modern-podcast-studio-with-microphones-headphones-and-illuminated-shelves-jhjGWvGGWA4), [giải trí](https://unsplash.com/photos/a-room-with-a-pool-table-and-couches-eNKEH99kpAA) và [tiện ích](https://unsplash.com/photos/a-person-sits-in-a-modern-laundromat-with-machines-fsVB2RGGos8).
+
 ## Quy trình đối tác
 
 1. Customer đăng ký tài khoản rồi gửi hồ sơ cửa hàng để được **bổ sung** quyền Provider; cùng email đó vẫn đặt dịch vụ như Customer.
@@ -84,7 +88,7 @@ npm run lint
 npm run build
 ```
 
-Kết quả QA hiện tại: backend 9/9 unit test đạt, frontend build và lint sạch. Luồng tranh chỗ cuối đã được kiểm thử đồng thời: đúng một request nhận `201`, request còn lại nhận `409`.
+Kết quả QA hiện tại: backend 18/18 unit test đạt, frontend build và lint sạch. Luồng tranh chỗ cuối đã được kiểm thử đồng thời: đúng một request nhận `201`, request còn lại nhận `409`.
 
 ## Chạy bằng Docker
 
