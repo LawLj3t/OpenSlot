@@ -12,25 +12,13 @@ public static class DbInitializer
     private sealed record ProviderSeed(string Email, string DisplayName, string Password, string BusinessName, string Phone, string Description);
     private sealed record VenueSeed(string ProviderEmail, string Name, string Address, string District, double Latitude, double Longitude, string? LegacyName = null);
     private sealed record ResourceSeed(string VenueName, string Name, string ResourceType, string Code, string FloorOrZone, string PositionDescription, int MaxCapacity, string? LegacyName = null, string? LegacyCode = null);
-    private sealed record ServiceSeed(string VenueName, string CategorySlug, string Name, string Description, long BasePriceVnd, string[]? LegacyNames = null);
+    private sealed record ServiceSeed(string VenueName, string CategorySlug, string Name, string Description, long BasePriceVnd, string ImageUrl, string[]? LegacyNames = null);
     private sealed record SlotSeed(string ServiceName, string ResourceCode, int OffsetMinutes, int DurationMinutes, long OriginalPriceVnd, long DealPriceVnd, int Capacity);
 
     private static readonly CategorySeed[] CategorySeeds =
     {
         new("sports", "Thể thao", "trophy"), new("beauty", "Làm đẹp", "sparkles"), new("workspace", "Không gian làm việc", "laptop"),
         new("creative", "Sáng tạo", "camera"), new("entertainment", "Giải trí", "joystick"), new("utilities", "Tiện ích", "tools")
-    };
-
-    // Free Unsplash photos for the demo catalogue. The URLs stay remote so the
-    // app does not bundle third-party photography into the repository.
-    private static readonly IReadOnlyDictionary<string, string> CategoryImageUrls = new Dictionary<string, string>
-    {
-        ["sports"] = "https://images.unsplash.com/photo-1775993167284-8e6a6e56ab69?auto=format&fit=crop&fm=jpg&q=80&w=1200",
-        ["beauty"] = "https://images.unsplash.com/photo-1781450090585-1a511b7066d9?auto=format&fit=crop&fm=jpg&q=80&w=1200",
-        ["workspace"] = "https://images.unsplash.com/photo-1772723822651-d2161754d61b?auto=format&fit=crop&fm=jpg&q=80&w=1200",
-        ["creative"] = "https://images.unsplash.com/photo-1782274265689-4f10a91d4abb?auto=format&fit=crop&fm=jpg&q=80&w=1200",
-        ["entertainment"] = "https://images.unsplash.com/photo-1704040686294-9c1878cf5c7d?auto=format&fit=crop&fm=jpg&q=80&w=1200",
-        ["utilities"] = "https://images.unsplash.com/photo-1760788780087-a723989f93dc?auto=format&fit=crop&fm=jpg&q=80&w=1200"
     };
 
     private static readonly ProviderSeed[] ProviderSeeds =
@@ -71,18 +59,18 @@ public static class DbInitializer
 
     private static readonly ServiceSeed[] ServiceSeeds =
     {
-        new("Campus Active Cầu Giấy", "sports", "Sân cầu lông", "Đặt sân tiêu chuẩn trong khung giờ còn trống.", 180_000, ["Sân cầu lông 60 phút"]),
-        new("Campus Active Cầu Giấy", "sports", "Sân pickleball", "Sân pickleball cho nhóm bạn cần chơi ngay.", 240_000),
-        new("Glow Wellness Đống Đa", "beauty", "Gội đầu dưỡng sinh", "Suất chăm sóc tóc và thư giãn còn trống trong ngày.", 150_000, ["Gội đầu thư giãn 45 phút"]),
-        new("Glow Wellness Đống Đa", "beauty", "Làm móng nhanh", "Lịch nail còn trống cho khách cần đặt sát giờ.", 220_000),
-        new("Focus Hub Cầu Giấy", "workspace", "Bàn làm việc", "Chỗ ngồi yên tĩnh cho học tập và làm việc.", 100_000, ["Bàn làm việc theo giờ"]),
-        new("Focus Hub Cầu Giấy", "workspace", "Phòng họp nhóm", "Phòng họp sẵn màn hình cho nhóm nhỏ.", 450_000),
-        new("Frame Lab Hai Bà Trưng", "creative", "Studio chụp ảnh", "Không gian chụp ảnh cơ bản với phông nền và đèn.", 500_000),
-        new("Frame Lab Hai Bà Trưng", "creative", "Phòng podcast", "Phòng thu âm dành cho podcast và phỏng vấn ngắn.", 350_000),
-        new("Play Loft Ba Đình", "entertainment", "Bàn bi-a", "Bàn bi-a còn trống cho nhóm bạn sau giờ làm.", 180_000),
-        new("Play Loft Ba Đình", "entertainment", "Phòng karaoke mini", "Phòng riêng cho nhóm nhỏ muốn hát sát giờ.", 600_000),
-        new("Care Express Thanh Xuân", "utilities", "Rửa xe máy", "Dịch vụ rửa xe nhanh trong khi bạn chờ.", 80_000),
-        new("Care Express Thanh Xuân", "utilities", "Máy giặt tự phục vụ", "Một máy giặt trống để xử lý đồ dùng ngay.", 60_000)
+        new("Campus Active Cầu Giấy", "sports", "Sân cầu lông", "Đặt sân tiêu chuẩn trong khung giờ còn trống.", 180_000, "https://images.unsplash.com/photo-1775993167284-8e6a6e56ab69?auto=format&fit=crop&fm=jpg&q=80&w=1200", ["Sân cầu lông 60 phút"]),
+        new("Campus Active Cầu Giấy", "sports", "Sân pickleball", "Sân pickleball cho nhóm bạn cần chơi ngay.", 240_000, "https://images.unsplash.com/photo-1761644707612-adf8354c7576?auto=format&fit=crop&fm=jpg&q=80&w=1200"),
+        new("Glow Wellness Đống Đa", "beauty", "Gội đầu dưỡng sinh", "Suất chăm sóc tóc và thư giãn còn trống trong ngày.", 150_000, "https://images.unsplash.com/photo-1781450090585-1a511b7066d9?auto=format&fit=crop&fm=jpg&q=80&w=1200", ["Gội đầu thư giãn 45 phút"]),
+        new("Glow Wellness Đống Đa", "beauty", "Làm móng nhanh", "Lịch nail còn trống cho khách cần đặt sát giờ.", 220_000, "https://images.unsplash.com/photo-1632345031435-8727f6897d53?auto=format&fit=crop&fm=jpg&q=80&w=1200"),
+        new("Focus Hub Cầu Giấy", "workspace", "Bàn làm việc", "Chỗ ngồi yên tĩnh cho học tập và làm việc.", 100_000, "https://images.unsplash.com/photo-1772723822651-d2161754d61b?auto=format&fit=crop&fm=jpg&q=80&w=1200", ["Bàn làm việc theo giờ"]),
+        new("Focus Hub Cầu Giấy", "workspace", "Phòng họp nhóm", "Phòng họp sẵn màn hình cho nhóm nhỏ.", 450_000, "https://images.unsplash.com/photo-1572025442811-aa5146a780fb?auto=format&fit=crop&fm=jpg&q=80&w=1200"),
+        new("Frame Lab Hai Bà Trưng", "creative", "Studio chụp ảnh", "Không gian chụp ảnh cơ bản với phông nền và đèn.", 500_000, "https://images.unsplash.com/photo-1786325492091-899010c3e228?auto=format&fit=crop&fm=jpg&q=80&w=1200"),
+        new("Frame Lab Hai Bà Trưng", "creative", "Phòng podcast", "Phòng thu âm dành cho podcast và phỏng vấn ngắn.", 350_000, "https://images.unsplash.com/photo-1782274265689-4f10a91d4abb?auto=format&fit=crop&fm=jpg&q=80&w=1200"),
+        new("Play Loft Ba Đình", "entertainment", "Bàn bi-a", "Bàn bi-a còn trống cho nhóm bạn sau giờ làm.", 180_000, "https://images.unsplash.com/photo-1704040686294-9c1878cf5c7d?auto=format&fit=crop&fm=jpg&q=80&w=1200"),
+        new("Play Loft Ba Đình", "entertainment", "Phòng karaoke mini", "Phòng riêng cho nhóm nhỏ muốn hát sát giờ.", 600_000, "https://images.unsplash.com/photo-1786376461576-bc24acdd9a24?auto=format&fit=crop&fm=jpg&q=80&w=1200"),
+        new("Care Express Thanh Xuân", "utilities", "Rửa xe máy", "Dịch vụ rửa xe nhanh trong khi bạn chờ.", 80_000, "https://images.unsplash.com/photo-1782235869446-d8c52303554d?auto=format&fit=crop&fm=jpg&q=80&w=1200"),
+        new("Care Express Thanh Xuân", "utilities", "Máy giặt tự phục vụ", "Một máy giặt trống để xử lý đồ dùng ngay.", 60_000, "https://images.unsplash.com/photo-1760788780087-a723989f93dc?auto=format&fit=crop&fm=jpg&q=80&w=1200")
     };
 
     private static readonly SlotSeed[] SlotSeeds =
@@ -205,7 +193,7 @@ public static class DbInitializer
             var venue = venues[seed.VenueName]; var acceptedNames = new[] { seed.Name }.Concat(seed.LegacyNames ?? []).ToArray();
             var service = await db.ServiceOfferings.FirstOrDefaultAsync(x => x.VenueId == venue.Id && acceptedNames.Contains(x.Name), cancellationToken);
             if (service is null) { service = new ServiceOffering { VenueId = venue.Id }; db.ServiceOfferings.Add(service); }
-            service.CategoryId = categories[seed.CategorySlug].Id; service.Name = seed.Name; service.Description = seed.Description; service.BasePriceVnd = seed.BasePriceVnd; service.ImageUrl = CategoryImageUrls[seed.CategorySlug]; service.IsActive = true;
+            service.CategoryId = categories[seed.CategorySlug].Id; service.Name = seed.Name; service.Description = seed.Description; service.BasePriceVnd = seed.BasePriceVnd; service.ImageUrl = seed.ImageUrl; service.IsActive = true;
             services.Add(seed.Name, service);
         }
         await db.SaveChangesAsync(cancellationToken);

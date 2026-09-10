@@ -66,7 +66,22 @@ Tên dịch vụ không gắn số phút. Provider khai báo **giờ bắt đầ
 
 ## Ảnh minh họa demo
 
-Các thẻ dịch vụ và trang chi tiết dùng ảnh minh họa theo nhóm dịch vụ. Ảnh được tải trực tiếp từ Unsplash theo giấy phép của nguồn, không sao chép ảnh Pinterest hay lưu ảnh bên thứ ba vào repository. Nguồn đã chọn: [thể thao](https://unsplash.com/photos/indoor-badminton-court-with-blue-walls-and-floor-R3S6YdeHA6A), [làm đẹp](https://unsplash.com/photos/a-modern-hair-salon-interior-with-stylish-chairs-and-mirrors-_Fy7Kq0w6OI), [không gian làm việc](https://unsplash.com/photos/coworking-space-interior-with-pink-sofa-and-plants-6Z5BezrEsEk), [sáng tạo](https://unsplash.com/photos/modern-podcast-studio-with-microphones-headphones-and-illuminated-shelves-jhjGWvGGWA4), [giải trí](https://unsplash.com/photos/a-room-with-a-pool-table-and-couches-eNKEH99kpAA) và [tiện ích](https://unsplash.com/photos/a-person-sits-in-a-modern-laundromat-with-machines-fsVB2RGGos8).
+Mỗi dịch vụ cụ thể có một ảnh khác nhau (không dùng chung ảnh theo nhóm), hiển thị trên thẻ và trang chi tiết. Ảnh tải trực tiếp từ Unsplash theo giấy phép của nguồn; OpenSlot không sao chép ảnh Pinterest hay lưu ảnh bên thứ ba vào repository.
+
+| Dịch vụ | Nguồn ảnh |
+| --- | --- |
+| Sân cầu lông | [Unsplash](https://unsplash.com/photos/indoor-badminton-court-with-blue-walls-and-floor-R3S6YdeHA6A) |
+| Sân pickleball | [Unsplash](https://unsplash.com/photos/players-compete-in-a-pickleball-match-on-a-blue-court-79UPJtBsSAg) |
+| Gội đầu dưỡng sinh | [Unsplash](https://unsplash.com/photos/a-modern-hair-salon-interior-with-stylish-chairs-and-mirrors-_Fy7Kq0w6OI) |
+| Làm móng nhanh | [Unsplash](https://unsplash.com/photos/a-woman-getting-her-nails-done-at-a-nail-salon-gb6gtiTZKB8) |
+| Bàn làm việc | [Unsplash](https://unsplash.com/photos/coworking-space-interior-with-pink-sofa-and-plants-6Z5BezrEsEk) |
+| Phòng họp nhóm | [Unsplash](https://unsplash.com/photos/empty-meeting-room-6MtJ-y1hzTs) |
+| Studio chụp ảnh | [Unsplash](https://unsplash.com/photos/studio-light-with-mirror-and-furniture-bpk_rJAtVAk) |
+| Phòng podcast | [Unsplash](https://unsplash.com/photos/modern-podcast-studio-with-microphones-headphones-and-illuminated-shelves-jhjGWvGGWA4) |
+| Bàn bi-a | [Unsplash](https://unsplash.com/photos/a-room-with-a-pool-table-and-couches-eNKEH99kpAA) |
+| Phòng karaoke mini | [Unsplash](https://unsplash.com/photos/man-singing-karaoke-in-neon-bar-zJQVtdBaDrY) |
+| Rửa xe máy | [Unsplash](https://unsplash.com/photos/washing-gold-sports-car-with-pressure-stream-D1E_eOtSFe0) |
+| Máy giặt tự phục vụ | [Unsplash](https://unsplash.com/photos/a-person-sits-in-a-modern-laundromat-with-machines-fsVB2RGGos8) |
 
 ## Quy trình đối tác
 
