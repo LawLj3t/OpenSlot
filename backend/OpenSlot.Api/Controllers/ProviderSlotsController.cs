@@ -115,6 +115,7 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
     [HttpPost("{slotId:guid}/publish")]
     public async Task<IActionResult> Publish(Guid slotId, CancellationToken cancellationToken)
     {
+        await EnsureCanPublish(cancellationToken);
         var slot = await db.DealSlots
             .Include(x => x.ServiceOffering).ThenInclude(x => x.Venue).ThenInclude(x => x.ProviderProfile)
             .Include(x => x.BookableResource)
@@ -125,11 +126,6 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
         if (slot.BookableResource is null || !slot.BookableResource.IsActive)
         {
             throw new ApiException("Slot phải gắn với một đơn vị đặt chỗ đang hoạt động.");
-        }
-
-        if (slot.ServiceOffering.Venue.ProviderProfile.Status != ProviderStatus.Approved)
-        {
-            throw new ApiException("Provider chưa được Admin duyệt.", StatusCodes.Status403Forbidden);
         }
 
         if (slot.Status != DealSlotStatus.Draft)
@@ -237,6 +233,20 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
         if (status == ProviderStatus.Suspended)
         {
             throw new ApiException("Hồ sơ đối tác đang bị tạm khóa nên không thể thay đổi slot.", StatusCodes.Status403Forbidden);
+        }
+    }
+
+    private async Task EnsureCanPublish(CancellationToken cancellationToken)
+    {
+        var status = await db.ProviderProfiles
+            .Where(x => x.UserId == UserId)
+            .Select(x => (ProviderStatus?)x.Status)
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? throw new ApiException("Không tìm thấy hồ sơ đối tác.", StatusCodes.Status404NotFound);
+
+        if (status != ProviderStatus.Approved)
+        {
+            throw new ApiException("Hồ sơ cửa hàng đang chờ Manager duyệt nên chưa thể phát hành slot.", StatusCodes.Status403Forbidden);
         }
     }
 
