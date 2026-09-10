@@ -194,3 +194,12 @@ export type AdminSlot = {
   confirmedBookingCount: number
   status: number
 }
+
+export type AdminCategory = {
+  id: number
+  name: string
+  slug: string
+  iconName: string
+  isActive: boolean
+  serviceCount: number
+}

@@ -23,10 +23,10 @@ SQLite + EF Core migrations
 ## Mô hình dữ liệu
 
 - `ApplicationUser`: tài khoản, strike và trạng thái khóa.
-- `ProviderProfile`: hồ sơ đối tác gắn 1-1 với user.
+- `ProviderProfile`: hồ sơ doanh nghiệp/cửa hàng gắn 1-1 với user; một Provider có thể quản lý nhiều venue/chi nhánh.
 - `Venue`: địa điểm và tọa độ bản đồ.
 - `BookableResource`: sân, bàn, ghế, phòng, máy hoặc đơn vị thực tế khách nhận khi đặt.
-- `Category`, `ServiceOffering`: danh mục và loại dịch vụ tại một venue; dịch vụ không giữ thời lượng cố định.
+- `Category`, `ServiceOffering`: Manager quản lý danh mục chung; Provider tự tạo dịch vụ cụ thể tại venue. Dịch vụ không giữ thời lượng cố định.
 - `DealSlot`: khung bắt đầu/kết thúc thực tế, giá, sức chứa, cửa sổ booking, đơn vị đặt và concurrency token.
 - `Booking`: khách, trạng thái, public code và PIN đã hash.
 - `Notification`, `Report`, `AuditLog`: thông báo, kiểm duyệt và dấu vết vận hành.
@@ -34,8 +34,8 @@ SQLite + EF Core migrations
 ## Luồng chính
 
 1. Admin duyệt provider.
-2. Provider tạo venue, đơn vị có thể đặt, service và slot nháp; hệ thống kiểm tra giờ, giá, sức chứa và slot chồng lấn trên cùng đơn vị.
-3. Provider phát hành slot.
+2. Customer gửi hồ sơ trở thành Provider. Provider ở trạng thái Pending có thể chuẩn bị venue, đơn vị có thể đặt, service và slot nháp.
+3. Manager duyệt, yêu cầu bổ sung hoặc tạm khóa Provider. Chỉ Provider Approved phát hành slot; hệ thống kiểm tra giờ, giá, sức chứa và slot chồng lấn trên cùng đơn vị.
 4. Customer tìm theo từ khóa/khu vực/danh mục hoặc vị trí hiện tại, rồi đặt chỗ.
 5. Transaction và concurrency token bảo đảm không bán vượt sức chứa.
 6. Hệ thống trả QR/PIN; provider check-in trong cửa sổ hợp lệ và đánh dấu hoàn tất.
@@ -44,7 +44,7 @@ SQLite + EF Core migrations
 ## Bảo mật và tính toàn vẹn
 
 - ASP.NET Core Identity hash mật khẩu; API dùng JWT và role `Customer`, `Provider`, `Manager`, `Admin`.
-- Manager vận hành và kiểm duyệt; chỉ Admin được cấp hoặc thu hồi quyền Manager.
+- Manager vận hành, duyệt Provider, quản lý danh mục và kiểm duyệt; chỉ Admin được cấp hoặc thu hồi quyền Manager.
 - PIN check-in 6 số sinh bằng bộ tạo số ngẫu nhiên mật mã và chỉ lưu bản hash.
 - Mọi provider query đều kiểm tra quyền sở hữu dữ liệu.
 - Request booking được rate-limit; validation chạy ở cả client và server.

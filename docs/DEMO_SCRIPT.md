@@ -30,6 +30,7 @@ Nhấn mạnh điểm khác website đặt lịch: đây là marketplace đa d�
 ### 3. Provider operations (2 phút)
 
 - Đăng nhập Provider.
+- Có thể mở mục **Đăng ký cửa hàng** bằng tài khoản Customer để gửi một hồ sơ mới; Manager sẽ thấy trạng thái **Chờ duyệt**.
 - Chỉ khu “Hồ sơ, địa điểm và đơn vị đặt”; tạo mới được trực tiếp từ UI.
 - Tạo slot nháp bằng giờ bắt đầu/kết thúc thực tế, giá deal nhỏ hơn giá gốc, sau đó phát hành.
 - Dùng public code và PIN của Customer để check-in, rồi bấm “Hoàn tất”.
@@ -38,7 +39,7 @@ Nếu slot demo chưa đến cửa sổ check-in, giải thích backend cố ý 
 
 ### 4. Manager/Admin và moderation (1.5 phút)
 
-- Đăng nhập Manager để chỉ dashboard số người dùng, slot, booking, tỷ lệ lấp đầy và no-show; sau đó vào Admin để chỉ quyền cấp/thu hồi Manager.
+- Đăng nhập Manager để chỉ dashboard số người dùng, slot, booking, tỷ lệ lấp đầy và no-show; duyệt một Provider chờ duyệt, thêm danh mục mới hoặc yêu cầu Provider bổ sung hồ sơ. Sau đó vào Admin để chỉ quyền cấp/thu hồi Manager.
 - Duyệt/khóa provider.
 - Khóa/mở tài khoản người dùng.
 - Từ Customer gửi báo cáo một slot, quay lại Admin xử lý báo cáo.

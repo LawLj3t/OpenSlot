@@ -7,8 +7,8 @@ Nền tảng săn các khung giờ dịch vụ còn trống với ưu đãi sát
 ## Chức năng chính
 
 - Khách hàng: đăng ký, đăng nhập, khám phá/lọc slot, giữ chỗ, QR/PIN check-in, xem và hủy lịch.
-- Đối tác: cập nhật hồ sơ, tạo địa điểm, khai báo sân/bàn/ghế/phòng có thể đặt, tạo dịch vụ và phát hành slot đúng đơn vị; check-in rồi hoàn tất dịch vụ.
-- Manager: dashboard vận hành, duyệt/tạm khóa đối tác, theo dõi tài khoản, kiểm duyệt dịch vụ/slot và xử lý báo cáo.
+- Đối tác: chủ cửa hàng tự nộp hồ sơ, cập nhật địa điểm, khai báo sân/bàn/ghế/phòng có thể đặt, tạo dịch vụ và phát hành slot đúng đơn vị; check-in rồi hoàn tất dịch vụ.
+- Manager: dashboard vận hành, duyệt/yêu cầu bổ sung/tạm khóa đối tác, quản lý danh mục chung, theo dõi tài khoản, kiểm duyệt dịch vụ/slot và xử lý báo cáo.
 - Quản trị viên: quản lý toàn hệ thống và cấp/thu hồi quyền Manager.
 - Hệ thống: thông báo trong app, tìm kiếm theo từ khóa/khu vực, bản đồ thật và sắp xếp theo khoảng cách hiện tại.
 - Dữ liệu demo: 6 nhóm dịch vụ, 6 đối tác, 6 địa điểm, 12 đơn vị có thể đặt và 12 slot sát giờ tại Hà Nội.
@@ -59,9 +59,16 @@ Các tài khoản này chỉ được tạo khi môi trường là Development h
 
 ## Catalog demo
 
-Sáu nhóm dịch vụ gồm Thể thao, Làm đẹp, Không gian làm việc, Sáng tạo, Giải trí và Tiện ích. Mỗi nhóm có một Provider riêng cùng các đơn vị đặt cụ thể như sân cầu lông, bàn nail, phòng họp, studio, phòng karaoke hoặc máy giặt.
+Sáu nhóm dịch vụ gồm Thể thao, Làm đẹp, Không gian làm việc, Sáng tạo, Giải trí và Tiện ích. Dữ liệu demo có sáu Provider độc lập, đại diện cho sáu cửa hàng/địa điểm khác nhau. Đây chỉ là dữ liệu mẫu: kiến trúc không giới hạn một Provider vào một nhóm dịch vụ; Provider tự tạo dịch vụ của cửa hàng và chọn danh mục do Manager quản lý.
 
 Tên dịch vụ không gắn số phút. Provider khai báo **giờ bắt đầu và giờ kết thúc cho từng slot thực tế**, nên cùng một dịch vụ có thể có các khung trống khác nhau.
+
+## Quy trình đối tác
+
+1. Customer đăng ký tài khoản rồi gửi hồ sơ cửa hàng để trở thành Provider.
+2. Tài khoản Provider ở trạng thái **Chờ duyệt** có thể chuẩn bị hồ sơ, địa điểm, dịch vụ, đơn vị đặt và slot nháp.
+3. Manager duyệt, yêu cầu bổ sung hoặc tạm khóa hồ sơ. Chỉ Provider đã duyệt mới phát hành slot công khai.
+4. Manager quản lý danh mục chung; Provider tự khai báo dịch vụ cụ thể của cửa hàng.
 
 ## Bản đồ
 

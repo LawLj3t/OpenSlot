@@ -6,6 +6,7 @@ using OpenSlot.Api.Contracts.Providers;
 using OpenSlot.Api.Data;
 using OpenSlot.Api.Domain;
 using OpenSlot.Api.Domain.Entities;
+using OpenSlot.Api.Domain.Enums;
 using OpenSlot.Api.Infrastructure;
 
 namespace OpenSlot.Api.Controllers;
@@ -26,13 +27,28 @@ public sealed class ProviderProfileController(AppDbContext db) : ControllerBase
     [HttpPut("profile")]
     public async Task<IActionResult> UpdateProfile(UpdateProviderProfileRequest request, CancellationToken cancellationToken)
     {
-        var profile = await ProfileQuery().SingleOrDefaultAsync(cancellationToken)
-            ?? throw new ApiException("Không tìm thấy hồ sơ đối tác.", StatusCodes.Status404NotFound);
+        var profile = await GetConfigurableProfile(cancellationToken);
         profile.BusinessName = request.BusinessName.Trim();
         profile.Description = request.Description?.Trim();
         profile.ContactPhone = request.ContactPhone.Trim();
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+
+    [HttpPost("profile/resubmit")]
+    public async Task<IActionResult> ResubmitProfile(CancellationToken cancellationToken)
+    {
+        var profile = await ProfileQuery().SingleOrDefaultAsync(cancellationToken)
+            ?? throw new ApiException("Không tìm thấy hồ sơ đối tác.", StatusCodes.Status404NotFound);
+        if (profile.Status != ProviderStatus.Rejected)
+        {
+            throw new ApiException("Chỉ hồ sơ bị từ chối mới cần gửi lại xét duyệt.", StatusCodes.Status409Conflict);
+        }
+
+        profile.Status = ProviderStatus.Pending;
+        db.AuditLogs.Add(new AuditLog { ActorUserId = UserId, Action = "provider.application-resubmitted", EntityType = nameof(ProviderProfile), EntityId = profile.Id.ToString() });
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new { profile.Id, profile.Status });
     }
 
     [HttpGet("venues")]
@@ -43,8 +59,7 @@ public sealed class ProviderProfileController(AppDbContext db) : ControllerBase
     [HttpPost("venues")]
     public async Task<IActionResult> CreateVenue(UpsertVenueRequest request, CancellationToken cancellationToken)
     {
-        var profile = await ProfileQuery().SingleOrDefaultAsync(cancellationToken)
-            ?? throw new ApiException("Không tìm thấy hồ sơ đối tác.", StatusCodes.Status404NotFound);
+        var profile = await GetConfigurableProfile(cancellationToken);
         var venue = new Venue { ProviderProfileId = profile.Id };
         MapVenue(venue, request);
         db.Venues.Add(venue);
@@ -65,6 +80,7 @@ public sealed class ProviderProfileController(AppDbContext db) : ControllerBase
     [HttpPost("resources")]
     public async Task<IActionResult> CreateResource(UpsertBookableResourceRequest request, CancellationToken cancellationToken)
     {
+        await EnsureCanConfigure(cancellationToken);
         var venue = await db.Venues.Include(x => x.ProviderProfile).SingleOrDefaultAsync(x => x.Id == request.VenueId, cancellationToken)
             ?? throw new ApiException("Không tìm thấy địa điểm.", StatusCodes.Status404NotFound);
         EnsureOwner(venue.ProviderProfile.UserId);
@@ -83,6 +99,7 @@ public sealed class ProviderProfileController(AppDbContext db) : ControllerBase
     [HttpPost("resources/{id:guid}/deactivate")]
     public async Task<IActionResult> DeactivateResource(Guid id, CancellationToken cancellationToken)
     {
+        await EnsureCanConfigure(cancellationToken);
         var resource = await db.BookableResources.Include(x => x.Venue).ThenInclude(x => x.ProviderProfile).SingleOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new ApiException("Không tìm thấy đơn vị đặt chỗ.", StatusCodes.Status404NotFound);
         EnsureOwner(resource.Venue.ProviderProfile.UserId);
@@ -96,6 +113,7 @@ public sealed class ProviderProfileController(AppDbContext db) : ControllerBase
     [HttpPut("venues/{id:guid}")]
     public async Task<IActionResult> UpdateVenue(Guid id, UpsertVenueRequest request, CancellationToken cancellationToken)
     {
+        await EnsureCanConfigure(cancellationToken);
         var venue = await db.Venues.Include(x => x.ProviderProfile).SingleOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new ApiException("Không tìm thấy địa điểm.", StatusCodes.Status404NotFound);
         EnsureOwner(venue.ProviderProfile.UserId);
@@ -107,9 +125,11 @@ public sealed class ProviderProfileController(AppDbContext db) : ControllerBase
     [HttpPost("services")]
     public async Task<IActionResult> CreateService(UpsertServiceRequest request, CancellationToken cancellationToken)
     {
+        await EnsureCanConfigure(cancellationToken);
         await ValidateReferences(request, cancellationToken);
         var service = new ServiceOffering();
         MapService(service, request);
+        service.IsActive = true;
         db.ServiceOfferings.Add(service);
         await db.SaveChangesAsync(cancellationToken);
         return Created(string.Empty, new { service.Id });
@@ -118,6 +138,7 @@ public sealed class ProviderProfileController(AppDbContext db) : ControllerBase
     [HttpPut("services/{id:guid}")]
     public async Task<IActionResult> UpdateService(Guid id, UpsertServiceRequest request, CancellationToken cancellationToken)
     {
+        await EnsureCanConfigure(cancellationToken);
         var service = await db.ServiceOfferings.Include(x => x.Venue).ThenInclude(x => x.ProviderProfile).SingleOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new ApiException("Không tìm thấy dịch vụ.", StatusCodes.Status404NotFound);
         EnsureOwner(service.Venue.ProviderProfile.UserId);
@@ -130,6 +151,19 @@ public sealed class ProviderProfileController(AppDbContext db) : ControllerBase
     }
 
     private IQueryable<ProviderProfile> ProfileQuery() => db.ProviderProfiles.Where(x => x.UserId == UserId);
+
+    private async Task<ProviderProfile> GetConfigurableProfile(CancellationToken cancellationToken)
+    {
+        var profile = await ProfileQuery().SingleOrDefaultAsync(cancellationToken)
+            ?? throw new ApiException("Không tìm thấy hồ sơ đối tác.", StatusCodes.Status404NotFound);
+        if (profile.Status == ProviderStatus.Suspended)
+        {
+            throw new ApiException("Hồ sơ đối tác đang bị tạm khóa nên không thể thay đổi dữ liệu.", StatusCodes.Status403Forbidden);
+        }
+        return profile;
+    }
+
+    private async Task EnsureCanConfigure(CancellationToken cancellationToken) => _ = await GetConfigurableProfile(cancellationToken);
     private async Task ValidateReferences(UpsertServiceRequest request, CancellationToken cancellationToken)
     {
         var venue = await db.Venues.Include(x => x.ProviderProfile).SingleOrDefaultAsync(x => x.Id == request.VenueId, cancellationToken)
@@ -139,7 +173,7 @@ public sealed class ProviderProfileController(AppDbContext db) : ControllerBase
     }
     private void EnsureOwner(string ownerId) { if (ownerId != UserId) throw new ApiException("Bạn không có quyền quản lý dữ liệu này.", StatusCodes.Status403Forbidden); }
     private static void MapVenue(Venue venue, UpsertVenueRequest request) { venue.Name = request.Name.Trim(); venue.AddressLine = request.AddressLine.Trim(); venue.District = request.District.Trim(); venue.City = request.City.Trim(); venue.Latitude = request.Latitude; venue.Longitude = request.Longitude; }
-    private static void MapService(ServiceOffering service, UpsertServiceRequest request) { service.VenueId = request.VenueId; service.CategoryId = request.CategoryId; service.Name = request.Name.Trim(); service.Description = request.Description?.Trim(); service.BasePriceVnd = request.BasePriceVnd; service.ImageUrl = request.ImageUrl?.Trim(); service.IsActive = true; }
+    private static void MapService(ServiceOffering service, UpsertServiceRequest request) { service.VenueId = request.VenueId; service.CategoryId = request.CategoryId; service.Name = request.Name.Trim(); service.Description = request.Description?.Trim(); service.BasePriceVnd = request.BasePriceVnd; service.ImageUrl = request.ImageUrl?.Trim(); }
     private static void MapResource(BookableResource resource, UpsertBookableResourceRequest request, string? code) { resource.Name = request.Name.Trim(); resource.ResourceType = request.ResourceType.Trim(); resource.Code = code; resource.FloorOrZone = string.IsNullOrWhiteSpace(request.FloorOrZone) ? null : request.FloorOrZone.Trim(); resource.PositionDescription = string.IsNullOrWhiteSpace(request.PositionDescription) ? null : request.PositionDescription.Trim(); resource.MaxCapacity = request.MaxCapacity; resource.IsActive = true; }
     private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new ApiException("Phiên đăng nhập không hợp lệ.", StatusCodes.Status401Unauthorized);
 }

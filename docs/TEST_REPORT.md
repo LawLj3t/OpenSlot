@@ -6,11 +6,11 @@ Ngày kiểm thử gần nhất: 10/09/2026.
 
 | Hạng mục | Kết quả |
 | --- | --- |
-| `dotnet test OpenSlot.slnx --no-restore` | 9 passed, 0 failed |
+| `dotnet test OpenSlot.slnx --no-restore` | 12 passed, 0 failed |
 | `npm run lint` | Thành công, 0 warning/error |
 | `npm run build` | Thành công, TypeScript và Vite production build |
 
-Unit test tập trung vào `SlotPolicy`: giá hợp lệ, giá deal thấp hơn giá gốc, thời gian bắt đầu/kết thúc, cửa sổ booking, capacity và điều kiện phát hành.
+Unit test tập trung vào `SlotPolicy` và chuẩn hóa slug danh mục: giá hợp lệ, giá deal thấp hơn giá gốc, thời gian bắt đầu/kết thúc, cửa sổ booking, capacity, điều kiện phát hành và tên danh mục tiếng Việt.
 
 ## Smoke test API
 
@@ -20,7 +20,8 @@ Unit test tập trung vào `SlotPolicy`: giá hợp lệ, giá deal thấp hơn 
 - API provider catalog không còn trả `defaultDurationMinutes`; thời lượng được lưu ở `startAtUtc`/`endAtUtc` của slot.
 - Customer browse/search, tạo booking, nhận notification và gửi report.
 - Provider đọc profile/catalog, tạo/phát hành slot và quản lý check-in.
-- Admin đọc dashboard/provider/user/service/slot/report, ẩn–mở dịch vụ, hủy slot trống và xử lý report.
+- Customer gửi hồ sơ cửa hàng, hệ thống đổi sang Provider Pending; Manager tìm thấy hồ sơ, duyệt thành công và Provider có thể phát hành slot.
+- Manager/Admin đọc dashboard/provider/user/service/slot/report, quản lý danh mục, ẩn–mở dịch vụ, hủy slot trống và xử lý report.
 - Khi admin ẩn một dịch vụ, số slot public giảm từ 3 xuống 2; khi mở lại trở về 3.
 - Token cũ của tài khoản vừa bị khóa trả `401 Unauthorized` ngay ở request kế tiếp.
 

@@ -14,6 +14,18 @@ public sealed class RegisterRequest
     public string Password { get; init; } = string.Empty;
 }
 
+public sealed class ApplyForProviderRequest
+{
+    [Required, MinLength(2), MaxLength(160)]
+    public string BusinessName { get; init; } = string.Empty;
+
+    [Required, MinLength(8), MaxLength(30)]
+    public string ContactPhone { get; init; } = string.Empty;
+
+    [MaxLength(2000)]
+    public string? Description { get; init; }
+}
+
 public sealed class LoginRequest
 {
     [Required, EmailAddress]

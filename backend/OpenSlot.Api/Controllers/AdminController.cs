@@ -3,11 +3,13 @@ using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using OpenSlot.Api.Contracts.Admin;
 using OpenSlot.Api.Data;
 using OpenSlot.Api.Domain;
 using OpenSlot.Api.Domain.Enums;
 using OpenSlot.Api.Domain.Entities;
 using OpenSlot.Api.Infrastructure;
+using OpenSlot.Api.Services;
 
 namespace OpenSlot.Api.Controllers;
 
@@ -141,6 +143,50 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
     [HttpPost("providers/{providerId:guid}/suspend")]
     public Task<IActionResult> Suspend(Guid providerId, CancellationToken cancellationToken) => SetProviderStatus(providerId, ProviderStatus.Suspended, cancellationToken);
 
+    [HttpPost("providers/{providerId:guid}/reject")]
+    public Task<IActionResult> Reject(Guid providerId, CancellationToken cancellationToken) => SetProviderStatus(providerId, ProviderStatus.Rejected, cancellationToken);
+
+    [HttpGet("categories")]
+    public async Task<IActionResult> Categories(CancellationToken cancellationToken) => Ok(await db.Categories.AsNoTracking()
+        .OrderBy(x => x.Name)
+        .Select(x => new { x.Id, x.Name, x.Slug, x.IconName, x.IsActive, serviceCount = x.ServiceOfferings.Count })
+        .ToListAsync(cancellationToken));
+
+    [HttpPost("categories")]
+    public async Task<IActionResult> CreateCategory(CreateCategoryRequest request, CancellationToken cancellationToken)
+    {
+        var baseSlug = CategorySlugGenerator.Generate(request.Name);
+        if (string.IsNullOrWhiteSpace(baseSlug)) throw new ApiException("Tên danh mục phải chứa chữ hoặc số.");
+        var slug = baseSlug;
+        var suffix = 2;
+        while (await db.Categories.AnyAsync(x => x.Slug == slug, cancellationToken)) slug = $"{baseSlug}-{suffix++}";
+
+        var category = new Category { Name = request.Name.Trim(), Slug = slug, IconName = request.IconName.Trim(), IsActive = true };
+        db.Categories.Add(category);
+        await db.SaveChangesAsync(cancellationToken);
+        db.AuditLogs.Add(new AuditLog { ActorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier), Action = "category.created", EntityType = nameof(Category), EntityId = category.Id.ToString() });
+        await db.SaveChangesAsync(cancellationToken);
+        return Created($"/api/admin/categories/{category.Id}", new { category.Id, category.Name, category.Slug, category.IconName, category.IsActive });
+    }
+
+    [HttpPut("categories/{categoryId:int}")]
+    public async Task<IActionResult> UpdateCategory(int categoryId, UpdateCategoryRequest request, CancellationToken cancellationToken)
+    {
+        var category = await db.Categories.SingleOrDefaultAsync(x => x.Id == categoryId, cancellationToken)
+            ?? throw new ApiException("Không tìm thấy danh mục.", StatusCodes.Status404NotFound);
+        category.Name = request.Name.Trim();
+        category.IconName = request.IconName.Trim();
+        db.AuditLogs.Add(new AuditLog { ActorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier), Action = "category.updated", EntityType = nameof(Category), EntityId = category.Id.ToString() });
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("categories/{categoryId:int}/activate")]
+    public Task<IActionResult> ActivateCategory(int categoryId, CancellationToken cancellationToken) => SetCategoryActive(categoryId, true, cancellationToken);
+
+    [HttpPost("categories/{categoryId:int}/deactivate")]
+    public Task<IActionResult> DeactivateCategory(int categoryId, CancellationToken cancellationToken) => SetCategoryActive(categoryId, false, cancellationToken);
+
     private async Task<IActionResult> SetProviderStatus(Guid providerId, ProviderStatus status, CancellationToken cancellationToken)
     {
         var provider = await db.ProviderProfiles.SingleOrDefaultAsync(x => x.Id == providerId, cancellationToken)
@@ -153,9 +199,30 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
             EntityType = nameof(ProviderProfile),
             EntityId = providerId.ToString()
         });
-        db.Notifications.Add(new OpenSlot.Api.Domain.Entities.Notification { UserId = provider.UserId, Title = status == ProviderStatus.Approved ? "Hồ sơ đối tác đã được duyệt" : "Hồ sơ đối tác bị tạm khóa", Message = status == ProviderStatus.Approved ? "Bạn có thể phát hành slot trên OpenSlot." : "Liên hệ quản trị viên nếu bạn cần hỗ trợ.", Link = "/provider" });
+        var (title, message) = status switch
+        {
+            ProviderStatus.Approved => ("Hồ sơ đối tác đã được duyệt", "Bạn có thể phát hành slot trên OpenSlot."),
+            ProviderStatus.Rejected => ("Hồ sơ đối tác cần bổ sung", "Hãy cập nhật thông tin cửa hàng rồi gửi lại để Manager xét duyệt."),
+            _ => ("Hồ sơ đối tác bị tạm khóa", "Liên hệ quản trị viên nếu bạn cần hỗ trợ.")
+        };
+        db.Notifications.Add(new OpenSlot.Api.Domain.Entities.Notification { UserId = provider.UserId, Title = title, Message = message, Link = "/provider" });
         await db.SaveChangesAsync(cancellationToken);
         return Ok(new { provider.Id, provider.Status });
+    }
+
+    private async Task<IActionResult> SetCategoryActive(int categoryId, bool active, CancellationToken cancellationToken)
+    {
+        var category = await db.Categories.SingleOrDefaultAsync(x => x.Id == categoryId, cancellationToken)
+            ?? throw new ApiException("Không tìm thấy danh mục.", StatusCodes.Status404NotFound);
+        if (category.IsActive == active) return Ok(new { category.Id, category.IsActive });
+        if (!active && await db.DealSlots.AnyAsync(x => x.ServiceOffering.CategoryId == categoryId && x.Status == DealSlotStatus.Published && x.StartAtUtc > DateTime.UtcNow, cancellationToken))
+        {
+            throw new ApiException("Không thể tạm ngưng danh mục đang có slot công khai trong tương lai.", StatusCodes.Status409Conflict);
+        }
+        category.IsActive = active;
+        db.AuditLogs.Add(new AuditLog { ActorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier), Action = active ? "category.activated" : "category.deactivated", EntityType = nameof(Category), EntityId = category.Id.ToString() });
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new { category.Id, category.IsActive });
     }
 
     private async Task<IActionResult> SetUserSuspended(string userId, bool suspended, CancellationToken cancellationToken)

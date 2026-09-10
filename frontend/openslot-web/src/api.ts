@@ -1,4 +1,4 @@
-import type { AdminDashboard, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, DealSlot, MyProviderProfile, Notification, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, Report, Session } from './types'
+import type { AdminCategory, AdminDashboard, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, DealSlot, MyProviderProfile, Notification, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, Report, Session } from './types'
 
 const apiBase = import.meta.env.VITE_API_URL ?? '/api'
 const geocodingBase = import.meta.env.VITE_GEOCODING_URL ?? 'https://nominatim.openstreetmap.org'
@@ -104,6 +104,7 @@ export const api = {
   register: (displayName: string, email: string, password: string) => request<Session>('/auth/register', {
     method: 'POST', body: JSON.stringify({ displayName, email, password }),
   }),
+  applyForProvider: (payload: object, token: string) => request<Session>('/auth/provider-applications', { method: 'POST', body: JSON.stringify(payload) }, token),
   book: (slotId: string, token: string) => request<BookingConfirmation>(`/bookings/slots/${slotId}`, { method: 'POST' }, token),
   myBookings: (token: string) => request<Booking[]>('/bookings/mine', {}, token),
   cancelBooking: (bookingId: string, reason: string, token: string) => request<void>(`/bookings/${bookingId}/cancel`, {
@@ -128,6 +129,9 @@ export const api = {
   adminUsers: (token: string) => request<AdminUser[]>('/admin/users', {}, token),
   adminServices: (token: string) => request<AdminService[]>('/admin/services', {}, token),
   adminSlots: (token: string) => request<AdminSlot[]>('/admin/slots', {}, token),
+  adminCategories: (token: string) => request<AdminCategory[]>('/admin/categories', {}, token),
+  createAdminCategory: (payload: object, token: string) => request<AdminCategory>('/admin/categories', { method: 'POST', body: JSON.stringify(payload) }, token),
+  setAdminCategoryActive: (categoryId: number, active: boolean, token: string) => request<void>(`/admin/categories/${categoryId}/${active ? 'activate' : 'deactivate'}`, { method: 'POST' }, token),
   setServiceActive: (serviceId: string, active: boolean, token: string) => request<void>(`/admin/services/${serviceId}/${active ? 'activate' : 'deactivate'}`, { method: 'POST' }, token),
   adminCancelSlot: (slotId: string, token: string) => request<void>(`/admin/slots/${slotId}/cancel`, { method: 'POST' }, token),
   suspendUser: (userId: string, token: string) => request<void>(`/admin/users/${encodeURIComponent(userId)}/suspend`, { method: 'POST' }, token),
@@ -142,4 +146,6 @@ export const api = {
   readAllNotifications: (token: string) => request<void>('/notifications/read-all', { method: 'POST' }, token),
   approveProvider: (providerId: string, token: string) => request(`/admin/providers/${providerId}/approve`, { method: 'POST' }, token),
   suspendProvider: (providerId: string, token: string) => request(`/admin/providers/${providerId}/suspend`, { method: 'POST' }, token),
+  rejectProvider: (providerId: string, token: string) => request(`/admin/providers/${providerId}/reject`, { method: 'POST' }, token),
+  resubmitProviderProfile: (token: string) => request('/provider/profile/resubmit', { method: 'POST' }, token),
 }
