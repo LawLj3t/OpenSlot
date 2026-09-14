@@ -133,7 +133,7 @@ public sealed class AuthController(
     [HttpPost("resend-verification")]
     [EnableRateLimiting("email-verification")]
     [ProducesResponseType<EmailConfirmationResponse>(StatusCodes.Status202Accepted)]
-    public async Task<ActionResult<EmailConfirmationResponse>> ResendVerification(ResendVerificationRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<EmailConfirmationResponse>> ResendVerification(ResendEmailVerificationRequest request, CancellationToken cancellationToken)
     {
         if (!emailVerificationService.IsConfigured)
         {

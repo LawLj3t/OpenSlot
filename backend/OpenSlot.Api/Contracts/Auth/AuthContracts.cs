@@ -23,7 +23,7 @@ public sealed class ConfirmEmailRequest
     public string Token { get; init; } = string.Empty;
 }
 
-public sealed class ResendVerificationRequest
+public sealed class ResendEmailVerificationRequest
 {
     [Required, EmailAddress, StringLength(256)]
     public string Email { get; init; } = string.Empty;

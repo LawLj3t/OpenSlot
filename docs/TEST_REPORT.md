@@ -6,7 +6,7 @@ Ngày kiểm thử gần nhất: 14/09/2026.
 
 | Hạng mục | Kết quả |
 | --- | --- |
-| `dotnet test OpenSlot.slnx --no-restore` | 24 passed, 0 failed |
+| `dotnet test OpenSlot.slnx --no-restore` | 26 passed, 0 failed |
 | `npm run lint` | Thành công, 0 warning/error |
 | `npm run build` | Thành công, TypeScript và Vite production build |
 
@@ -45,4 +45,4 @@ Kết quả: chỉ 1 booking được ghi nhận, không overbooking.
 - [ ] Trình duyệt được cấp quyền vị trí nếu demo khoảng cách.
 - [ ] Có Internet nếu muốn tải tile OpenStreetMap; phần còn lại vẫn chạy local.
 - [ ] Không chiếu `Jwt__Key` hoặc secret triển khai.
-- [ ] Cấu hình `Email__ResendApiKey` và sender Resend đã xác minh, sau đó thử đăng ký một Gmail thật và mở link xác minh.
+- [ ] Cấu hình `Email__GmailAddress` và `Email__GmailAppPassword`, sau đó thử đăng ký một Gmail thật và mở link xác minh.

@@ -12,8 +12,8 @@ Deploy Dockerfile ở thư mục gốc lên một container host. React được
 | `ConnectionStrings__OpenSlotDb` | `Data Source=/data/openslot.db` | `/data` nên là persistent volume |
 | `SeedDemoData` | `true` | Chỉ dùng bản mentor review |
 | `ASPNETCORE_URLS` | `http://+:8080` | Dockerfile đã đặt sẵn |
-| `Email__ResendApiKey` | `re_...` | Secret API key của Resend, không commit vào Git |
-| `Email__FromAddress` | `no-reply@ten-mien-cua-ban.com` | Địa chỉ/sender đã xác minh trên Resend |
+| `Email__GmailAddress` | `openslot.demo@gmail.com` | Gmail dùng để gửi link xác minh |
+| `Email__GmailAppPassword` | mật khẩu ứng dụng 16 ký tự | Secret Gmail App Password, không commit vào Git |
 | `Email__FromName` | `OpenSlot` | Tên hiển thị trong email |
 | `Email__PublicBaseUrl` | `https://openslot-vn.onrender.com` | Domain công khai để tạo link xác minh |
 
@@ -41,11 +41,11 @@ Kiểm tra `http://localhost:8080/health`, sau đó mở `http://localhost:8080`
 
 Nếu host miễn phí không có persistent volume, app vẫn chạy nhưng dữ liệu phát sinh có thể mất khi container restart; seed demo sẽ tạo lại dữ liệu mẫu. Đây là hạn chế chấp nhận được cho buổi review, không phù hợp sản phẩm thật.
 
-## Xác minh Gmail bằng link
+## Xác minh Gmail bằng link (demo miễn phí)
 
-OpenSlot dùng Resend để gửi link xác minh khi người dùng đăng ký Gmail. Không dùng SMS hoặc OTP. Trên Resend, tạo API key chỉ có quyền gửi email, xác minh sender/domain rồi thêm bốn biến `Email__...` ở bảng trên vào secret/environment variables của hosting. Tuyệt đối không đặt API key trong `appsettings.json` hoặc commit vào Git.
+OpenSlot dùng Gmail SMTP để gửi link xác minh khi người dùng đăng ký Gmail. Không dùng SMS hoặc OTP. Bật Xác minh 2 bước trên Gmail gửi thư, tạo **App Password** riêng cho OpenSlot rồi thêm bốn biến `Email__...` ở bảng trên vào secret/environment variables của hosting. Tuyệt đối không đặt App Password trong `appsettings.json` hoặc commit vào Git.
 
-Nếu chưa cấu hình Resend, đăng ký mới sẽ trả thông báo dịch vụ email đang được thiết lập; tài khoản demo `@openslot.local` vẫn đăng nhập bình thường. Sau khi cấu hình, hãy đăng ký một Gmail thử nghiệm, mở link email và đăng nhập để kiểm tra toàn bộ luồng.
+Gmail cá nhân có giới hạn gửi hằng ngày, nên cấu hình này chỉ dành cho demo. Người đăng ký có thể dùng bất kỳ Gmail nào; Gmail gửi thư chỉ là địa chỉ "From". Nếu chưa cấu hình SMTP, đăng ký mới sẽ trả thông báo dịch vụ email đang được thiết lập; tài khoản demo `@openslot.local` vẫn đăng nhập bình thường. Sau khi cấu hình, hãy đăng ký một Gmail thử nghiệm, mở link email và đăng nhập để kiểm tra toàn bộ luồng.
 
 ## Render Free (cấu hình sẵn)
 

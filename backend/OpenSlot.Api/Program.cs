@@ -130,11 +130,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
-builder.Services.AddHttpClient<IEmailVerificationService, ResendEmailVerificationService>(client =>
-{
-    client.BaseAddress = new Uri("https://api.resend.com/");
-    client.Timeout = TimeSpan.FromSeconds(15);
-});
+builder.Services.AddScoped<IEmailVerificationService, GmailSmtpEmailVerificationService>();
 builder.Services.AddScoped<IPasswordHasher<Booking>, PasswordHasher<Booking>>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddHostedService<SlotLifecycleWorker>();
