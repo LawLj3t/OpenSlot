@@ -1,7 +1,11 @@
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Options;
 using OpenSlot.Api.Contracts.Auth;
 using OpenSlot.Api.Data;
 using OpenSlot.Api.Domain;
@@ -14,19 +18,30 @@ namespace OpenSlot.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public sealed class AuthController(UserManager<ApplicationUser> userManager, IJwtTokenService jwtTokenService, AppDbContext db) : ControllerBase
+public sealed class AuthController(
+    UserManager<ApplicationUser> userManager,
+    IJwtTokenService jwtTokenService,
+    IEmailVerificationService emailVerificationService,
+    IOptions<EmailOptions> emailOptions,
+    AppDbContext db) : ControllerBase
 {
     [HttpPost("register")]
-    [ProducesResponseType<AuthResponse>(StatusCodes.Status201Created)]
-    public async Task<ActionResult<AuthResponse>> Register(RegisterRequest request, CancellationToken cancellationToken)
+    [EnableRateLimiting("email-verification")]
+    [ProducesResponseType<RegistrationResponse>(StatusCodes.Status202Accepted)]
+    public async Task<ActionResult<RegistrationResponse>> Register(RegisterRequest request, CancellationToken cancellationToken)
     {
         var email = request.Email.Trim().ToLowerInvariant();
+        if (!emailVerificationService.IsConfigured)
+        {
+            throw new ApiException("Dịch vụ gửi email đang được thiết lập. Vui lòng thử lại sau.", StatusCodes.Status503ServiceUnavailable);
+        }
+
         var user = new ApplicationUser
         {
             UserName = email,
             Email = email,
             DisplayName = request.DisplayName.Trim(),
-            EmailConfirmed = true
+            EmailConfirmed = false
         };
 
         var result = await userManager.CreateAsync(user, request.Password);
@@ -38,9 +53,24 @@ public sealed class AuthController(UserManager<ApplicationUser> userManager, IJw
             });
         }
 
-        await userManager.AddToRoleAsync(user, RoleNames.Customer);
-        var response = await jwtTokenService.CreateAsync(user, cancellationToken);
-        return CreatedAtAction(nameof(Me), response);
+        var roleResult = await userManager.AddToRoleAsync(user, RoleNames.Customer);
+        if (!roleResult.Succeeded)
+        {
+            await userManager.DeleteAsync(user);
+            throw new ApiException("Không thể tạo quyền Khách hàng cho tài khoản.");
+        }
+
+        try
+        {
+            await SendConfirmationAsync(user, cancellationToken);
+        }
+        catch
+        {
+            await userManager.DeleteAsync(user);
+            throw new ApiException("Không thể gửi email xác minh. Vui lòng thử lại sau.", StatusCodes.Status503ServiceUnavailable);
+        }
+
+        return Accepted(new RegistrationResponse(email, "OpenSlot đã gửi link xác minh tới Gmail của bạn. Hãy mở email và xác minh trước khi đăng nhập."));
     }
 
     [HttpPost("login")]
@@ -57,7 +87,73 @@ public sealed class AuthController(UserManager<ApplicationUser> userManager, IJw
             throw new ApiException("Tài khoản hiện đang bị khóa.", StatusCodes.Status403Forbidden);
         }
 
+        if (!user.EmailConfirmed)
+        {
+            throw new ApiException("Email chưa được xác minh. Hãy kiểm tra Gmail hoặc yêu cầu gửi lại link xác minh.", StatusCodes.Status403Forbidden);
+        }
+
         return Ok(await jwtTokenService.CreateAsync(user, cancellationToken));
+    }
+
+    [HttpPost("confirm-email")]
+    [EnableRateLimiting("email-verification")]
+    [ProducesResponseType<EmailConfirmationResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<EmailConfirmationResponse>> ConfirmEmail(ConfirmEmailRequest request, CancellationToken cancellationToken)
+    {
+        var user = await userManager.FindByIdAsync(request.UserId);
+        if (user is null)
+        {
+            throw new ApiException("Link xác minh không hợp lệ hoặc tài khoản không còn tồn tại.", StatusCodes.Status400BadRequest);
+        }
+
+        if (user.EmailConfirmed)
+        {
+            return Ok(new EmailConfirmationResponse("Email này đã được xác minh. Bạn có thể đăng nhập OpenSlot."));
+        }
+
+        string token;
+        try
+        {
+            token = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(request.Token));
+        }
+        catch (FormatException)
+        {
+            throw new ApiException("Link xác minh không hợp lệ.", StatusCodes.Status400BadRequest);
+        }
+
+        var result = await userManager.ConfirmEmailAsync(user, token);
+        if (!result.Succeeded)
+        {
+            throw new ApiException("Link xác minh đã hết hạn hoặc không hợp lệ. Hãy yêu cầu gửi lại email.", StatusCodes.Status400BadRequest);
+        }
+
+        return Ok(new EmailConfirmationResponse("Xác minh email thành công. Bạn có thể đăng nhập OpenSlot."));
+    }
+
+    [HttpPost("resend-verification")]
+    [EnableRateLimiting("email-verification")]
+    [ProducesResponseType<EmailConfirmationResponse>(StatusCodes.Status202Accepted)]
+    public async Task<ActionResult<EmailConfirmationResponse>> ResendVerification(ResendVerificationRequest request, CancellationToken cancellationToken)
+    {
+        if (!emailVerificationService.IsConfigured)
+        {
+            throw new ApiException("Dịch vụ gửi email đang được thiết lập. Vui lòng thử lại sau.", StatusCodes.Status503ServiceUnavailable);
+        }
+
+        var user = await userManager.FindByEmailAsync(request.Email.Trim());
+        if (user is { EmailConfirmed: false })
+        {
+            try
+            {
+                await SendConfirmationAsync(user, cancellationToken);
+            }
+            catch
+            {
+                throw new ApiException("Không thể gửi email xác minh. Vui lòng thử lại sau.", StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        return Accepted(new EmailConfirmationResponse("Nếu Gmail này có tài khoản chưa xác minh, OpenSlot đã gửi lại link xác minh."));
     }
 
     [Authorize(Roles = RoleNames.Customer)]
@@ -128,5 +224,23 @@ public sealed class AuthController(UserManager<ApplicationUser> userManager, IJw
             roles.ToArray(),
             user.IsSuspended,
             user.BookingSuspendedUntilUtc));
+    }
+
+    private async Task SendConfirmationAsync(ApplicationUser user, CancellationToken cancellationToken)
+    {
+        var publicBaseUrl = emailOptions.Value.PublicBaseUrl.TrimEnd('/');
+        if (!Uri.TryCreate(publicBaseUrl, UriKind.Absolute, out _))
+        {
+            throw new InvalidOperationException("Email:PublicBaseUrl is not configured.");
+        }
+
+        var token = await userManager.GenerateEmailConfirmationTokenAsync(user);
+        var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
+        var link = QueryHelpers.AddQueryString($"{publicBaseUrl}/verify-email", new Dictionary<string, string?>
+        {
+            ["userId"] = user.Id,
+            ["token"] = encodedToken
+        });
+        await emailVerificationService.SendConfirmationAsync(user, link, cancellationToken);
     }
 }

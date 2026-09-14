@@ -7,12 +7,30 @@ public sealed class RegisterRequest
     [Required, StringLength(100, MinimumLength = 2)]
     public string DisplayName { get; init; } = string.Empty;
 
-    [Required, EmailAddress, StringLength(256)]
+    [Required, EmailAddress, StringLength(256), RegularExpression(@"(?i)^[^\s@]+@gmail\.com$", ErrorMessage = "Vui lòng nhập địa chỉ Gmail hợp lệ.")]
     public string Email { get; init; } = string.Empty;
 
     [Required, StringLength(100, MinimumLength = 8)]
     public string Password { get; init; } = string.Empty;
 }
+
+public sealed class ConfirmEmailRequest
+{
+    [Required, StringLength(128)]
+    public string UserId { get; init; } = string.Empty;
+
+    [Required, StringLength(4096)]
+    public string Token { get; init; } = string.Empty;
+}
+
+public sealed class ResendVerificationRequest
+{
+    [Required, EmailAddress, StringLength(256)]
+    public string Email { get; init; } = string.Empty;
+}
+
+public sealed record RegistrationResponse(string Email, string Message);
+public sealed record EmailConfirmationResponse(string Message);
 
 public sealed class ApplyForProviderRequest
 {

@@ -1,4 +1,4 @@
-import type { AdminCategory, AdminDashboard, AdminProviderDetail, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, DealSlot, MyProviderProfile, Notification, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, Report, Session } from './types'
+import type { AdminCategory, AdminDashboard, AdminProviderDetail, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, DealSlot, EmailConfirmationResponse, MyProviderProfile, Notification, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, RegistrationResponse, Report, Session } from './types'
 
 const apiBase = import.meta.env.VITE_API_URL ?? '/api'
 const geocodingBase = import.meta.env.VITE_GEOCODING_URL ?? 'https://nominatim.openstreetmap.org'
@@ -120,8 +120,14 @@ export const api = {
   login: (email: string, password: string) => request<Session>('/auth/login', {
     method: 'POST', body: JSON.stringify({ email, password }),
   }),
-  register: (displayName: string, email: string, password: string) => request<Session>('/auth/register', {
+  register: (displayName: string, email: string, password: string) => request<RegistrationResponse>('/auth/register', {
     method: 'POST', body: JSON.stringify({ displayName, email, password }),
+  }),
+  confirmEmail: (userId: string, token: string) => request<EmailConfirmationResponse>('/auth/confirm-email', {
+    method: 'POST', body: JSON.stringify({ userId, token }),
+  }),
+  resendVerification: (email: string) => request<EmailConfirmationResponse>('/auth/resend-verification', {
+    method: 'POST', body: JSON.stringify({ email }),
   }),
   applyForProvider: (payload: object, token: string) => request<Session>('/auth/provider-applications', { method: 'POST', body: JSON.stringify(payload) }, token),
   book: (slotId: string, token: string) => request<BookingConfirmation>(`/bookings/slots/${slotId}`, { method: 'POST' }, token),

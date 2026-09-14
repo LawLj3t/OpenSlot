@@ -1,0 +1,51 @@
+.email-confirmation,
+.registration-complete {
+  display: grid;
+  gap: 15px;
+}
+
+.email-confirmation {
+  max-width: 490px;
+  text-align: center;
+}
+
+.email-confirmation > p:not(.eyebrow),
+.registration-complete > p {
+  margin: 0;
+  color: #657287;
+  line-height: 1.65;
+}
+
+.confirmation-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 3px;
+  border-radius: 50%;
+  background: #f2f4f7;
+  color: #64748b;
+  font-size: 23px;
+}
+
+.confirmation-icon.loading i { animation: email-verification-spin 1s linear infinite; }
+.confirmation-icon.success { background: #e8f6ec; color: #2c8653; }
+.confirmation-icon.error { background: #fff0f1; color: #bd4652; }
+.registration-complete { padding: 8px 0; }
+.registration-complete .confirmation-icon { margin: 0; }
+.registration-complete .btn { width: 100%; margin-top: 3px; }
+
+.auth-resend {
+  justify-self: center;
+  border: 0;
+  background: transparent;
+  color: #d76142;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.auth-resend:disabled { color: #9aa5b2; }
+
+@keyframes email-verification-spin {
+  to { transform: rotate(360deg); }
+}

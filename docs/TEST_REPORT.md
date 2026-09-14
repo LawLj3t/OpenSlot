@@ -1,16 +1,16 @@
 # Báo cáo kiểm thử OpenSlot
 
-Ngày kiểm thử gần nhất: 10/09/2026.
+Ngày kiểm thử gần nhất: 14/09/2026.
 
 ## Kiểm thử tự động
 
 | Hạng mục | Kết quả |
 | --- | --- |
-| `dotnet test OpenSlot.slnx --no-restore` | 12 passed, 0 failed |
+| `dotnet test OpenSlot.slnx --no-restore` | 24 passed, 0 failed |
 | `npm run lint` | Thành công, 0 warning/error |
 | `npm run build` | Thành công, TypeScript và Vite production build |
 
-Unit test tập trung vào `SlotPolicy` và chuẩn hóa slug danh mục: giá hợp lệ, giá deal thấp hơn giá gốc, thời gian bắt đầu/kết thúc, cửa sổ booking, capacity, điều kiện phát hành và tên danh mục tiếng Việt.
+Unit test tập trung vào `SlotPolicy`, chuẩn hóa slug danh mục, validation số điện thoại và chỉ chấp nhận Gmail khi đăng ký: giá hợp lệ, giá deal thấp hơn giá gốc, thời gian bắt đầu/kết thúc, cửa sổ booking, capacity, điều kiện phát hành và tên danh mục tiếng Việt.
 
 ## Smoke test API
 
@@ -24,6 +24,7 @@ Unit test tập trung vào `SlotPolicy` và chuẩn hóa slug danh mục: giá h
 - Manager/Admin đọc dashboard/provider/user/service/slot/report, quản lý danh mục, ẩn–mở dịch vụ, hủy slot trống và xử lý report.
 - Khi admin ẩn một dịch vụ, số slot public giảm từ 3 xuống 2; khi mở lại trở về 3.
 - Token cũ của tài khoản vừa bị khóa trả `401 Unauthorized` ngay ở request kế tiếp.
+- Đăng ký mới chỉ nhận địa chỉ `@gmail.com`; tài khoản có `EmailConfirmed = false` không thể đăng nhập trước khi mở link xác minh.
 
 ## Kiểm thử concurrency
 
@@ -44,3 +45,4 @@ Kết quả: chỉ 1 booking được ghi nhận, không overbooking.
 - [ ] Trình duyệt được cấp quyền vị trí nếu demo khoảng cách.
 - [ ] Có Internet nếu muốn tải tile OpenStreetMap; phần còn lại vẫn chạy local.
 - [ ] Không chiếu `Jwt__Key` hoặc secret triển khai.
+- [ ] Cấu hình `Email__ResendApiKey` và sender Resend đã xác minh, sau đó thử đăng ký một Gmail thật và mở link xác minh.

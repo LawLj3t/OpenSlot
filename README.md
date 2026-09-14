@@ -6,7 +6,7 @@ Nền tảng săn các khung giờ dịch vụ còn trống với ưu đãi sát
 
 ## Chức năng chính
 
-- Khách hàng: đăng ký, đăng nhập, khám phá/lọc slot, thanh toán demo qua QR VietinBank trước khi giữ chỗ, QR/PIN check-in, xem và hủy lịch.
+- Khách hàng: đăng ký Gmail, xác minh bằng link email, đăng nhập, khám phá/lọc slot, thanh toán demo qua QR VietinBank trước khi giữ chỗ, QR/PIN check-in, xem và hủy lịch.
 - Đối tác: chủ cửa hàng tự nộp hồ sơ, cập nhật địa điểm, khai báo sân/bàn/ghế/phòng có thể đặt, tạo dịch vụ và phát hành slot đúng đơn vị; check-in rồi hoàn tất dịch vụ.
 - Đối tác: một tài khoản vẫn giữ quyền Khách hàng để đặt dịch vụ; người dùng chọn cổng Khách hàng hoặc Đối tác khi đăng nhập và có thể chuyển lại trong thanh điều hướng.
 - Manager: dashboard vận hành, duyệt/yêu cầu bổ sung/tạm khóa đối tác, xem chi tiết cửa hàng/địa điểm/đơn vị đặt/dịch vụ/slot, quản lý danh mục chung, theo dõi tài khoản, kiểm duyệt dịch vụ/slot và xử lý báo cáo.
@@ -18,6 +18,10 @@ Nền tảng săn các khung giờ dịch vụ còn trống với ưu đãi sát
 ## Thanh toán demo
 
 Luồng khách hàng là chọn slot → quét QR VietinBank → chọn “Tôi đã thanh toán” → hệ thống mới tạo booking và hiện trong “Lịch của tôi”. Đây là mô phỏng giao diện cho đồ án; hệ thống chưa kết nối ngân hàng hoặc tự xác thực giao dịch thực tế.
+
+## Xác minh Gmail
+
+Người dùng mới chỉ đăng ký bằng địa chỉ `@gmail.com`. OpenSlot gửi một link xác minh, và chỉ cho phép đăng nhập sau khi link được mở thành công. Luồng này dùng Resend, không dùng SMS/OTP; API key và sender xác minh được để trong biến môi trường. Xem [hướng dẫn triển khai](docs/DEPLOYMENT.md) để cấu hình gửi email thật trên Render.
 
 ## Công nghệ
 
