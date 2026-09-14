@@ -6,7 +6,7 @@ Nền tảng săn các khung giờ dịch vụ còn trống với ưu đãi sát
 
 ## Chức năng chính
 
-- Khách hàng: đăng ký Gmail, xác minh bằng link email, đăng nhập, khám phá/lọc slot, thanh toán demo qua QR VietinBank trước khi giữ chỗ, QR/PIN check-in, xem và hủy lịch.
+- Khách hàng: đăng ký Gmail, xác minh bằng link email, đăng nhập, khám phá/lọc slot, giữ chỗ realtime trong lúc thanh toán QR VietinBank demo, QR/PIN check-in, xem và hủy lịch.
 - Đối tác: chủ cửa hàng tự nộp hồ sơ, cập nhật địa điểm, khai báo sân/bàn/ghế/phòng có thể đặt, tạo dịch vụ và phát hành slot đúng đơn vị; check-in rồi hoàn tất dịch vụ.
 - Đối tác: một tài khoản vẫn giữ quyền Khách hàng để đặt dịch vụ; người dùng chọn cổng Khách hàng hoặc Đối tác khi đăng nhập và có thể chuyển lại trong thanh điều hướng.
 - Manager: dashboard vận hành, duyệt/yêu cầu bổ sung/tạm khóa đối tác, xem chi tiết cửa hàng/địa điểm/đơn vị đặt/dịch vụ/slot, quản lý danh mục chung, theo dõi tài khoản, kiểm duyệt dịch vụ/slot và xử lý báo cáo.
@@ -15,9 +15,13 @@ Nền tảng săn các khung giờ dịch vụ còn trống với ưu đãi sát
 - Dữ liệu demo: 6 nhóm dịch vụ, 6 đối tác, 6 địa điểm, 12 đơn vị có thể đặt và 12 slot sát giờ tại Hà Nội.
 - Quy tắc chống lạm dụng: đóng booking trước giờ bắt đầu 15 phút; một khách tối đa 3 booking deal còn hiệu lực/ngày; hủy sát giờ/no-show nhận strike; sau 3 strike trong 30 ngày bị khóa đặt chỗ 7 ngày; không cho hai slot trùng giờ trên cùng sân/bàn/ghế/phòng; chống overbooking bằng optimistic concurrency.
 
-## Thanh toán demo
+## Giữ chỗ realtime và thanh toán demo
 
-Luồng khách hàng là chọn slot → quét QR VietinBank → chọn “Tôi đã thanh toán” → hệ thống mới tạo booking và hiện trong “Lịch của tôi”. Đây là mô phỏng giao diện cho đồ án; hệ thống chưa kết nối ngân hàng hoặc tự xác thực giao dịch thực tế.
+Luồng khách hàng là chọn slot → hệ thống tạo một lượt **giữ chỗ 10 phút** → quét QR VietinBank → chọn “Tôi đã thanh toán” → hệ thống xác nhận booking và hiện trong “Lịch của tôi”. Trong thời gian giữ chỗ, số chỗ còn lại giảm ngay cho mọi người đang xem; slot chỉ còn một chỗ sẽ tạm biến khỏi danh sách. Hủy thanh toán trả chỗ ngay, còn lượt bị bỏ dở tự hết hạn sau 10 phút.
+
+SignalR phát sự kiện thay đổi sức chứa đến các màn hình khám phá, chi tiết slot và khu vực Provider. API vẫn tính số lượt giữ chỗ còn hạn trong transaction, nên không overbook khi người dùng bấm gần như cùng lúc. Với nhiều bản sao backend trong tương lai, cần thêm Redis/Azure SignalR backplane để phát sự kiện qua các máy chủ.
+
+Đây vẫn là thanh toán mô phỏng cho đồ án: OpenSlot chưa kết nối ngân hàng hoặc tự xác thực giao dịch thực tế.
 
 ## Xác minh Gmail
 
@@ -25,7 +29,7 @@ Người dùng mới chỉ đăng ký bằng địa chỉ `@gmail.com`. OpenSlot
 
 ## Công nghệ
 
-- Backend: C# / ASP.NET Core 10 Web API, EF Core, Identity, JWT, SQLite, Swagger.
+- Backend: C# / ASP.NET Core 10 Web API, EF Core, Identity, JWT, SignalR, SQLite/PostgreSQL, Swagger.
 - Frontend: React 19, TypeScript, Vite, Bootstrap 5, React Router, QR code.
 - Maps: OpenStreetMap + Leaflet (marker thật theo tọa độ, miễn phí, không cần API key).
 - Tests: xUnit.
@@ -111,7 +115,7 @@ npm run lint
 npm run build
 ```
 
-Kết quả QA hiện tại: backend 18/18 unit test đạt, frontend build và lint sạch. Luồng tranh chỗ cuối đã được kiểm thử đồng thời: đúng một request nhận `201`, request còn lại nhận `409`.
+Kết quả QA hiện tại: backend 30/30 unit test đạt, frontend build và lint sạch. Luồng tranh chỗ cuối và lượt giữ chỗ đã được kiểm thử đồng thời: đúng một request giữ được chỗ, request còn lại nhận `409`.
 
 ## Chạy bằng Docker
 

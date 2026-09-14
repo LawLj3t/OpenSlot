@@ -11,6 +11,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.DataProtection;
 using System.Security.Claims;
 using Microsoft.AspNetCore.HttpOverrides;
+using OpenSlot.Api.Realtime;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
@@ -140,6 +141,7 @@ builder.Services.AddCors(options => options.AddPolicy("OpenSlotWeb", policy =>
         .AllowAnyHeader()
         .AllowAnyMethod()));
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 builder.Services.AddSwaggerGen();
@@ -150,6 +152,7 @@ builder.Services.AddHttpClient<IEmailVerificationService, GmailApiEmailVerificat
 });
 builder.Services.AddScoped<IPasswordHasher<Booking>, PasswordHasher<Booking>>();
 builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddSingleton<ISlotAvailabilityNotifier, SlotAvailabilityNotifier>();
 builder.Services.AddHostedService<SlotLifecycleWorker>();
 
 var app = builder.Build();
@@ -166,6 +169,7 @@ await using (var scope = app.Services.CreateAsyncScope())
     if (usesPostgreSql)
     {
         await db.Database.EnsureCreatedAsync();
+        await CheckoutHoldSchemaInitializer.EnsureCreatedAsync(db);
     }
     else
     {
@@ -198,6 +202,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
 app.MapControllers();
+app.MapHub<AvailabilityHub>("/hubs/availability");
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "OpenSlot.Api", utcNow = DateTime.UtcNow }));
 if (File.Exists(spaIndexPath))
 {

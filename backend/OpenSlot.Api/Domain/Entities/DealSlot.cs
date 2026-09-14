@@ -28,4 +28,5 @@ public sealed class DealSlot
     public ServiceOffering ServiceOffering { get; set; } = null!;
     public BookableResource? BookableResource { get; set; }
     public ICollection<Booking> Bookings { get; set; } = new List<Booking>();
+    public ICollection<SlotHold> Holds { get; set; } = new List<SlotHold>();
 }

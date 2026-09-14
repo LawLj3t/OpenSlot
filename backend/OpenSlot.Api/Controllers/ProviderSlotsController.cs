@@ -40,6 +40,7 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetMine(CancellationToken cancellationToken)
     {
+        var now = DateTime.UtcNow;
         var slots = await db.DealSlots
             .AsNoTracking()
             .Include(x => x.ServiceOffering).ThenInclude(x => x.Venue).ThenInclude(x => x.ProviderProfile)
@@ -61,6 +62,7 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
                 x.DealPriceVnd,
                 x.Capacity,
                 x.ConfirmedBookingCount,
+                activeHoldCount = db.SlotHolds.Count(hold => hold.DealSlotId == x.Id && hold.Status == SlotHoldStatus.Active && hold.ExpiresAtUtc > now),
                 x.Status
             })
             .ToListAsync(cancellationToken);

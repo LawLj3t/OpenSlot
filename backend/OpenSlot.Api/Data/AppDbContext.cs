@@ -14,6 +14,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<ServiceOffering> ServiceOfferings => Set<ServiceOffering>();
     public DbSet<DealSlot> DealSlots => Set<DealSlot>();
     public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<SlotHold> SlotHolds => Set<SlotHold>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Report> Reports => Set<Report>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
@@ -89,6 +90,21 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasIndex(x => x.PublicCode).IsUnique();
             entity.HasIndex(x => new { x.DealSlotId, x.CustomerUserId }).IsUnique();
             entity.HasIndex(x => new { x.CustomerUserId, x.Status, x.BookedAtUtc });
+        });
+
+        builder.Entity<SlotHold>(entity =>
+        {
+            entity.Property(x => x.ReleaseReason).HasMaxLength(200);
+            entity.HasIndex(x => new { x.DealSlotId, x.Status, x.ExpiresAtUtc });
+            entity.HasIndex(x => new { x.CustomerUserId, x.DealSlotId, x.Status });
+            entity.HasOne(x => x.DealSlot)
+                .WithMany(x => x.Holds)
+                .HasForeignKey(x => x.DealSlotId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ApplicationUser>()
+                .WithMany()
+                .HasForeignKey(x => x.CustomerUserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<Notification>(entity =>

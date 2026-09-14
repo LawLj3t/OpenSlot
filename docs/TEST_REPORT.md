@@ -6,7 +6,7 @@ Ngày kiểm thử gần nhất: 14/09/2026.
 
 | Hạng mục | Kết quả |
 | --- | --- |
-| `dotnet test OpenSlot.slnx --no-restore` | 26 passed, 0 failed |
+| `dotnet test OpenSlot.slnx --no-restore` | 30 passed, 0 failed |
 | `npm run lint` | Thành công, 0 warning/error |
 | `npm run build` | Thành công, TypeScript và Vite production build |
 
@@ -18,7 +18,7 @@ Unit test tập trung vào `SlotPolicy`, chuẩn hóa slug danh mục, validatio
 - Tài khoản seed đăng nhập đúng bốn role; Provider được seed thành sáu tài khoản độc lập.
 - Database sạch có 6 category, 6 provider profile, 6 venue, 12 service, 12 đơn vị đặt và 12 deal slot demo.
 - API provider catalog không còn trả `defaultDurationMinutes`; thời lượng được lưu ở `startAtUtc`/`endAtUtc` của slot.
-- Customer browse/search, tạo booking, nhận notification và gửi report.
+- Customer browse/search, giữ chỗ, xác nhận booking, nhận notification và gửi report.
 - Provider đọc profile/catalog, tạo/phát hành slot và quản lý check-in.
 - Customer gửi hồ sơ cửa hàng, hệ thống bổ sung Provider Pending nhưng vẫn giữ Customer; Manager tìm thấy hồ sơ, xem chi tiết, duyệt thành công và Provider có thể phát hành slot.
 - Manager/Admin đọc dashboard/provider/user/service/slot/report, quản lý danh mục, ẩn–mở dịch vụ, hủy slot trống và xử lý report.
@@ -26,7 +26,7 @@ Unit test tập trung vào `SlotPolicy`, chuẩn hóa slug danh mục, validatio
 - Token cũ của tài khoản vừa bị khóa trả `401 Unauthorized` ngay ở request kế tiếp.
 - Đăng ký mới chỉ nhận địa chỉ `@gmail.com`; tài khoản có `EmailConfirmed = false` không thể đăng nhập trước khi mở link xác minh.
 
-## Kiểm thử concurrency
+## Kiểm thử concurrency và giữ chỗ realtime
 
 Thiết lập một slot capacity = 1, dùng hai tài khoản Customer gửi request booking gần như đồng thời:
 
@@ -36,6 +36,13 @@ Thiết lập một slot capacity = 1, dùng hai tài khoản Customer gửi req
 | Customer B | `201 Created` |
 
 Kết quả: chỉ 1 booking được ghi nhận, không overbooking.
+
+Thử thêm với một slot capacity = 1:
+
+- Customer A tạo hold thành công; slot bị ẩn khỏi API browse và Customer B không thể tạo hold.
+- Hủy hold của Customer A trả slot lại API browse ngay; Customer B có thể giữ lại.
+- Xác nhận hold tạo đúng một booking xuất hiện trong “Lịch của tôi”.
+- Hub SignalR `/hubs/availability` thương lượng thành công các transport WebSocket, Server-Sent Events và Long Polling.
 
 ## Checklist trước demo
 

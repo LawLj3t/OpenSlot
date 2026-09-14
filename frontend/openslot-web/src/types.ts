@@ -77,6 +77,22 @@ export type BookingConfirmation = {
   expiresAtUtc: string
 }
 
+export type SlotHold = {
+  holdId: string
+  dealSlotId: string
+  expiresAtUtc: string
+  remainingCapacity: number
+  capacity: number
+}
+
+export type SlotAvailabilityUpdate = {
+  slotId: string
+  remainingCapacity: number
+  capacity: number
+  status: number
+  reason: string
+}
+
 export type ProviderService = {
   id: string
   name: string
@@ -130,6 +146,7 @@ export type ProviderSlot = {
   dealPriceVnd: number
   capacity: number
   confirmedBookingCount: number
+  activeHoldCount: number
   status: number
 }
 

@@ -7,7 +7,7 @@ OpenSlot là modular monolith gồm React SPA, ASP.NET Core Web API và SQLite. 
 ```text
 Browser (React + Leaflet)
         |
-        | HTTPS / JSON / JWT
+        | HTTPS / JSON / JWT + SignalR
         v
 ASP.NET Core API
   |-- Auth & role authorization
@@ -28,6 +28,7 @@ SQLite + EF Core migrations
 - `BookableResource`: sân, bàn, ghế, phòng, máy hoặc đơn vị thực tế khách nhận khi đặt.
 - `Category`, `ServiceOffering`: Manager quản lý danh mục chung; Provider tự tạo dịch vụ cụ thể tại venue. Dịch vụ không giữ thời lượng cố định.
 - `DealSlot`: khung bắt đầu/kết thúc thực tế, giá, sức chứa, cửa sổ booking, đơn vị đặt và concurrency token.
+- `SlotHold`: lượt giữ chỗ ngắn hạn, có thời điểm hết hạn và trạng thái Active/Confirmed/Released/Expired.
 - `Booking`: khách, trạng thái, public code và PIN đã hash.
 - `Notification`, `Report`, `AuditLog`: thông báo, kiểm duyệt và dấu vết vận hành.
 
@@ -36,8 +37,8 @@ SQLite + EF Core migrations
 1. Admin duyệt provider.
 2. Customer gửi hồ sơ để được bổ sung quyền Provider trên cùng email. Provider ở trạng thái Pending có thể chuẩn bị venue, đơn vị có thể đặt, service và slot nháp; khi cần, chủ cửa hàng chuyển về cổng Customer để đặt dịch vụ.
 3. Manager duyệt, yêu cầu bổ sung hoặc tạm khóa Provider. Chỉ Provider Approved phát hành slot; hệ thống kiểm tra giờ, giá, sức chứa và slot chồng lấn trên cùng đơn vị.
-4. Customer tìm theo từ khóa/khu vực/danh mục hoặc vị trí hiện tại, rồi đặt chỗ.
-5. Transaction và concurrency token bảo đảm không bán vượt sức chứa.
+4. Customer tìm theo từ khóa/khu vực/danh mục hoặc vị trí hiện tại. Khi vào thanh toán, API tạo `SlotHold` trong 10 phút và SignalR cập nhật sức chứa cho các trình duyệt đang mở.
+5. Customer xác nhận thanh toán demo để chuyển `SlotHold` thành `Booking`; hủy hoặc hết hạn sẽ trả chỗ. Transaction và concurrency token bảo đảm không bán vượt sức chứa.
 6. Hệ thống trả QR/PIN; provider check-in trong cửa sổ hợp lệ và đánh dấu hoàn tất.
 7. Worker tự hết hạn slot, đánh dấu no-show và áp dụng strike.
 
@@ -50,6 +51,7 @@ SQLite + EF Core migrations
 - Request booking được rate-limit; validation chạy ở cả client và server.
 - Unique index ngăn một khách đặt cùng slot hai lần.
 - EF transaction cùng optimistic concurrency bảo vệ chiếc chỗ cuối cùng.
+- Sức chứa hiển thị luôn trừ booking đã xác nhận và `SlotHold` còn hạn; worker nền dọn các hold hết hạn. SignalR chỉ phát dữ liệu công khai về sức chứa, không phát thông tin khách hàng.
 - Admin action và thay đổi vòng đời quan trọng được lưu audit log.
 
 ## Quyết định phạm vi

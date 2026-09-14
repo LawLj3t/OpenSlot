@@ -4,6 +4,7 @@ using OpenSlot.Api.Contracts.Slots;
 using OpenSlot.Api.Data;
 using OpenSlot.Api.Domain.Enums;
 using OpenSlot.Api.Infrastructure;
+using OpenSlot.Api.Services;
 
 namespace OpenSlot.Api.Controllers;
 
@@ -66,7 +67,9 @@ public sealed class SlotsController(AppDbContext db) : ControllerBase
         }
 
         var slots = await query.OrderBy(x => x.StartAtUtc).Take(100).ToListAsync(cancellationToken);
-        var items = slots.Select(slot => ToListItem(slot, latitude, longitude))
+        var activeHoldCounts = await GetActiveHoldCountsAsync(slots.Select(x => x.Id), now, cancellationToken);
+        var items = slots.Select(slot => ToListItem(slot, latitude, longitude, activeHoldCounts.GetValueOrDefault(slot.Id)))
+            .Where(x => x.RemainingCapacity > 0)
             .OrderBy(x => x.DistanceKm ?? double.MaxValue)
             .ThenBy(x => x.StartAtUtc)
             .ToList();
@@ -76,6 +79,7 @@ public sealed class SlotsController(AppDbContext db) : ControllerBase
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<DealSlotDetails>> GetById(Guid id, CancellationToken cancellationToken)
     {
+        var now = DateTime.UtcNow;
         var slot = await db.DealSlots
             .AsNoTracking()
             .Include(x => x.ServiceOffering).ThenInclude(x => x.Category)
@@ -86,6 +90,10 @@ public sealed class SlotsController(AppDbContext db) : ControllerBase
                                        x.ServiceOffering.Venue.ProviderProfile.Status == ProviderStatus.Approved &&
                                        (x.Status == DealSlotStatus.Published || x.Status == DealSlotStatus.SoldOut), cancellationToken)
             ?? throw new ApiException("Không tìm thấy slot.", StatusCodes.Status404NotFound);
+
+        var activeHoldCount = await db.SlotHolds.CountAsync(
+            x => x.DealSlotId == slot.Id && x.Status == SlotHoldStatus.Active && x.ExpiresAtUtc > now,
+            cancellationToken);
 
         return Ok(new DealSlotDetails(
             slot.Id,
@@ -110,11 +118,26 @@ public sealed class SlotsController(AppDbContext db) : ControllerBase
             slot.OriginalPriceVnd,
             slot.DealPriceVnd,
             slot.Capacity,
-            Math.Max(0, slot.Capacity - slot.ConfirmedBookingCount),
+            SlotAvailabilityPolicy.RemainingCapacity(slot.Capacity, slot.ConfirmedBookingCount, activeHoldCount),
             slot.Status));
     }
 
-    private static DealSlotListItem ToListItem(Domain.Entities.DealSlot slot, double? latitude, double? longitude)
+    private async Task<Dictionary<Guid, int>> GetActiveHoldCountsAsync(IEnumerable<Guid> slotIds, DateTime now, CancellationToken cancellationToken)
+    {
+        var ids = slotIds.ToArray();
+        if (ids.Length == 0)
+        {
+            return [];
+        }
+
+        return await db.SlotHolds
+            .AsNoTracking()
+            .Where(x => ids.Contains(x.DealSlotId) && x.Status == SlotHoldStatus.Active && x.ExpiresAtUtc > now)
+            .GroupBy(x => x.DealSlotId)
+            .ToDictionaryAsync(x => x.Key, x => x.Count(), cancellationToken);
+    }
+
+    private static DealSlotListItem ToListItem(Domain.Entities.DealSlot slot, double? latitude, double? longitude, int activeHoldCount)
     {
         double? distanceKm = latitude is not null && longitude is not null
             ? CalculateDistance(latitude.Value, longitude.Value, slot.ServiceOffering.Venue.Latitude, slot.ServiceOffering.Venue.Longitude)
@@ -140,7 +163,7 @@ public sealed class SlotsController(AppDbContext db) : ControllerBase
             slot.OriginalPriceVnd,
             slot.DealPriceVnd,
             slot.Capacity,
-            Math.Max(0, slot.Capacity - slot.ConfirmedBookingCount),
+            SlotAvailabilityPolicy.RemainingCapacity(slot.Capacity, slot.ConfirmedBookingCount, activeHoldCount),
             slot.Status,
             distanceKm);
     }

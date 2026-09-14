@@ -1,7 +1,8 @@
-import type { AdminCategory, AdminDashboard, AdminProviderDetail, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, DealSlot, EmailConfirmationResponse, MyProviderProfile, Notification, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, RegistrationResponse, Report, Session } from './types'
+import type { AdminCategory, AdminDashboard, AdminProviderDetail, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, DealSlot, EmailConfirmationResponse, MyProviderProfile, Notification, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, RegistrationResponse, Report, Session, SlotHold } from './types'
 
 const apiBase = import.meta.env.VITE_API_URL ?? '/api'
 const geocodingBase = import.meta.env.VITE_GEOCODING_URL ?? 'https://nominatim.openstreetmap.org'
+export const realtimeHubUrl = apiBase.replace(/\/api\/?$/, '') + '/hubs/availability'
 
 export type GeocodedLocation = {
   label: string
@@ -143,6 +144,9 @@ export const api = {
   }),
   applyForProvider: (payload: object, token: string) => request<Session>('/auth/provider-applications', { method: 'POST', body: JSON.stringify(payload) }, token),
   book: (slotId: string, token: string) => request<BookingConfirmation>(`/bookings/slots/${slotId}`, { method: 'POST' }, token),
+  createHold: (slotId: string, token: string) => request<SlotHold>(`/booking-holds/slots/${slotId}`, { method: 'POST' }, token),
+  confirmHold: (holdId: string, token: string) => request<BookingConfirmation>(`/booking-holds/${holdId}/confirm`, { method: 'POST' }, token),
+  releaseHold: (holdId: string, token: string) => request<void>(`/booking-holds/${holdId}/release`, { method: 'POST' }, token),
   myBookings: (token: string) => request<Booking[]>('/bookings/mine', {}, token),
   cancelBooking: (bookingId: string, reason: string, token: string) => request<void>(`/bookings/${bookingId}/cancel`, {
     method: 'POST', body: JSON.stringify({ reason }),
