@@ -121,6 +121,19 @@ builder.Services.AddAuthorization();
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        var response = context.HttpContext.Response;
+        response.StatusCode = StatusCodes.Status429TooManyRequests;
+        response.ContentType = "application/problem+json";
+        await response.WriteAsJsonAsync(new
+        {
+            type = "https://httpstatuses.com/429",
+            title = "Request failed",
+            status = StatusCodes.Status429TooManyRequests,
+            detail = "Bạn đã gửi quá nhiều yêu cầu email. Vui lòng chờ ít phút rồi thử lại."
+        }, cancellationToken);
+    };
     options.AddPolicy("booking", httpContext => RateLimitPartition.GetFixedWindowLimiter(
         httpContext.User.Identity?.Name ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
         _ => new FixedWindowRateLimiterOptions
@@ -130,11 +143,13 @@ builder.Services.AddRateLimiter(options =>
             QueueLimit = 0,
             AutoReplenishment = true
         }));
-    options.AddPolicy("email-verification", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+    // Only routes that actually send an email share this quota. Confirmation
+    // and password reset submissions do not send mail and must not consume it.
+    options.AddPolicy("email-send", httpContext => RateLimitPartition.GetFixedWindowLimiter(
         httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
         _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 4,
+            PermitLimit = 8,
             Window = TimeSpan.FromMinutes(15),
             QueueLimit = 0,
             AutoReplenishment = true

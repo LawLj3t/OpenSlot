@@ -110,6 +110,9 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
     const validationErrors = rawErrors && !Array.isArray(rawErrors) && typeof rawErrors === 'object'
       ? rawErrors
       : {}
+    if (response.status === 429) {
+      throw new Error(problem?.detail ?? 'Bạn đã gửi quá nhiều yêu cầu email. Vui lòng chờ ít phút rồi thử lại.')
+    }
     if (validationErrors.ContactPhone?.length) {
       throw new Error('Số điện thoại không hợp lệ, vui lòng nhập lại.')
     }

@@ -26,7 +26,7 @@ public sealed class AuthController(
     AppDbContext db) : ControllerBase
 {
     [HttpPost("register")]
-    [EnableRateLimiting("email-verification")]
+    [EnableRateLimiting("email-send")]
     [ProducesResponseType<RegistrationResponse>(StatusCodes.Status202Accepted)]
     public async Task<ActionResult<RegistrationResponse>> Register(RegisterRequest request, CancellationToken cancellationToken)
     {
@@ -96,7 +96,6 @@ public sealed class AuthController(
     }
 
     [HttpPost("confirm-email")]
-    [EnableRateLimiting("email-verification")]
     [ProducesResponseType<EmailConfirmationResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<EmailConfirmationResponse>> ConfirmEmail(ConfirmEmailRequest request, CancellationToken cancellationToken)
     {
@@ -131,7 +130,7 @@ public sealed class AuthController(
     }
 
     [HttpPost("resend-verification")]
-    [EnableRateLimiting("email-verification")]
+    [EnableRateLimiting("email-send")]
     [ProducesResponseType<EmailConfirmationResponse>(StatusCodes.Status202Accepted)]
     public async Task<ActionResult<EmailConfirmationResponse>> ResendVerification(ResendEmailVerificationRequest request, CancellationToken cancellationToken)
     {
@@ -157,7 +156,7 @@ public sealed class AuthController(
     }
 
     [HttpPost("forgot-password")]
-    [EnableRateLimiting("email-verification")]
+    [EnableRateLimiting("email-send")]
     [ProducesResponseType<PasswordResetRequestResponse>(StatusCodes.Status202Accepted)]
     public async Task<ActionResult<PasswordResetRequestResponse>> ForgotPassword(ForgotPasswordRequest request, CancellationToken cancellationToken)
     {
@@ -183,7 +182,6 @@ public sealed class AuthController(
     }
 
     [HttpPost("reset-password")]
-    [EnableRateLimiting("email-verification")]
     [ProducesResponseType<EmailConfirmationResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<EmailConfirmationResponse>> ResetPassword(ResetPasswordRequest request, CancellationToken cancellationToken)
     {

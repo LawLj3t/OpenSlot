@@ -25,7 +25,7 @@ SignalR phát sự kiện thay đổi sức chứa đến các màn hình khám 
 
 ## Xác minh Gmail
 
-Người dùng mới chỉ đăng ký bằng địa chỉ `@gmail.com`. OpenSlot gửi một link xác minh, và chỉ cho phép đăng nhập sau khi link được mở thành công. Luồng demo dùng Gmail API qua HTTPS và OAuth 2.0, không dùng SMS/OTP; OAuth secret và refresh token chỉ được để trong biến môi trường. Bất kỳ Gmail nào cũng có thể nhận link. Xem [hướng dẫn triển khai](docs/DEPLOYMENT.md) để cấu hình gửi email thật trên Render.
+Người dùng mới chỉ đăng ký bằng địa chỉ `@gmail.com`. OpenSlot gửi một link xác minh, và chỉ cho phép đăng nhập sau khi link được mở thành công. Luồng demo dùng Gmail API qua HTTPS và OAuth 2.0, không dùng SMS/OTP; OAuth secret và refresh token chỉ được để trong biến môi trường. Bất kỳ Gmail nào cũng có thể nhận link. Các thao tác thực sự gửi email (đăng ký, gửi lại xác minh, quên mật khẩu) có giới hạn riêng để chống spam, còn việc mở link xác minh hoặc đặt lại mật khẩu không làm tiêu hao giới hạn này. Xem [hướng dẫn triển khai](docs/DEPLOYMENT.md) để cấu hình gửi email thật trên Render.
 
 Người dùng cũng có thể chọn **Quên mật khẩu** tại trang đăng nhập. OpenSlot gửi link đặt lại mật khẩu qua Gmail; link dùng một lần, hết hạn sau 30 phút. Khi đổi thành công, mọi phiên đăng nhập cũ bị vô hiệu và người dùng quay lại đăng nhập bằng mật khẩu mới.
 
