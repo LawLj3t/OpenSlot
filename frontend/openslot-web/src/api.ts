@@ -84,7 +84,19 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
   headers.set('Content-Type', 'application/json')
   if (token) headers.set('Authorization', `Bearer ${token}`)
 
-  const response = await fetch(`${apiBase}${path}`, { ...init, headers })
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), 25_000)
+  let response: Response
+  try {
+    response = await fetch(`${apiBase}${path}`, { ...init, headers, signal: controller.signal })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('Yêu cầu đang mất quá lâu. Vui lòng thử lại.')
+    }
+    throw new Error('Không thể kết nối OpenSlot. Vui lòng kiểm tra mạng và thử lại.')
+  } finally {
+    window.clearTimeout(timeoutId)
+  }
   if (!response.ok) {
     const problem = await response.json().catch(() => null) as {
       detail?: string

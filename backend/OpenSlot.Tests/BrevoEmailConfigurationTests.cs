@@ -5,15 +5,15 @@ using OpenSlot.Api.Services;
 
 namespace OpenSlot.Tests;
 
-public sealed class GmailSmtpConfigurationTests
+public sealed class BrevoEmailConfigurationTests
 {
     [Fact]
-    public void CompleteGmailConfiguration_IsReadyToSend()
+    public void CompleteBrevoConfiguration_IsReadyToSend()
     {
         var service = CreateService(new EmailOptions
         {
-            GmailAddress = "openslot.demo@gmail.com",
-            GmailAppPassword = "abcdefghijklmnop",
+            BrevoApiKey = "xkeysib-test-key",
+            BrevoSenderEmail = "openslot.demo@gmail.com",
             PublicBaseUrl = "https://openslot-vn.onrender.com"
         });
 
@@ -21,17 +21,17 @@ public sealed class GmailSmtpConfigurationTests
     }
 
     [Fact]
-    public void MissingAppPassword_IsNotReadyToSend()
+    public void MissingApiKey_IsNotReadyToSend()
     {
         var service = CreateService(new EmailOptions
         {
-            GmailAddress = "openslot.demo@gmail.com",
+            BrevoSenderEmail = "openslot.demo@gmail.com",
             PublicBaseUrl = "https://openslot-vn.onrender.com"
         });
 
         Assert.False(service.IsConfigured);
     }
 
-    private static GmailSmtpEmailVerificationService CreateService(EmailOptions options) =>
-        new(Options.Create(options), NullLogger<GmailSmtpEmailVerificationService>.Instance);
+    private static BrevoEmailVerificationService CreateService(EmailOptions options) =>
+        new(new HttpClient { BaseAddress = new Uri("https://api.brevo.com/") }, Options.Create(options), NullLogger<BrevoEmailVerificationService>.Instance);
 }

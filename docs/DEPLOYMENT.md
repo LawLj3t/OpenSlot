@@ -12,8 +12,8 @@ Deploy Dockerfile ở thư mục gốc lên một container host. React được
 | `ConnectionStrings__OpenSlotDb` | `Data Source=/data/openslot.db` | `/data` nên là persistent volume |
 | `SeedDemoData` | `true` | Chỉ dùng bản mentor review |
 | `ASPNETCORE_URLS` | `http://+:8080` | Dockerfile đã đặt sẵn |
-| `Email__GmailAddress` | `openslot.demo@gmail.com` | Gmail dùng để gửi link xác minh |
-| `Email__GmailAppPassword` | mật khẩu ứng dụng 16 ký tự | Secret Gmail App Password, không commit vào Git |
+| `Email__BrevoApiKey` | `xkeysib-...` | Secret API key của Brevo, không commit vào Git |
+| `Email__BrevoSenderEmail` | `openslot.demo@gmail.com` | Gmail đã xác minh trong Brevo để gửi link |
 | `Email__FromName` | `OpenSlot` | Tên hiển thị trong email |
 | `Email__PublicBaseUrl` | `https://openslot-vn.onrender.com` | Domain công khai để tạo link xác minh |
 
@@ -43,9 +43,9 @@ Nếu host miễn phí không có persistent volume, app vẫn chạy nhưng d�
 
 ## Xác minh Gmail bằng link (demo miễn phí)
 
-OpenSlot dùng Gmail SMTP để gửi link xác minh khi người dùng đăng ký Gmail. Không dùng SMS hoặc OTP. Bật Xác minh 2 bước trên Gmail gửi thư, tạo **App Password** riêng cho OpenSlot rồi thêm bốn biến `Email__...` ở bảng trên vào secret/environment variables của hosting. Tuyệt đối không đặt App Password trong `appsettings.json` hoặc commit vào Git.
+OpenSlot dùng Brevo Email API qua HTTPS để gửi link xác minh khi người dùng đăng ký Gmail. Không dùng SMS hoặc OTP. Tạo tài khoản Brevo, xác minh Gmail gửi thư trong Brevo, tạo API key riêng cho OpenSlot rồi thêm bốn biến `Email__...` ở bảng trên vào secret/environment variables của hosting. Tuyệt đối không đặt API key trong `appsettings.json` hoặc commit vào Git.
 
-Gmail cá nhân có giới hạn gửi hằng ngày, nên cấu hình này chỉ dành cho demo. Người đăng ký có thể dùng bất kỳ Gmail nào; Gmail gửi thư chỉ là địa chỉ "From". Nếu chưa cấu hình SMTP, đăng ký mới sẽ trả thông báo dịch vụ email đang được thiết lập; tài khoản demo `@openslot.local` vẫn đăng nhập bình thường. Sau khi cấu hình, hãy đăng ký một Gmail thử nghiệm, mở link email và đăng nhập để kiểm tra toàn bộ luồng.
+Brevo miễn phí phù hợp cho demo nhưng có giới hạn gửi thư. Người đăng ký có thể dùng bất kỳ Gmail nào; Gmail gửi thư chỉ là địa chỉ "From" đã được xác minh trong Brevo. Render Free chặn SMTP nhưng cho phép luồng HTTPS này. Nếu chưa cấu hình API, đăng ký mới sẽ trả thông báo dịch vụ email đang được thiết lập; tài khoản demo `@openslot.local` vẫn đăng nhập bình thường. Sau khi cấu hình, hãy đăng ký một Gmail thử nghiệm, mở link email và đăng nhập để kiểm tra toàn bộ luồng.
 
 ## Render Free (cấu hình sẵn)
 

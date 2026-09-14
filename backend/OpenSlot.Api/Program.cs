@@ -130,7 +130,11 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
-builder.Services.AddScoped<IEmailVerificationService, GmailSmtpEmailVerificationService>();
+builder.Services.AddHttpClient<IEmailVerificationService, BrevoEmailVerificationService>(client =>
+{
+    client.BaseAddress = new Uri("https://api.brevo.com/");
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
 builder.Services.AddScoped<IPasswordHasher<Booking>, PasswordHasher<Booking>>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddHostedService<SlotLifecycleWorker>();

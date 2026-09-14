@@ -45,4 +45,4 @@ Kết quả: chỉ 1 booking được ghi nhận, không overbooking.
 - [ ] Trình duyệt được cấp quyền vị trí nếu demo khoảng cách.
 - [ ] Có Internet nếu muốn tải tile OpenStreetMap; phần còn lại vẫn chạy local.
 - [ ] Không chiếu `Jwt__Key` hoặc secret triển khai.
-- [ ] Cấu hình `Email__GmailAddress` và `Email__GmailAppPassword`, sau đó thử đăng ký một Gmail thật và mở link xác minh.
+- [ ] Cấu hình `Email__BrevoApiKey` và `Email__BrevoSenderEmail`, sau đó thử đăng ký một Gmail thật và mở link xác minh.
