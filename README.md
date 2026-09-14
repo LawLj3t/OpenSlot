@@ -21,7 +21,7 @@ Luồng khách hàng là chọn slot → quét QR VietinBank → chọn “Tôi 
 
 ## Xác minh Gmail
 
-Người dùng mới chỉ đăng ký bằng địa chỉ `@gmail.com`. OpenSlot gửi một link xác minh, và chỉ cho phép đăng nhập sau khi link được mở thành công. Luồng demo dùng Brevo Email API qua HTTPS, không dùng SMS/OTP; API key chỉ được để trong biến môi trường. Bất kỳ Gmail nào cũng có thể nhận link. Xem [hướng dẫn triển khai](docs/DEPLOYMENT.md) để cấu hình gửi email thật trên Render.
+Người dùng mới chỉ đăng ký bằng địa chỉ `@gmail.com`. OpenSlot gửi một link xác minh, và chỉ cho phép đăng nhập sau khi link được mở thành công. Luồng demo dùng Gmail API qua HTTPS và OAuth 2.0, không dùng SMS/OTP; OAuth secret và refresh token chỉ được để trong biến môi trường. Bất kỳ Gmail nào cũng có thể nhận link. Xem [hướng dẫn triển khai](docs/DEPLOYMENT.md) để cấu hình gửi email thật trên Render.
 
 ## Công nghệ
 
