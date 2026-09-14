@@ -18,6 +18,7 @@ builder.Logging.AddConsole();
 
 var connectionString = builder.Configuration.GetConnectionString("OpenSlotDb")
     ?? throw new InvalidOperationException("Connection string 'OpenSlotDb' is not configured.");
+var usesPostgreSql = IsPostgreSqlConnectionString(connectionString);
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("JWT configuration is missing.");
 if (string.IsNullOrWhiteSpace(jwtOptions.Key))
@@ -42,7 +43,16 @@ Directory.CreateDirectory(dataProtectionPath);
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionPath))
     .SetApplicationName("OpenSlot");
-builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connectionString));
+builder.Services.AddDbContext<AppDbContext>(options =>
+{
+    if (usesPostgreSql)
+    {
+        options.UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure());
+        return;
+    }
+
+    options.UseSqlite(connectionString);
+});
 builder.Services
     .AddIdentity<ApplicationUser, IdentityRole>(options =>
     {
@@ -145,7 +155,18 @@ app.UseForwardedHeaders();
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.MigrateAsync();
+    // The existing migrations were generated for SQLite. A new PostgreSQL
+    // database is created from the current EF model so provider-specific
+    // identity columns are generated correctly; SQLite keeps its migrations
+    // for local development and backwards compatibility.
+    if (usesPostgreSql)
+    {
+        await db.Database.EnsureCreatedAsync();
+    }
+    else
+    {
+        await db.Database.MigrateAsync();
+    }
     if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("SeedDemoData"))
     {
         await DbInitializer.InitializeAsync(scope.ServiceProvider);
@@ -180,5 +201,11 @@ if (File.Exists(spaIndexPath))
 }
 
 app.Run();
+
+static bool IsPostgreSqlConnectionString(string value) =>
+    value.StartsWith("Host=", StringComparison.OrdinalIgnoreCase)
+    || value.StartsWith("Server=", StringComparison.OrdinalIgnoreCase)
+    || value.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase)
+    || value.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase);
 
 public partial class Program;

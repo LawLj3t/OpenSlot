@@ -9,7 +9,7 @@ Deploy Dockerfile ở thư mục gốc lên một container host. React được
 | Tên | Giá trị mẫu | Ghi chú |
 | --- | --- | --- |
 | `Jwt__Key` | chuỗi ngẫu nhiên dài từ 32 byte | Lưu dưới dạng secret |
-| `ConnectionStrings__OpenSlotDb` | `Data Source=/data/openslot.db` | `/data` nên là persistent volume |
+| `ConnectionStrings__OpenSlotDb` | Chuỗi kết nối PostgreSQL | Bắt buộc dùng database persistent khi chạy công khai |
 | `SeedDemoData` | `true` | Chỉ dùng bản mentor review |
 | `ASPNETCORE_URLS` | `http://+:8080` | Dockerfile đã đặt sẵn |
 | `Email__GoogleClientId` | `...apps.googleusercontent.com` | OAuth client ID của Google Cloud |
@@ -37,7 +37,14 @@ Kiểm tra `http://localhost:8080/health`, sau đó mở `http://localhost:8080`
 
 1. Tạo web service/container từ repository Git.
 2. Chọn Dockerfile ở thư mục gốc và port `8080`.
-3. Tạo persistent disk/volume mount tại `/data` nếu nền tảng hỗ trợ.
+3. Tạo một PostgreSQL database persistent (ví dụ Neon, Supabase hoặc Render PostgreSQL) rồi đặt toàn bộ connection string vào `ConnectionStrings__OpenSlotDb`.
+4. Không dùng `Data Source=/tmp/openslot.db` trên Render: mỗi deploy sẽ xóa toàn bộ tài khoản, slot và booking.
+
+## Database trên môi trường công khai
+
+OpenSlot tự nhận diện chuỗi kết nối PostgreSQL bắt đầu bằng `Host=` hoặc `postgresql://`. Với PostgreSQL mới, ứng dụng tạo schema khi chạy lần đầu và seed dữ liệu demo khi `SeedDemoData=true`. Sau đó mọi thay đổi do người dùng tạo được lưu trong database cloud, độc lập với mỗi lần Render deploy.
+
+SQLite vẫn được giữ cho môi trường phát triển local. Không dùng SQLite trong thư mục tạm trên Render.
 4. Khai báo các biến môi trường ở trên, đặc biệt `Jwt__Key` dưới dạng secret.
 5. Deploy và kiểm tra `/health` trước khi gửi URL cho mentor.
 
