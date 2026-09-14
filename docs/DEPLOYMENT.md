@@ -50,11 +50,13 @@ SQLite vẫn được giữ cho môi trường phát triển local. Không dùng
 
 Nếu host miễn phí không có persistent volume, app vẫn chạy nhưng dữ liệu phát sinh có thể mất khi container restart; seed demo sẽ tạo lại dữ liệu mẫu. Đây là hạn chế chấp nhận được cho buổi review, không phù hợp sản phẩm thật.
 
-## Xác minh Gmail bằng link (demo miễn phí)
+## Xác minh Gmail và đặt lại mật khẩu bằng link (demo miễn phí)
 
 OpenSlot dùng Gmail API qua HTTPS để gửi link xác minh khi người dùng đăng ký Gmail. Không dùng SMS hoặc OTP. Trong Google Cloud Console, tạo OAuth client cho ứng dụng web, bật Gmail API và cấp scope `https://www.googleapis.com/auth/gmail.send` cho Gmail gửi thư. Lưu client secret và refresh token ở Render qua các biến `Email__...` trong bảng trên; tuyệt đối không đặt các giá trị này trong `appsettings.json` hoặc commit vào Git.
 
 Người đăng ký có thể dùng bất kỳ Gmail nào; Gmail gửi thư chỉ là địa chỉ "From" đã được cấp quyền OAuth. Render Free chặn SMTP nhưng không chặn Gmail API qua HTTPS. Nếu chưa cấu hình API, đăng ký mới sẽ trả thông báo dịch vụ email đang được thiết lập; tài khoản demo `@openslot.local` vẫn đăng nhập bình thường. Sau khi cấu hình, hãy đăng ký một Gmail thử nghiệm, mở link email và đăng nhập để kiểm tra toàn bộ luồng.
+
+Chức năng **Quên mật khẩu** dùng cùng Gmail API: hệ thống chỉ gửi link với tài khoản Gmail đã xác minh, token dùng một lần và hết hạn sau 30 phút. Sau khi đặt lại mật khẩu, security stamp đổi nên toàn bộ JWT đã cấp trước đó bị từ chối; người dùng phải đăng nhập lại.
 
 ## Render Free (cấu hình sẵn)
 

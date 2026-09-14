@@ -6,11 +6,13 @@ Ngày kiểm thử gần nhất: 14/09/2026.
 
 | Hạng mục | Kết quả |
 | --- | --- |
-| `dotnet test OpenSlot.slnx --no-restore` | 30 passed, 0 failed |
+| `dotnet test OpenSlot.slnx --no-restore` | 31 passed, 0 failed |
 | `npm run lint` | Thành công, 0 warning/error |
 | `npm run build` | Thành công, TypeScript và Vite production build |
 
 Unit test tập trung vào `SlotPolicy`, chuẩn hóa slug danh mục, validation số điện thoại và chỉ chấp nhận Gmail khi đăng ký: giá hợp lệ, giá deal thấp hơn giá gốc, thời gian bắt đầu/kết thúc, cửa sổ booking, capacity, điều kiện phát hành và tên danh mục tiếng Việt.
+
+Luồng bảo mật tài khoản kiểm thử token đặt lại mật khẩu: token Identity chỉ sử dụng được một lần, thay đổi mật khẩu đổi security stamp và token JWT cũ sẽ không còn hợp lệ.
 
 ## Smoke test API
 

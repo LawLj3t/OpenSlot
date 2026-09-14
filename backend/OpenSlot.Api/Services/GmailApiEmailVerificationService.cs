@@ -26,6 +26,18 @@ public sealed class GmailApiEmailVerificationService(
 
     public async Task SendConfirmationAsync(ApplicationUser user, string confirmationLink, CancellationToken cancellationToken = default)
     {
+        var html = $"<main style=\"font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#17233a\"><h1>Chào {HtmlEncoder.Default.Encode(user.DisplayName)},</h1><p>Nhấn nút bên dưới để xác minh email và hoàn tất tạo tài khoản OpenSlot.</p><p><a href=\"{HtmlEncoder.Default.Encode(confirmationLink)}\" style=\"display:inline-block;padding:12px 20px;border-radius:999px;background:#17233a;color:#fff;text-decoration:none;font-weight:bold\">Xác minh email</a></p><p style=\"color:#667085;font-size:13px\">Nếu bạn không tạo tài khoản OpenSlot, hãy bỏ qua email này.</p></main>";
+        await SendAsync(user, "Xác minh email tài khoản OpenSlot", html, cancellationToken);
+    }
+
+    public async Task SendPasswordResetAsync(ApplicationUser user, string resetLink, CancellationToken cancellationToken = default)
+    {
+        var html = $"<main style=\"font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#17233a\"><h1>Chào {HtmlEncoder.Default.Encode(user.DisplayName)},</h1><p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu OpenSlot của bạn.</p><p><a href=\"{HtmlEncoder.Default.Encode(resetLink)}\" style=\"display:inline-block;padding:12px 20px;border-radius:999px;background:#17233a;color:#fff;text-decoration:none;font-weight:bold\">Đặt lại mật khẩu</a></p><p>Link này chỉ có hiệu lực trong 30 phút và dùng được một lần.</p><p style=\"color:#667085;font-size:13px\">Nếu không phải bạn yêu cầu, hãy bỏ qua email này. Mật khẩu của bạn sẽ không thay đổi.</p></main>";
+        await SendAsync(user, "Đặt lại mật khẩu OpenSlot", html, cancellationToken);
+    }
+
+    private async Task SendAsync(ApplicationUser user, string subject, string html, CancellationToken cancellationToken)
+    {
         if (!IsConfigured)
         {
             throw new InvalidOperationException("Dịch vụ email chưa được cấu hình.");
@@ -33,7 +45,7 @@ public sealed class GmailApiEmailVerificationService(
 
         var recipientEmail = user.Email ?? throw new InvalidOperationException("Tài khoản không có địa chỉ email.");
         var accessToken = await GetAccessTokenAsync(cancellationToken);
-        var rawMessage = CreateRawMessage(recipientEmail, user.DisplayName, confirmationLink);
+        var rawMessage = CreateRawMessage(recipientEmail, subject, html);
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://gmail.googleapis.com/gmail/v1/users/me/messages/send")
         {
             Content = JsonContent.Create(new GmailSendRequest(rawMessage))
@@ -45,18 +57,18 @@ public sealed class GmailApiEmailVerificationService(
             using var response = await httpClient.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                logger.LogWarning("Gmail API rejected verification email for user {UserId} with status {StatusCode}", user.Id, (int)response.StatusCode);
+                logger.LogWarning("Gmail API rejected account email for user {UserId} with status {StatusCode}", user.Id, (int)response.StatusCode);
                 throw new InvalidOperationException("Dịch vụ email tạm thời chưa thể gửi thư. Vui lòng thử lại sau.");
             }
         }
         catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
-            logger.LogWarning(exception, "Gmail API timed out while sending verification email for user {UserId}", user.Id);
+            logger.LogWarning(exception, "Gmail API timed out while sending account email for user {UserId}", user.Id);
             throw new InvalidOperationException("Dịch vụ email phản hồi chậm. Vui lòng thử lại sau.", exception);
         }
         catch (HttpRequestException exception)
         {
-            logger.LogWarning(exception, "Gmail API request failed while sending verification email for user {UserId}", user.Id);
+            logger.LogWarning(exception, "Gmail API request failed while sending account email for user {UserId}", user.Id);
             throw new InvalidOperationException("Không thể kết nối dịch vụ email. Vui lòng thử lại sau.", exception);
         }
     }
@@ -91,15 +103,12 @@ public sealed class GmailApiEmailVerificationService(
         return token.AccessToken;
     }
 
-    private string CreateRawMessage(string recipientEmail, string displayName, string confirmationLink)
+    private string CreateRawMessage(string recipientEmail, string subject, string html)
     {
-        var safeName = HtmlEncoder.Default.Encode(displayName);
-        var safeLink = HtmlEncoder.Default.Encode(confirmationLink);
-        var html = $"<main style=\"font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#17233a\"><h1>Chào {safeName},</h1><p>Nhấn nút bên dưới để xác minh email và hoàn tất tạo tài khoản OpenSlot.</p><p><a href=\"{safeLink}\" style=\"display:inline-block;padding:12px 20px;border-radius:999px;background:#17233a;color:#fff;text-decoration:none;font-weight:bold\">Xác minh email</a></p><p style=\"color:#667085;font-size:13px\">Nếu bạn không tạo tài khoản OpenSlot, hãy bỏ qua email này.</p></main>";
         var message = string.Join("\r\n", [
             $"From: {EncodeHeader(_options.FromName)} <{_options.GoogleSenderEmail}>",
             $"To: <{recipientEmail}>",
-            $"Subject: {EncodeHeader("Xác minh email tài khoản OpenSlot")}",
+            $"Subject: {EncodeHeader(subject)}",
             "MIME-Version: 1.0",
             "Content-Type: text/html; charset=utf-8",
             "Content-Transfer-Encoding: base64",

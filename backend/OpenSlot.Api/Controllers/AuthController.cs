@@ -156,6 +156,71 @@ public sealed class AuthController(
         return Accepted(new EmailConfirmationResponse("Nếu Gmail này có tài khoản chưa xác minh, OpenSlot đã gửi lại link xác minh."));
     }
 
+    [HttpPost("forgot-password")]
+    [EnableRateLimiting("email-verification")]
+    [ProducesResponseType<PasswordResetRequestResponse>(StatusCodes.Status202Accepted)]
+    public async Task<ActionResult<PasswordResetRequestResponse>> ForgotPassword(ForgotPasswordRequest request, CancellationToken cancellationToken)
+    {
+        if (!emailVerificationService.IsConfigured)
+        {
+            throw new ApiException("Dịch vụ gửi email đang được thiết lập. Vui lòng thử lại sau.", StatusCodes.Status503ServiceUnavailable);
+        }
+
+        var user = await userManager.FindByEmailAsync(request.Email.Trim());
+        if (user is { EmailConfirmed: true, IsSuspended: false })
+        {
+            try
+            {
+                await SendPasswordResetAsync(user, cancellationToken);
+            }
+            catch
+            {
+                throw new ApiException("Không thể gửi email đặt lại mật khẩu. Vui lòng thử lại sau.", StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        return Accepted(new PasswordResetRequestResponse("Nếu Gmail này có tài khoản đã xác minh, OpenSlot đã gửi link đặt lại mật khẩu."));
+    }
+
+    [HttpPost("reset-password")]
+    [EnableRateLimiting("email-verification")]
+    [ProducesResponseType<EmailConfirmationResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<EmailConfirmationResponse>> ResetPassword(ResetPasswordRequest request, CancellationToken cancellationToken)
+    {
+        if (!string.Equals(request.Password, request.ConfirmPassword, StringComparison.Ordinal))
+        {
+            throw new ApiException("Mật khẩu xác nhận không khớp.", StatusCodes.Status400BadRequest);
+        }
+
+        var user = await userManager.FindByIdAsync(request.UserId);
+        if (user is null)
+        {
+            throw new ApiException("Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.", StatusCodes.Status400BadRequest);
+        }
+
+        string token;
+        try
+        {
+            token = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(request.Token));
+        }
+        catch (FormatException)
+        {
+            throw new ApiException("Link đặt lại mật khẩu không hợp lệ.", StatusCodes.Status400BadRequest);
+        }
+
+        var result = await userManager.ResetPasswordAsync(user, token, request.Password);
+        if (!result.Succeeded)
+        {
+            if (result.Errors.Any(error => error.Code == "InvalidToken"))
+            {
+                throw new ApiException("Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.", StatusCodes.Status400BadRequest);
+            }
+            return BadRequest(new { errors = result.Errors.Select(x => new { x.Code, x.Description }) });
+        }
+
+        return Ok(new EmailConfirmationResponse("Đặt lại mật khẩu thành công. Bạn có thể đăng nhập bằng mật khẩu mới."));
+    }
+
     [Authorize(Roles = RoleNames.Customer)]
     [HttpPost("provider-applications")]
     [ProducesResponseType<AuthResponse>(StatusCodes.Status201Created)]
@@ -242,5 +307,23 @@ public sealed class AuthController(
             ["token"] = encodedToken
         });
         await emailVerificationService.SendConfirmationAsync(user, link, cancellationToken);
+    }
+
+    private async Task SendPasswordResetAsync(ApplicationUser user, CancellationToken cancellationToken)
+    {
+        var publicBaseUrl = emailOptions.Value.PublicBaseUrl.TrimEnd('/');
+        if (!Uri.TryCreate(publicBaseUrl, UriKind.Absolute, out _))
+        {
+            throw new InvalidOperationException("Email:PublicBaseUrl is not configured.");
+        }
+
+        var token = await userManager.GeneratePasswordResetTokenAsync(user);
+        var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
+        var link = QueryHelpers.AddQueryString($"{publicBaseUrl}/reset-password", new Dictionary<string, string?>
+        {
+            ["userId"] = user.Id,
+            ["token"] = encodedToken
+        });
+        await emailVerificationService.SendPasswordResetAsync(user, link, cancellationToken);
     }
 }

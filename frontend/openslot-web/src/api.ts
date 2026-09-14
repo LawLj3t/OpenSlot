@@ -1,4 +1,4 @@
-import type { AdminCategory, AdminDashboard, AdminProviderDetail, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, DealSlot, EmailConfirmationResponse, MyProviderProfile, Notification, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, RegistrationResponse, Report, Session, SlotHold } from './types'
+import type { AdminCategory, AdminDashboard, AdminProviderDetail, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, DealSlot, EmailConfirmationResponse, MyProviderProfile, Notification, PasswordResetRequestResponse, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, RegistrationResponse, Report, Session, SlotHold } from './types'
 
 const apiBase = import.meta.env.VITE_API_URL ?? '/api'
 const geocodingBase = import.meta.env.VITE_GEOCODING_URL ?? 'https://nominatim.openstreetmap.org'
@@ -141,6 +141,12 @@ export const api = {
   }),
   resendVerification: (email: string) => request<EmailConfirmationResponse>('/auth/resend-verification', {
     method: 'POST', body: JSON.stringify({ email }),
+  }),
+  forgotPassword: (email: string) => request<PasswordResetRequestResponse>('/auth/forgot-password', {
+    method: 'POST', body: JSON.stringify({ email }),
+  }),
+  resetPassword: (userId: string, token: string, password: string, confirmPassword: string) => request<EmailConfirmationResponse>('/auth/reset-password', {
+    method: 'POST', body: JSON.stringify({ userId, token, password, confirmPassword }),
   }),
   applyForProvider: (payload: object, token: string) => request<Session>('/auth/provider-applications', { method: 'POST', body: JSON.stringify(payload) }, token),
   book: (slotId: string, token: string) => request<BookingConfirmation>(`/bookings/slots/${slotId}`, { method: 'POST' }, token),

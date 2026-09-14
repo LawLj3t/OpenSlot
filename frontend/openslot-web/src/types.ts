@@ -52,6 +52,10 @@ export type EmailConfirmationResponse = {
   message: string
 }
 
+export type PasswordResetRequestResponse = {
+  message: string
+}
+
 export type PortalRole = 'Customer' | 'Provider' | 'Manager' | 'Admin'
 
 export type Booking = {

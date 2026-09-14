@@ -70,6 +70,8 @@ builder.Services
     })
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
+builder.Services.Configure<DataProtectionTokenProviderOptions>(options =>
+    options.TokenLifespan = TimeSpan.FromMinutes(30));
 
 builder.Services
     .AddAuthentication(options =>
@@ -101,9 +103,11 @@ builder.Services
                     return;
                 }
 
+                var securityStamp = context.Principal?.FindFirstValue("security_stamp");
                 var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
                 var isActive = await db.Users.AnyAsync(
-                    user => user.Id == userId && !user.IsSuspended,
+                    user => user.Id == userId && !user.IsSuspended &&
+                            !string.IsNullOrWhiteSpace(securityStamp) && user.SecurityStamp == securityStamp,
                     context.HttpContext.RequestAborted);
                 if (!isActive)
                 {
