@@ -47,7 +47,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 {
     if (usesPostgreSql)
     {
-        options.UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure());
+        // Booking uses an explicit transaction to prevent two customers from
+        // reserving the same capacity. Npgsql's automatic retry strategy does
+        // not support a manually managed transaction unless every operation is
+        // wrapped in an execution strategy, so use the provider default here.
+        options.UseNpgsql(connectionString);
         return;
     }
 
