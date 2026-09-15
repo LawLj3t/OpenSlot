@@ -214,7 +214,31 @@ var spaIndexPath = Path.Combine(app.Environment.WebRootPath ?? string.Empty, "in
 if (File.Exists(spaIndexPath))
 {
     app.UseDefaultFiles();
-    app.UseStaticFiles();
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        OnPrepareResponse = ctx =>
+        {
+            var path = ctx.File.PhysicalPath ?? ctx.Context.Request.Path.Value ?? string.Empty;
+            // Cache JS/CSS assets with hash in filename for 1 year (immutable)
+            if (path.EndsWith(".js", StringComparison.OrdinalIgnoreCase) ||
+                path.EndsWith(".css", StringComparison.OrdinalIgnoreCase))
+            {
+                ctx.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable";
+            }
+            // Never cache index.html - always fetch fresh
+            else if (path.EndsWith("index.html", StringComparison.OrdinalIgnoreCase))
+            {
+                ctx.Context.Response.Headers.CacheControl = "no-cache,no-store,must-revalidate";
+                ctx.Context.Response.Headers.Pragma = "no-cache";
+                ctx.Context.Response.Headers.Expires = "0";
+            }
+            // Cache other assets (fonts, images) for 7 days
+            else
+            {
+                ctx.Context.Response.Headers.CacheControl = "public,max-age=604800";
+            }
+        }
+    });
 }
 app.UseCors("OpenSlotWeb");
 app.UseAuthentication();
