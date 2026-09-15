@@ -231,6 +231,13 @@ if (File.Exists(spaIndexPath))
                 ctx.Context.Response.Headers.CacheControl = "no-cache,no-store,must-revalidate";
                 ctx.Context.Response.Headers.Pragma = "no-cache";
                 ctx.Context.Response.Headers.Expires = "0";
+                // Add ETag based on file modification time to force revalidation
+                var fileInfo = new System.IO.FileInfo(path);
+                if (fileInfo.Exists)
+                {
+                    var etag = $"\"{fileInfo.LastWriteTimeUtc.Ticks:X}\"";
+                    ctx.Context.Response.Headers.ETag = etag;
+                }
             }
             // Cache other assets (fonts, images) for 7 days
             else
