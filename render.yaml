@@ -3,6 +3,7 @@ services:
     name: openslot-lawlj3et
     runtime: docker
     plan: free
+    branch: main
     autoDeployTrigger: commit
     healthCheckPath: /health
     envVars:
