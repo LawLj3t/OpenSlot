@@ -12,7 +12,7 @@
 .auth-experience .auth-pitch > .brand { display: none; }
 .auth-pitch-copy { position: relative; z-index: 3; width: min(100%, 470px); margin-top: clamp(105px, 17vh, 185px); }
 .auth-experience .auth-pitch .eyebrow { color: #ff896d; margin-bottom: 17px; }
-.auth-experience .auth-pitch h1 { max-width: 520px; margin: 0; color: #fff; font-size: clamp(38px, 3.55vw, 62px); line-height: 1.05; letter-spacing: -2.8px; }
+.auth-experience .auth-pitch h1 { max-width: 520px; margin: 0; color: #fff; font-size: clamp(24px, 2.8vw, 32px); line-height: 1.45; letter-spacing: -1.2px; }
 .auth-experience .auth-pitch p:not(.eyebrow) { max-width: 395px; margin: 20px 0 0; color: #d4dce7; font-size: 15px; line-height: 1.62; }
 
 .auth-visuals { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
@@ -52,14 +52,14 @@
 @media (max-width: 1150px) and (min-width: 901px) {
   .auth-experience .auth-visuals { transform: scale(.76); transform-origin: right center; }
   .auth-experience .auth-pitch-copy { margin-top: clamp(105px, 18vh, 165px); }
-  .auth-experience .auth-pitch h1 { font-size: clamp(36px, 4vw, 48px); }
+  .auth-experience .auth-pitch h1 { font-size: clamp(24px, 2.8vw, 32px); }
 }
 
 @media (max-width: 900px) {
   .auth-page.auth-experience { display: block; padding: 0; }
   .auth-experience .auth-pitch { min-height: 310px; padding: 32px 28px; border-radius: 0; }
   .auth-experience .auth-pitch-copy { width: 100%; margin-top: 58px; }
-  .auth-experience .auth-pitch h1 { font-size: clamp(34px, 8vw, 48px); }
+  .auth-experience .auth-pitch h1 { font-size: clamp(24px, 2.8vw, 32px); }
   .auth-experience .auth-pitch p:not(.eyebrow) { max-width: 510px; }
   .auth-experience .auth-visuals { display: none; }
   .auth-experience .quote { display: none; }
