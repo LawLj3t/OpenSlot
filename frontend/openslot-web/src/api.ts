@@ -32,7 +32,11 @@ const geocodeCacheKey = 'openslot-geocoding-cache-v2'
 
 function readGeocodeCache(): Record<string, GeocodedLocation> {
   try { return JSON.parse(localStorage.getItem(geocodeCacheKey) ?? '{}') as Record<string, GeocodedLocation> }
-  catch { return {} }
+  catch (error) {
+    console.warn('Geocoding cache corrupted, resetting:', error)
+    localStorage.removeItem(geocodeCacheKey)
+    return {}
+  }
 }
 
 function toGeocodedLocation(result: NominatimResult): GeocodedLocation {
@@ -59,7 +63,11 @@ async function geocodeLocation(query: string): Promise<GeocodedLocation | null> 
 
   const location = toGeocodedLocation(result)
   cache[normalized] = location
-  localStorage.setItem(geocodeCacheKey, JSON.stringify(cache))
+  try {
+    localStorage.setItem(geocodeCacheKey, JSON.stringify(cache))
+  } catch (error) {
+    console.warn('Cannot save geocode cache (storage quota exceeded):', error)
+  }
   return location
 }
 
@@ -76,11 +84,15 @@ async function reverseGeocodeLocation(latitude: number, longitude: number): Prom
 
   const location = toGeocodedLocation(result)
   cache[cacheKey] = location
-  localStorage.setItem(geocodeCacheKey, JSON.stringify(cache))
+  try {
+    localStorage.setItem(geocodeCacheKey, JSON.stringify(cache))
+  } catch (error) {
+    console.warn('Cannot save geocode cache (storage quota exceeded):', error)
+  }
   return location
 }
 
-async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}, token?: string, retryCount = 0): Promise<T> {
   const headers = new Headers(init.headers)
   headers.set('Content-Type', 'application/json')
   if (token) headers.set('Authorization', `Bearer ${token}`)
@@ -91,8 +103,17 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
   try {
     response = await fetch(`${apiBase}${path}`, { ...init, headers, signal: controller.signal })
   } catch (error) {
+    window.clearTimeout(timeoutId)
     if (error instanceof DOMException && error.name === 'AbortError') {
+      if (retryCount < 2) {
+        await new Promise(resolve => window.setTimeout(resolve, 1000 * (retryCount + 1)))
+        return request<T>(path, init, token, retryCount + 1)
+      }
       throw new Error('Yêu cầu đang mất quá lâu. Vui lòng thử lại.')
+    }
+    if (error instanceof TypeError && retryCount < 2) {
+      await new Promise(resolve => window.setTimeout(resolve, 1000 * (retryCount + 1)))
+      return request<T>(path, init, token, retryCount + 1)
     }
     throw new Error('Không thể kết nối OpenSlot. Vui lòng kiểm tra mạng và thử lại.')
   } finally {
