@@ -296,7 +296,7 @@ function AuthPage({ mode, onAuthenticated }: { mode: 'login' | 'register'; onAut
   return <div className="auth-page auth-experience">
     <section className="auth-pitch">
       <NavLink to="/" className="brand" aria-label="OpenSlot - Trang chủ"><span className="brand-mark"><i className="bi bi-plus-lg" /></span><span className="brand-open">Open</span><span>Slot</span></NavLink>
-      <div className="auth-pitch-copy"><p className="eyebrow">{mode === 'login' ? 'Ưu đãi sát giờ' : 'Tận hưởng thông minh'}</p><h1>{mode === 'login' ? <>Chỗ trống giá tốt,<br />tận hưởng trọn vẹn<br />mọi khoảnh khắc.</> : <>Khoảnh khắc trống<br />cũng đáng giá.</>}</h1><p>{mode === 'login' ? 'Khám phá dịch vụ còn trống với mức giá hợp lý, sẵn sàng cho trải nghiệm của bạn.' : 'Chọn dịch vụ đúng nơi, đúng thời điểm, đúng ngân sách.'}</p></div>
+      <div className="auth-pitch-copy"><p className="eyebrow">{mode === 'login' ? 'Ưu đãi sát giờ' : 'Tận hưởng thông minh'}</p><h1>{mode === 'login' ? <>Chỗ trống giá tốt,<br />tận hưởng trọn vẹn</> : <>Khoảnh khắc trống<br />cũng đáng giá.</>}</h1><p>{mode === 'login' ? 'Khám phá dịch vụ còn trống với mức giá hợp lý, sẵn sàng cho trải nghiệm của bạn.' : 'Chọn dịch vụ đúng nơi, đúng thời điểm, đúng ngân sách.'}</p></div>
       {mode === 'login' && <AuthVisuals />}
       <div className="quote">Những khoảnh khắc đáng giá<br />luôn có chỗ chờ bạn.<span /></div>
     </section>
