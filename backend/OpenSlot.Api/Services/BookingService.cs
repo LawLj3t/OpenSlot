@@ -60,6 +60,17 @@ public sealed class BookingService(
             await transaction.CommitAsync(cancellationToken);
             await PublishAvailabilityAsync(slot, activeHoldCount, "booking-confirmed", CancellationToken.None);
 
+            var providerUserId = slot.ServiceOffering?.Venue?.ProviderProfile?.UserId;
+            if (!string.IsNullOrWhiteSpace(providerUserId))
+            {
+                await availabilityNotifier.PublishNotificationAsync(
+                    providerUserId,
+                    "Có booking mới",
+                    $"{slot.ServiceOffering?.Name ?? "Dịch vụ"} vừa có thêm một khách đặt chỗ ({booking.PublicCode}).",
+                    "/provider",
+                    CancellationToken.None);
+            }
+
             return new BookingConfirmationResponse(
                 booking.Id,
                 booking.PublicCode,
@@ -233,6 +244,18 @@ public sealed class BookingService(
             await transaction.CommitAsync(cancellationToken);
 
             await PublishAvailabilityAsync(slot, activeHoldCount, "booking-confirmed", CancellationToken.None);
+
+            var providerUserId = slot.ServiceOffering?.Venue?.ProviderProfile?.UserId;
+            if (!string.IsNullOrWhiteSpace(providerUserId))
+            {
+                await availabilityNotifier.PublishNotificationAsync(
+                    providerUserId,
+                    "Có booking mới",
+                    $"{slot.ServiceOffering?.Name ?? "Dịch vụ"} vừa có thêm một khách đặt chỗ ({booking.PublicCode}).",
+                    "/provider",
+                    CancellationToken.None);
+            }
+
             return ToConfirmation(booking, pin, slot);
         }
         catch (DbUpdateConcurrencyException)
@@ -295,6 +318,9 @@ public sealed class BookingService(
         var now = DateTime.UtcNow;
         var booking = await db.Bookings
             .Include(x => x.DealSlot)
+                .ThenInclude(x => x.ServiceOffering)
+                    .ThenInclude(x => x.Venue)
+                        .ThenInclude(x => x.ProviderProfile)
             .SingleOrDefaultAsync(x => x.Id == bookingId && x.CustomerUserId == customerUserId, cancellationToken)
             ?? throw new ApiException("Không tìm thấy booking.", StatusCodes.Status404NotFound);
 
@@ -323,8 +349,36 @@ public sealed class BookingService(
 
         db.AuditLogs.Add(CreateAuditLog(customerUserId, "booking.cancelled", nameof(Booking), booking.Id.ToString(), null));
         db.Notifications.Add(new Notification { UserId = customerUserId, Title = "Đã hủy booking", Message = $"Booking {booking.PublicCode} đã được hủy.", Link = "/bookings" });
+
+        var providerUserId = booking.DealSlot.ServiceOffering?.Venue?.ProviderProfile?.UserId;
+        var serviceName = booking.DealSlot.ServiceOffering?.Name ?? "Dịch vụ";
+        var reasonSuffix = string.IsNullOrWhiteSpace(reason) ? string.Empty : $" Lý do: {reason.Trim()}.";
+        var providerTitle = "Khách đã hủy booking";
+        var providerMessage = $"Khách hàng vừa hủy booking {booking.PublicCode} ({serviceName}).{reasonSuffix} Slot đã được tự động mở lại.";
+
+        if (!string.IsNullOrWhiteSpace(providerUserId))
+        {
+            db.Notifications.Add(new Notification
+            {
+                UserId = providerUserId,
+                Title = providerTitle,
+                Message = providerMessage,
+                Link = "/provider"
+            });
+        }
+
         await db.SaveChangesAsync(cancellationToken);
         await PublishAvailabilityAsync(booking.DealSlot, activeHoldCount, "booking-cancelled", CancellationToken.None);
+
+        if (!string.IsNullOrWhiteSpace(providerUserId))
+        {
+            await availabilityNotifier.PublishNotificationAsync(
+                providerUserId,
+                providerTitle,
+                providerMessage,
+                "/provider",
+                CancellationToken.None);
+        }
     }
 
     public async Task CheckInAsync(string providerUserId, CheckInRequest request, CancellationToken cancellationToken = default)

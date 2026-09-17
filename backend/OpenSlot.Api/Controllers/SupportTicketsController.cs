@@ -7,12 +7,18 @@ using OpenSlot.Api.Data;
 using OpenSlot.Api.Domain;
 using OpenSlot.Api.Domain.Entities;
 using OpenSlot.Api.Infrastructure;
+using OpenSlot.Api.Realtime;
+using OpenSlot.Api.Services;
 
 namespace OpenSlot.Api.Controllers;
 
 [ApiController]
 [Route("api/support-tickets")]
-public sealed class SupportTicketsController(AppDbContext db) : ControllerBase
+public sealed class SupportTicketsController(
+    AppDbContext db,
+    IEmailVerificationService emailService,
+    ISlotAvailabilityNotifier availabilityNotifier,
+    ILogger<SupportTicketsController> logger) : ControllerBase
 {
     [AllowAnonymous]
     [HttpPost]
@@ -147,7 +153,45 @@ public sealed class SupportTicketsController(AppDbContext db) : ControllerBase
             });
         }
 
+        // If ticket was submitted by a registered user, create an in-app notification
+        if (!string.IsNullOrWhiteSpace(ticket.UserId))
+        {
+            var notifTitle = "CSKH đã phản hồi yêu cầu hỗ trợ";
+            var notifMessage = $"Yêu cầu '{ticket.Category}' của bạn đã được {resolverName} phản hồi: \"{resolutionNote}\"";
+            db.Notifications.Add(new Notification
+            {
+                UserId = ticket.UserId,
+                Title = notifTitle,
+                Message = notifMessage,
+                Link = "/help"
+            });
+            await availabilityNotifier.PublishNotificationAsync(
+                ticket.UserId,
+                notifTitle,
+                notifMessage,
+                "/help",
+                CancellationToken.None);
+        }
+
         await db.SaveChangesAsync(cancellationToken);
+
+        // Send email response to the sender's email address
+        try
+        {
+            await emailService.SendSupportTicketResolutionAsync(
+                ticket.SenderEmail,
+                ticket.SenderEmail.Split('@')[0],
+                ticket.Id,
+                ticket.Category,
+                ticket.Content,
+                resolutionNote,
+                resolverName,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to dispatch resolution email to {Email} for ticket {TicketId}", ticket.SenderEmail, ticket.Id);
+        }
 
         return Ok(ToDto(ticket));
     }

@@ -5,7 +5,7 @@ import { Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams, 
 import { QRCodeSVG } from 'qrcode.react'
 import { api } from './api'
 import type { GeocodedLocation } from './api'
-import { useSlotAvailability } from './realtime'
+import { useRealtimeNotifications, useSlotAvailability, type RealtimeNotificationPayload } from './realtime'
 import type { AdminCategory, AdminDashboard, AdminProviderDetail, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, DealSlot, MyProviderProfile, Notification, PortalRole, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, Report, Session, SlotHold } from './types'
 import { HelpCenterPage } from './HelpCenterPage'
 import { SupportRequestPage } from './SupportRequestPage'
@@ -70,6 +70,10 @@ function getStoredSession(): Session | null {
 function App() {
   const navigate = useNavigate()
   const [session, setSession] = useState<Session | null>(getStoredSession)
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [realtimeToast, setRealtimeToast] = useState<RealtimeNotificationPayload | null>(null)
+  const toastTimeoutRef = useRef<number | null>(null)
+
   const saveSession = (next: Session | null) => { const normalized = next ? { ...next, activeRole: activePortalRole(next) } : null; setSession(normalized); if (normalized) localStorage.setItem(sessionKey, JSON.stringify(normalized)); else localStorage.removeItem(sessionKey) }
   const switchPortal = (role: PortalRole) => {
     if (!session?.user.roles.includes(role)) return
@@ -78,6 +82,33 @@ function App() {
     navigate(homeFor(next))
   }
   const activeRole = activePortalRole(session); const isProvider = hasRole(session, 'Provider')
+
+  const checkUnread = useCallback(() => {
+    if (!session?.accessToken) {
+      setUnreadCount(0)
+      return
+    }
+    api.notifications(session.accessToken)
+      .then((items) => setUnreadCount(items.filter((x) => !x.isRead).length))
+      .catch(() => {})
+  }, [session])
+
+  useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- notification count loaded from external request lifecycle
+    checkUnread()
+  }, [checkUnread])
+
+  useRealtimeNotifications(session?.user.id, useCallback((payload) => {
+    setUnreadCount((prev) => prev + 1)
+    setRealtimeToast(payload)
+    if (toastTimeoutRef.current) {
+      window.clearTimeout(toastTimeoutRef.current)
+    }
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setRealtimeToast(null)
+    }, 7000)
+  }, []))
+
   return <>
     <header className="site-header">
       <NavLink to="/" className="brand" aria-label="OpenSlot - Trang chủ"><span className="brand-mark"><i className="bi bi-plus-lg" /></span><span className="brand-open">Open</span><span>Slot</span></NavLink>
@@ -87,7 +118,7 @@ function App() {
           <i className="bi bi-question-circle" />
           <span>Hỗ Trợ</span>
         </NavLink>
-        {session ? <><NavLink to="/notifications" className="notification-link" aria-label="Thông báo"><i className="bi bi-bell" /></NavLink><span className="user-label"><b>{session.user.displayName}</b>{session.user.roles.filter((role) => isPortalRole(role)).length > 1 ? <select aria-label="Chuyển khu vực sử dụng" value={activeRole} onChange={(event) => switchPortal(event.target.value as PortalRole)}>{session.user.roles.filter(isPortalRole).map((role) => <option key={role} value={role}>{portalLabel(role)}</option>)}</select> : <small>{portalLabel(activeRole)}</small>}</span><button className="btn btn-link text-decoration-none" onClick={() => saveSession(null)}>Đăng xuất</button></> : <><NavLink className="btn btn-link text-decoration-none" to="/login">Đăng nhập</NavLink><NavLink className="btn btn-primary rounded-pill px-4" to="/register">Tạo tài khoản</NavLink></>}
+        {session ? <><NavLink to="/notifications" className="notification-link" aria-label="Thông báo"><i className="bi bi-bell" />{unreadCount > 0 && <span className="notification-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}</NavLink><span className="user-label"><b>{session.user.displayName}</b>{session.user.roles.filter((role) => isPortalRole(role)).length > 1 ? <select aria-label="Chuyển khu vực sử dụng" value={activeRole} onChange={(event) => switchPortal(event.target.value as PortalRole)}>{session.user.roles.filter(isPortalRole).map((role) => <option key={role} value={role}>{portalLabel(role)}</option>)}</select> : <small>{portalLabel(activeRole)}</small>}</span><button className="btn btn-link text-decoration-none" onClick={() => saveSession(null)}>Đăng xuất</button></> : <><NavLink className="btn btn-link text-decoration-none" to="/login">Đăng nhập</NavLink><NavLink className="btn btn-primary rounded-pill px-4" to="/register">Tạo tài khoản</NavLink></>}
       </div>
     </header>
     <main><Routes>
@@ -107,11 +138,48 @@ function App() {
       <Route path="/help" element={<HelpCenterPage />} />
       <Route path="/help/request" element={<SupportRequestPage session={session} />} />
       <Route path="/cskh" element={(hasRole(session, 'CSKH') || hasRole(session, 'Manager') || hasRole(session, 'Admin')) ? <CskhPage session={session!} /> : <Navigate to={session ? homeFor(session) : '/login'} replace />} />
-      <Route path="/notifications" element={session ? <NotificationsPage session={session} /> : <Navigate to="/login" replace />} />
+      <Route path="/notifications" element={session ? <NotificationsPage session={session} onRead={checkUnread} /> : <Navigate to="/login" replace />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes></main>
     <footer><div><b>OpenSlot</b><span>Săn thời điểm trống. Tận hưởng giá hợp lý.</span></div><small>Demo đồ án cá nhân · ASP.NET Core + React</small></footer>
     <OpenSlotWebChat session={session} activeRole={activeRole} />
+    {realtimeToast && (
+      <div className="realtime-notification-toast" role="alert">
+        <div className="toast-icon"><i className="bi bi-bell-fill" /></div>
+        <div
+          className="toast-content"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            const link = realtimeToast.link
+            setRealtimeToast(null)
+            if (link) {
+              try {
+                const url = new URL(link, window.location.origin)
+                if (url.origin === window.location.origin) navigate(url.pathname + url.search + url.hash)
+                else window.location.assign(link)
+              } catch {
+                navigate(link)
+              }
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              const link = realtimeToast.link
+              setRealtimeToast(null)
+              if (link) navigate(link)
+            }
+          }}
+        >
+          <strong>{realtimeToast.title}</strong>
+          <p>{realtimeToast.message}</p>
+        </div>
+        <button className="toast-close" onClick={() => setRealtimeToast(null)} aria-label="Đóng">
+          <i className="bi bi-x-lg" />
+        </button>
+      </div>
+    )}
   </>
 }
 
@@ -682,9 +750,78 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
   const [stats, setStats] = useState<AdminDashboard | null>(null)
   const [filter, setFilter] = useState<number | undefined>()
   const [error, setError] = useState(''); const [message, setMessage] = useState(''); const [loading, setLoading] = useState(true); const isAdmin = mode === 'admin'
+
+  const [providerSearch, setProviderSearch] = useState('')
+  const [userSearch, setUserSearch] = useState('')
+  const [serviceSearch, setServiceSearch] = useState('')
+  const [slotSearch, setSlotSearch] = useState('')
+  const [reportSearch, setReportSearch] = useState('')
+
+  const [selectedProviders, setSelectedProviders] = useState<string[]>([])
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
+  const [selectedServices, setSelectedServices] = useState<string[]>([])
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([])
+  const [selectedReports, setSelectedReports] = useState<string[]>([])
+
   // oxlint-disable-next-line react/set-state-in-effect -- loading belongs to the request lifecycle
   const refresh = () => { setLoading(true); Promise.all([api.adminProviders(session.accessToken, filter), api.adminDashboard(session.accessToken), api.reports(session.accessToken), api.adminUsers(session.accessToken), api.adminServices(session.accessToken), api.adminSlots(session.accessToken)]).then(([providerData, dashboardData, reportData, userData, serviceData, slotData]) => { setProviders(providerData); setStats(dashboardData); setReports(reportData); setUsers(userData); setManagedServices(serviceData); setManagedSlots(slotData) }).catch((e: Error) => setError(e.message)).finally(() => setLoading(false)) }
   useEffect(refresh, [session.accessToken, filter])
+
+  const filteredProviders = useMemo(() => {
+    if (!providerSearch.trim()) return providers
+    const q = normalizeSearch(providerSearch)
+    return providers.filter((p) =>
+      normalizeSearch(p.businessName).includes(q) ||
+      normalizeSearch(p.ownerName).includes(q) ||
+      normalizeSearch(p.ownerEmail).includes(q) ||
+      normalizeSearch(p.contactPhone).includes(q) ||
+      (p.description && normalizeSearch(p.description).includes(q))
+    )
+  }, [providers, providerSearch])
+
+  const filteredUsers = useMemo(() => {
+    if (!userSearch.trim()) return users
+    const q = normalizeSearch(userSearch)
+    return users.filter((u) =>
+      normalizeSearch(u.displayName).includes(q) ||
+      normalizeSearch(u.email).includes(q) ||
+      u.roles.some((r) => normalizeSearch(roleLabel([r])).includes(q) || normalizeSearch(r).includes(q))
+    )
+  }, [users, userSearch])
+
+  const filteredServices = useMemo(() => {
+    if (!serviceSearch.trim()) return managedServices
+    const q = normalizeSearch(serviceSearch)
+    return managedServices.filter((s) =>
+      normalizeSearch(s.name).includes(q) ||
+      normalizeSearch(s.providerName).includes(q) ||
+      (s.categoryName && normalizeSearch(s.categoryName).includes(q)) ||
+      (s.venueName && normalizeSearch(s.venueName).includes(q))
+    )
+  }, [managedServices, serviceSearch])
+
+  const filteredSlots = useMemo(() => {
+    if (!slotSearch.trim()) return managedSlots
+    const q = normalizeSearch(slotSearch)
+    return managedSlots.filter((s) =>
+      normalizeSearch(s.serviceName).includes(q) ||
+      normalizeSearch(s.venueName).includes(q) ||
+      normalizeSearch(s.providerName).includes(q)
+    )
+  }, [managedSlots, slotSearch])
+
+  const filteredReports = useMemo(() => {
+    if (!reportSearch.trim()) return reports
+    const q = normalizeSearch(reportSearch)
+    return reports.filter((r) =>
+      normalizeSearch(r.targetType).includes(q) ||
+      normalizeSearch(r.targetId).includes(q) ||
+      normalizeSearch(r.reporterName).includes(q) ||
+      normalizeSearch(r.reporterEmail).includes(q) ||
+      normalizeSearch(r.reason).includes(q)
+    )
+  }, [reports, reportSearch])
+
   const update = async (provider: ProviderProfile, action: 'approve' | 'suspend' | 'reject') => { try { if (action === 'approve') await api.approveProvider(provider.id, session.accessToken); else if (action === 'reject') await api.rejectProvider(provider.id, session.accessToken); else await api.suspendProvider(provider.id, session.accessToken); const actionText = action === 'approve' ? 'duyệt' : action === 'reject' ? 'yêu cầu bổ sung hồ sơ' : 'tạm khóa'; setMessage(`${provider.businessName} đã được ${actionText}.`); refresh() } catch (e) { setError(e instanceof Error ? e.message : 'Không thể cập nhật provider.') } }
   const resolve = async (report: Report) => { try { await api.resolveReport(report.id, 'Đã kiểm tra và xử lý bởi quản trị viên.', session.accessToken); setMessage('Báo cáo đã được xử lý.'); refresh() } catch (e) { setError(e instanceof Error ? e.message : 'Không thể xử lý báo cáo.') } }
   const toggleUser = async (user: AdminUser) => { try { if (user.isSuspended) await api.restoreUser(user.id, session.accessToken); else await api.suspendUser(user.id, session.accessToken); setMessage(`Đã ${user.isSuspended ? 'mở khóa' : 'tạm khóa'} tài khoản ${user.email}.`); refresh() } catch (e) { setError(e instanceof Error ? e.message : 'Không thể cập nhật tài khoản.') } }
@@ -702,24 +839,576 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
     }
   }
   const viewProvider = async (provider: ProviderProfile) => { setError(''); setProviderDetail(null); setDetailLoading(true); try { setProviderDetail(await api.adminProviderDetail(provider.id, session.accessToken)) } catch (e) { setError(e instanceof Error ? e.message : 'Không thể tải chi tiết đối tác.') } finally { setDetailLoading(false) } }
+
+  const bulkDeleteProviders = async () => {
+    if (!window.confirm(`Xác nhận xóa ${selectedProviders.length} đối tác đã chọn? Chỉ đối tác không còn booking hoặc hold đang hoạt động mới có thể xóa.`)) return
+    try {
+      const res = await api.bulkDeleteProviders(selectedProviders, session.accessToken)
+      let msg = `Đã xóa ${res.deletedCount} đối tác.`
+      if (res.skippedCount > 0) msg += ` Bỏ qua ${res.skippedCount} đối tác do còn booking hoặc hold hoạt động.`
+      setMessage(msg)
+      setSelectedProviders([])
+      refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể xóa hàng loạt đối tác.')
+    }
+  }
+
+  const bulkSetProviderStatus = async (status: number, label: string) => {
+    if (!window.confirm(`Xác nhận ${label} ${selectedProviders.length} đối tác đã chọn?`)) return
+    try {
+      const res = await api.bulkSetProviderStatus(selectedProviders, status, session.accessToken)
+      setMessage(`Đã cập nhật trạng thái cho ${res.updatedCount} đối tác.`)
+      setSelectedProviders([])
+      refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể cập nhật đối tác.')
+    }
+  }
+
+  const bulkSuspendUsers = async (suspend: boolean) => {
+    const label = suspend ? 'tạm khóa' : 'mở khóa'
+    if (!window.confirm(`Xác nhận ${label} ${selectedUsers.length} tài khoản đã chọn?`)) return
+    try {
+      const res = await api.bulkSetUsersSuspended(selectedUsers, suspend, session.accessToken)
+      setMessage(`Đã ${label} ${res.updatedCount} tài khoản.`)
+      setSelectedUsers([])
+      refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể cập nhật tài khoản.')
+    }
+  }
+
+  const bulkToggleServices = async (active: boolean) => {
+    const label = active ? 'mở lại' : 'ẩn'
+    if (!window.confirm(`Xác nhận ${label} ${selectedServices.length} dịch vụ đã chọn?`)) return
+    try {
+      const res = await api.bulkSetServicesActive(selectedServices, active, session.accessToken)
+      setMessage(`Đã ${label} ${res.updatedCount} dịch vụ.`)
+      setSelectedServices([])
+      refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể cập nhật dịch vụ.')
+    }
+  }
+
+  const bulkCancelSlots = async () => {
+    if (!window.confirm(`Xác nhận hủy ${selectedSlots.length} slot đã chọn? Chỉ hủy các slot chưa có khách đặt chỗ.`)) return
+    try {
+      const res = await api.bulkCancelSlots(selectedSlots, session.accessToken)
+      let msg = `Đã hủy ${res.cancelledCount} slot.`
+      if (res.skippedCount > 0) msg += ` Bỏ qua ${res.skippedCount} slot do đã có khách đặt chỗ.`
+      setMessage(msg)
+      setSelectedSlots([])
+      refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể hủy slot.')
+    }
+  }
+
+  const bulkResolveReports = async () => {
+    if (!window.confirm(`Xác nhận đánh dấu đã xử lý ${selectedReports.length} báo cáo đã chọn?`)) return
+    try {
+      const res = await api.bulkResolveReports(selectedReports, session.accessToken)
+      setMessage(`Đã xử lý ${res.resolvedCount} báo cáo.`)
+      setSelectedReports([])
+      refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể xử lý báo cáo.')
+    }
+  }
+
+  const bulkDeleteReports = async () => {
+    if (!window.confirm(`Xác nhận xóa ${selectedReports.length} báo cáo đã chọn?`)) return
+    try {
+      const res = await api.bulkDeleteReports(selectedReports, session.accessToken)
+      setMessage(`Đã xóa ${res.deletedCount} báo cáo.`)
+      setSelectedReports([])
+      refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể xóa báo cáo.')
+    }
+  }
+
+  const selectableUsers = useMemo(() => {
+    return filteredUsers.filter((u) => u.id !== session.user.id && !u.roles.includes('Admin') && (isAdmin || !u.roles.includes('Manager')))
+  }, [filteredUsers, session.user.id, isAdmin])
+
+  const cancellableSlots = useMemo(() => {
+    return filteredSlots.filter((s) => s.status < 3 && s.confirmedBookingCount === 0)
+  }, [filteredSlots])
+
   return <div className="container dashboard">
     <p className="eyebrow">{isAdmin ? 'Quản trị hệ thống' : 'Vận hành nền tảng'}</p><h1>{isAdmin ? 'Tổng quan OpenSlot' : 'Trung tâm vận hành'}</h1><p className="dashboard-copy">{isAdmin ? 'Quản lý toàn hệ thống, phân quyền Manager và theo dõi mọi hoạt động.' : 'Theo dõi vận hành, duyệt đối tác và xử lý vi phạm trên OpenSlot.'}</p>
     {stats && <div className="admin-stats admin-stats-wide"><div><span>Người dùng</span><b>{stats.users}</b></div><div><span>Slot đang mở</span><b>{stats.publishedSlots}</b></div><div><span>Booking</span><b>{stats.bookings}</b></div><div><span>Tỷ lệ lấp đầy</span><b>{stats.fillRatePercent}%</b></div><div><span>No-show</span><b>{stats.noShows}</b></div></div>}
     {error && <div className="alert alert-danger">{error}</div>}{message && <div className="alert alert-success">{message}</div>}
     <div className="admin-section-title"><h2>Quản lý đối tác</h2><div className="admin-filter"><button className={filter === undefined ? 'active' : ''} onClick={() => setFilter(undefined)}>Tất cả</button><button className={filter === 0 ? 'active' : ''} onClick={() => setFilter(0)}>Chờ duyệt</button><button className={filter === 1 ? 'active' : ''} onClick={() => setFilter(1)}>Đã duyệt</button><button className={filter === 3 ? 'active' : ''} onClick={() => setFilter(3)}>Cần bổ sung</button><button className={filter === 2 ? 'active' : ''} onClick={() => setFilter(2)}>Tạm khóa</button><button className={filter === 4 ? 'active' : ''} onClick={() => setFilter(4)}>Đã xóa</button></div></div>
     {loading ? <div className="empty-state"><div className="spinner-border text-primary" /></div> : <>
-      <div className="provider-table admin-table"><div className="table-head"><span>Doanh nghiệp</span><span>Người phụ trách</span><span>Trạng thái</span><span>Thao tác</span></div>{providers.map((provider) => <div className="table-row" key={provider.id}><span><button className="provider-detail-trigger" onClick={() => viewProvider(provider)}><b>{provider.businessName}</b><i className="bi bi-box-arrow-up-right" /></button><small>{provider.contactPhone} · {provider.description || 'Chưa có mô tả'}</small></span><span><b>{provider.ownerName}</b><small>{provider.ownerEmail}</small></span><span><span className={`status-pill provider-status status-${provider.status}`}>{provider.status === 0 ? 'Chờ duyệt' : provider.status === 1 ? 'Đã duyệt' : provider.status === 3 ? 'Cần bổ sung' : provider.status === 4 ? 'Đã xóa' : 'Tạm khóa'}</span></span><span className="admin-actions"><button className="btn btn-sm btn-outline-secondary" onClick={() => viewProvider(provider)}>Xem</button>{provider.status !== 1 && provider.status !== 4 && <button className="btn btn-sm btn-outline-success" onClick={() => update(provider, 'approve')}>{provider.status === 2 ? 'Mở lại' : 'Duyệt'}</button>}{provider.status === 0 && <button className="btn btn-sm btn-outline-warning" onClick={() => update(provider, 'reject')}>Yêu cầu bổ sung</button>}{provider.status === 1 && <button className="btn btn-sm btn-outline-danger" onClick={() => update(provider, 'suspend')}>Khóa</button>}{isAdmin && provider.status !== 4 && <button className="btn btn-sm btn-outline-danger" onClick={() => deleteProvider(provider)}>Xóa</button>}</span></div>)}</div>
+      <div className="section-toolbar">
+        <div className="section-search">
+          <i className="bi bi-search" />
+          <input
+            type="text"
+            placeholder="Tìm kiếm đối tác theo tên, người phụ trách, email, sđt..."
+            value={providerSearch}
+            onChange={(e) => setProviderSearch(e.target.value)}
+          />
+          {providerSearch && (
+            <button className="search-clear" onClick={() => setProviderSearch('')} title="Xóa tìm kiếm">
+              <i className="bi bi-x-lg" />
+            </button>
+          )}
+        </div>
+        {selectedProviders.length > 0 && (
+          <div className="bulk-actions-bar">
+            <span className="bulk-count">Đã chọn <b>{selectedProviders.length}</b></span>
+            <div className="bulk-buttons">
+              <button className="btn btn-sm btn-outline-success" onClick={() => bulkSetProviderStatus(1, 'duyệt')}>
+                <i className="bi bi-check-lg" /> Duyệt
+              </button>
+              <button className="btn btn-sm btn-outline-warning" onClick={() => bulkSetProviderStatus(3, 'yêu cầu bổ sung')}>
+                Yêu cầu bổ sung
+              </button>
+              <button className="btn btn-sm btn-outline-danger" onClick={() => bulkSetProviderStatus(2, 'khóa')}>
+                Khóa
+              </button>
+              {isAdmin && (
+                <button className="btn btn-sm btn-danger" onClick={bulkDeleteProviders}>
+                  <i className="bi bi-trash" /> Xóa
+                </button>
+              )}
+              <button className="btn btn-sm btn-outline-secondary" onClick={() => setSelectedProviders([])}>
+                Bỏ chọn
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="provider-table admin-table">
+        <div className="table-head">
+          <span className="checkbox-cell">
+            <input
+              type="checkbox"
+              className="table-checkbox"
+              checked={filteredProviders.length > 0 && selectedProviders.length === filteredProviders.length}
+              onChange={(e) => setSelectedProviders(e.target.checked ? filteredProviders.map((p) => p.id) : [])}
+              aria-label="Chọn tất cả đối tác"
+            />
+          </span>
+          <span>Doanh nghiệp</span>
+          <span>Người phụ trách</span>
+          <span>Trạng thái</span>
+          <span>Thao tác</span>
+        </div>
+        {filteredProviders.length ? filteredProviders.map((provider) => (
+          <div className="table-row" key={provider.id}>
+            <span className="checkbox-cell">
+              <input
+                type="checkbox"
+                className="table-checkbox"
+                checked={selectedProviders.includes(provider.id)}
+                onChange={(e) => {
+                  setSelectedProviders((prev) =>
+                    e.target.checked ? [...prev, provider.id] : prev.filter((id) => id !== provider.id)
+                  )
+                }}
+                aria-label={`Chọn ${provider.businessName}`}
+              />
+            </span>
+            <span>
+              <button className="provider-detail-trigger" onClick={() => viewProvider(provider)}>
+                <b>{provider.businessName}</b>
+                <i className="bi bi-box-arrow-up-right" />
+              </button>
+              <small>{provider.contactPhone} · {provider.description || 'Chưa có mô tả'}</small>
+            </span>
+            <span>
+              <b>{provider.ownerName}</b>
+              <small>{provider.ownerEmail}</small>
+            </span>
+            <span>
+              <span className={`status-pill provider-status status-${provider.status}`}>
+                {provider.status === 0 ? 'Chờ duyệt' : provider.status === 1 ? 'Đã duyệt' : provider.status === 3 ? 'Cần bổ sung' : provider.status === 4 ? 'Đã xóa' : 'Tạm khóa'}
+              </span>
+            </span>
+            <span className="admin-actions">
+              <button className="btn btn-sm btn-outline-secondary" onClick={() => viewProvider(provider)}>Xem</button>
+              {provider.status !== 1 && provider.status !== 4 && <button className="btn btn-sm btn-outline-success" onClick={() => update(provider, 'approve')}>{provider.status === 2 ? 'Mở lại' : 'Duyệt'}</button>}
+              {provider.status === 0 && <button className="btn btn-sm btn-outline-warning" onClick={() => update(provider, 'reject')}>Yêu cầu bổ sung</button>}
+              {provider.status === 1 && <button className="btn btn-sm btn-outline-danger" onClick={() => update(provider, 'suspend')}>Khóa</button>}
+              {isAdmin && provider.status !== 4 && <button className="btn btn-sm btn-outline-danger" onClick={() => deleteProvider(provider)}>Xóa</button>}
+            </span>
+          </div>
+        )) : (
+          <div className="empty-state"><p>Không tìm thấy đối tác nào phù hợp.</p></div>
+        )}
+      </div>
       {detailLoading && <div className="provider-detail-panel loading"><div className="spinner-border text-primary" /><span>Đang tải chi tiết đối tác...</span></div>}
       {providerDetail && <ProviderDetailPanel detail={providerDetail} onClose={() => setProviderDetail(null)} />}
       <div className="admin-section-title"><h2>{isAdmin ? 'Quản lý tài khoản và Manager' : 'Theo dõi tài khoản'}</h2><span className="section-note">{users.filter((x) => x.isSuspended).length} tài khoản đang khóa</span></div>
-      <div className="provider-table user-table"><div className="table-head"><span>Tài khoản</span><span>Ngày tạo</span><span>Vi phạm</span><span>Thao tác</span></div>{users.map((user) => { const targetIsAdmin = user.roles.includes('Admin'); const targetIsManager = user.roles.includes('Manager'); const canModerate = user.id !== session.user.id && !targetIsAdmin && (isAdmin || !targetIsManager); const canChangeManager = isAdmin && user.id !== session.user.id && !targetIsAdmin && (targetIsManager || (user.roles.includes('Customer') && !user.roles.includes('Provider'))); return <div className="table-row" key={user.id}><span><b>{user.displayName}</b><small>{user.email} · {roleLabel(user.roles)}</small></span><span>{formatTime(user.createdAtUtc)}</span><span>{user.strikeCount} strike {user.isSuspended && <small className="text-danger">Tài khoản bị khóa</small>}</span><span className="admin-actions">{canModerate && <button onClick={() => toggleUser(user)} className={`btn btn-sm ${user.isSuspended ? 'btn-outline-success' : 'btn-outline-danger'}`}>{user.isSuspended ? 'Mở khóa' : 'Tạm khóa'}</button>}{canChangeManager && <button onClick={() => toggleManager(user)} className={`btn btn-sm ${targetIsManager ? 'btn-outline-secondary' : 'btn-outline-primary'}`}>{targetIsManager ? 'Thu hồi Manager' : 'Cấp Manager'}</button>}{!canModerate && !canChangeManager && <span className="section-note">{targetIsAdmin ? 'Tài khoản Admin' : user.id === session.user.id ? 'Tài khoản hiện tại' : 'Chỉ có thể theo dõi'}</span>}</span></div>})}</div>
+      <div className="section-toolbar">
+        <div className="section-search">
+          <i className="bi bi-search" />
+          <input
+            type="text"
+            placeholder="Tìm tài khoản theo tên, email, vai trò..."
+            value={userSearch}
+            onChange={(e) => setUserSearch(e.target.value)}
+          />
+          {userSearch && (
+            <button className="search-clear" onClick={() => setUserSearch('')} title="Xóa tìm kiếm">
+              <i className="bi bi-x-lg" />
+            </button>
+          )}
+        </div>
+        {selectedUsers.length > 0 && (
+          <div className="bulk-actions-bar">
+            <span className="bulk-count">Đã chọn <b>{selectedUsers.length}</b></span>
+            <div className="bulk-buttons">
+              <button className="btn btn-sm btn-outline-danger" onClick={() => bulkSuspendUsers(true)}>
+                <i className="bi bi-lock" /> Khóa
+              </button>
+              <button className="btn btn-sm btn-outline-success" onClick={() => bulkSuspendUsers(false)}>
+                <i className="bi bi-unlock" /> Mở khóa
+              </button>
+              <button className="btn btn-sm btn-outline-secondary" onClick={() => setSelectedUsers([])}>
+                Bỏ chọn
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="provider-table user-table">
+        <div className="table-head">
+          <span className="checkbox-cell">
+            <input
+              type="checkbox"
+              className="table-checkbox"
+              checked={selectableUsers.length > 0 && selectableUsers.every((u) => selectedUsers.includes(u.id))}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setSelectedUsers(Array.from(new Set([...selectedUsers, ...selectableUsers.map((u) => u.id)])))
+                } else {
+                  const selectableIds = new Set(selectableUsers.map((u) => u.id))
+                  setSelectedUsers((prev) => prev.filter((id) => !selectableIds.has(id)))
+                }
+              }}
+              aria-label="Chọn tất cả tài khoản có thể thao tác"
+            />
+          </span>
+          <span>Tài khoản</span>
+          <span>Ngày tạo</span>
+          <span>Vi phạm</span>
+          <span>Thao tác</span>
+        </div>
+        {filteredUsers.length ? filteredUsers.map((user) => {
+          const targetIsAdmin = user.roles.includes('Admin')
+          const targetIsManager = user.roles.includes('Manager')
+          const canModerate = user.id !== session.user.id && !targetIsAdmin && (isAdmin || !targetIsManager)
+          const canChangeManager = isAdmin && user.id !== session.user.id && !targetIsAdmin && (targetIsManager || (user.roles.includes('Customer') && !user.roles.includes('Provider')))
+          return (
+            <div className="table-row" key={user.id}>
+              <span className="checkbox-cell">
+                {canModerate ? (
+                  <input
+                    type="checkbox"
+                    className="table-checkbox"
+                    checked={selectedUsers.includes(user.id)}
+                    onChange={(e) => {
+                      setSelectedUsers((prev) =>
+                        e.target.checked ? [...prev, user.id] : prev.filter((id) => id !== user.id)
+                      )
+                    }}
+                    aria-label={`Chọn ${user.displayName}`}
+                  />
+                ) : <span />}
+              </span>
+              <span>
+                <b>{user.displayName}</b>
+                <small>{user.email} · {roleLabel(user.roles)}</small>
+              </span>
+              <span>{formatTime(user.createdAtUtc)}</span>
+              <span>
+                {user.strikeCount} strike {user.isSuspended && <small className="text-danger">Tài khoản bị khóa</small>}
+              </span>
+              <span className="admin-actions">
+                {canModerate && (
+                  <button onClick={() => toggleUser(user)} className={`btn btn-sm ${user.isSuspended ? 'btn-outline-success' : 'btn-outline-danger'}`}>
+                    {user.isSuspended ? 'Mở khóa' : 'Tạm khóa'}
+                  </button>
+                )}
+                {canChangeManager && (
+                  <button onClick={() => toggleManager(user)} className={`btn btn-sm ${targetIsManager ? 'btn-outline-secondary' : 'btn-outline-primary'}`}>
+                    {targetIsManager ? 'Thu hồi Manager' : 'Cấp Manager'}
+                  </button>
+                )}
+                {!canModerate && !canChangeManager && (
+                  <span className="section-note">{targetIsAdmin ? 'Tài khoản Admin' : user.id === session.user.id ? 'Tài khoản hiện tại' : 'Chỉ có thể theo dõi'}</span>
+                )}
+              </span>
+            </div>
+          )
+        }) : (
+          <div className="empty-state"><p>Không tìm thấy tài khoản phù hợp.</p></div>
+        )}
+      </div>
       <CategoryManagementPanel token={session.accessToken} isAdmin={isAdmin} />
-      <div className="admin-section-title"><h2>Kiểm duyệt dịch vụ</h2><span className="section-note">{managedServices.filter((x) => !x.isActive).length} dịch vụ đang ẩn</span></div>
-      <div className="provider-table service-table"><div className="table-head"><span>Dịch vụ</span><span>Đối tác</span><span>Giá gốc</span><span>Thao tác</span></div>{managedServices.map((service) => <div className="table-row" key={service.id}><span><b>{service.name}</b><small>{service.categoryName} · {service.venueName}</small></span><span>{service.providerName}</span><span>{formatMoney(service.basePriceVnd)}</span><span><button onClick={() => toggleService(service)} className={`btn btn-sm ${service.isActive ? 'btn-outline-danger' : 'btn-outline-success'}`}>{service.isActive ? 'Ẩn' : 'Mở lại'}</button></span></div>)}</div>
-      <div className="admin-section-title"><h2>Kiểm duyệt slot</h2><span className="section-note">Tối đa 200 slot gần nhất</span></div>
-      <div className="provider-table slot-admin-table"><div className="table-head"><span>Slot</span><span>Đối tác</span><span>Đã đặt</span><span>Thao tác</span></div>{managedSlots.map((slot) => <div className="table-row" key={slot.id}><span><b>{slot.serviceName}</b><small>{slot.venueName} · {formatTime(slot.startAtUtc)}</small></span><span>{slot.providerName}</span><span>{slot.confirmedBookingCount}/{slot.capacity}</span><span>{slot.status < 3 ? <button disabled={slot.confirmedBookingCount > 0} onClick={() => cancelSlot(slot)} className="btn btn-sm btn-outline-danger">Hủy</button> : <span className="status-pill">Đã đóng</span>}</span></div>)}</div>
-      <div className="admin-section-title report-title"><h2>Báo cáo vi phạm</h2><span>{reports.filter((x) => x.status === 0).length} báo cáo đang mở</span></div>
-      <div className="report-list">{reports.length ? reports.map((report) => <article key={report.id}><div><b>{report.targetType} · {report.targetId}</b><small>{report.reporterName} ({report.reporterEmail}) · {formatTime(report.createdAtUtc)}</small><p>{report.reason}</p></div>{report.status === 0 ? <button className="btn btn-sm btn-outline-success" onClick={() => resolve(report)}>Đánh dấu đã xử lý</button> : <span className="status-pill">Đã xử lý</span>}</article>) : <div className="empty-state"><p>Chưa có báo cáo nào.</p></div>}</div>
+      <div className="admin-section-title">
+        <h2>Kiểm duyệt dịch vụ</h2>
+        <span className="section-note">{managedServices.filter((x) => !x.isActive).length} dịch vụ đang ẩn</span>
+      </div>
+      <div className="section-toolbar">
+        <div className="section-search">
+          <i className="bi bi-search" />
+          <input
+            type="text"
+            placeholder="Tìm dịch vụ theo tên, danh mục, địa điểm, đối tác..."
+            value={serviceSearch}
+            onChange={(e) => setServiceSearch(e.target.value)}
+          />
+          {serviceSearch && (
+            <button className="search-clear" onClick={() => setServiceSearch('')} title="Xóa tìm kiếm">
+              <i className="bi bi-x-lg" />
+            </button>
+          )}
+        </div>
+        {selectedServices.length > 0 && (
+          <div className="bulk-actions-bar">
+            <span className="bulk-count">Đã chọn <b>{selectedServices.length}</b></span>
+            <div className="bulk-buttons">
+              <button className="btn btn-sm btn-outline-danger" onClick={() => bulkToggleServices(false)}>
+                <i className="bi bi-eye-slash" /> Ẩn
+              </button>
+              <button className="btn btn-sm btn-outline-success" onClick={() => bulkToggleServices(true)}>
+                <i className="bi bi-eye" /> Mở lại
+              </button>
+              <button className="btn btn-sm btn-outline-secondary" onClick={() => setSelectedServices([])}>
+                Bỏ chọn
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="provider-table service-table">
+        <div className="table-head">
+          <span className="checkbox-cell">
+            <input
+              type="checkbox"
+              className="table-checkbox"
+              checked={filteredServices.length > 0 && selectedServices.length === filteredServices.length}
+              onChange={(e) => setSelectedServices(e.target.checked ? filteredServices.map((s) => s.id) : [])}
+              aria-label="Chọn tất cả dịch vụ"
+            />
+          </span>
+          <span>Dịch vụ</span>
+          <span>Đối tác</span>
+          <span>Giá gốc</span>
+          <span>Thao tác</span>
+        </div>
+        {filteredServices.length ? filteredServices.map((service) => (
+          <div className="table-row" key={service.id}>
+            <span className="checkbox-cell">
+              <input
+                type="checkbox"
+                className="table-checkbox"
+                checked={selectedServices.includes(service.id)}
+                onChange={(e) => {
+                  setSelectedServices((prev) =>
+                    e.target.checked ? [...prev, service.id] : prev.filter((id) => id !== service.id)
+                  )
+                }}
+                aria-label={`Chọn ${service.name}`}
+              />
+            </span>
+            <span>
+              <b>{service.name}</b>
+              <small>{service.categoryName} · {service.venueName}</small>
+            </span>
+            <span>{service.providerName}</span>
+            <span>{formatMoney(service.basePriceVnd)}</span>
+            <span>
+              <button onClick={() => toggleService(service)} className={`btn btn-sm ${service.isActive ? 'btn-outline-danger' : 'btn-outline-success'}`}>
+                {service.isActive ? 'Ẩn' : 'Mở lại'}
+              </button>
+            </span>
+          </div>
+        )) : (
+          <div className="empty-state"><p>Không tìm thấy dịch vụ phù hợp.</p></div>
+        )}
+      </div>
+      <div className="admin-section-title">
+        <h2>Kiểm duyệt slot</h2>
+        <span className="section-note">Tối đa 200 slot gần nhất</span>
+      </div>
+      <div className="section-toolbar">
+        <div className="section-search">
+          <i className="bi bi-search" />
+          <input
+            type="text"
+            placeholder="Tìm slot theo tên dịch vụ, địa điểm, đối tác..."
+            value={slotSearch}
+            onChange={(e) => setSlotSearch(e.target.value)}
+          />
+          {slotSearch && (
+            <button className="search-clear" onClick={() => setSlotSearch('')} title="Xóa tìm kiếm">
+              <i className="bi bi-x-lg" />
+            </button>
+          )}
+        </div>
+        {selectedSlots.length > 0 && (
+          <div className="bulk-actions-bar">
+            <span className="bulk-count">Đã chọn <b>{selectedSlots.length}</b></span>
+            <div className="bulk-buttons">
+              <button className="btn btn-sm btn-outline-danger" onClick={bulkCancelSlots}>
+                <i className="bi bi-x-circle" /> Hủy slot đã chọn
+              </button>
+              <button className="btn btn-sm btn-outline-secondary" onClick={() => setSelectedSlots([])}>
+                Bỏ chọn
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="provider-table slot-admin-table">
+        <div className="table-head">
+          <span className="checkbox-cell">
+            <input
+              type="checkbox"
+              className="table-checkbox"
+              checked={cancellableSlots.length > 0 && cancellableSlots.every((s) => selectedSlots.includes(s.id))}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setSelectedSlots(Array.from(new Set([...selectedSlots, ...cancellableSlots.map((s) => s.id)])))
+                } else {
+                  const cancellableIds = new Set(cancellableSlots.map((s) => s.id))
+                  setSelectedSlots((prev) => prev.filter((id) => !cancellableIds.has(id)))
+                }
+              }}
+              aria-label="Chọn tất cả slot có thể hủy"
+            />
+          </span>
+          <span>Slot</span>
+          <span>Đối tác</span>
+          <span>Đã đặt</span>
+          <span>Thao tác</span>
+        </div>
+        {filteredSlots.length ? filteredSlots.map((slot) => (
+          <div className="table-row" key={slot.id}>
+            <span className="checkbox-cell">
+              {slot.status < 3 && slot.confirmedBookingCount === 0 ? (
+                <input
+                  type="checkbox"
+                  className="table-checkbox"
+                  checked={selectedSlots.includes(slot.id)}
+                  onChange={(e) => {
+                    setSelectedSlots((prev) =>
+                      e.target.checked ? [...prev, slot.id] : prev.filter((id) => id !== slot.id)
+                    )
+                  }}
+                  aria-label={`Chọn slot ${slot.serviceName}`}
+                />
+              ) : <span />}
+            </span>
+            <span>
+              <b>{slot.serviceName}</b>
+              <small>{slot.venueName} · {formatTime(slot.startAtUtc)}</small>
+            </span>
+            <span>{slot.providerName}</span>
+            <span>{slot.confirmedBookingCount}/{slot.capacity}</span>
+            <span>
+              {slot.status < 3 ? (
+                <button disabled={slot.confirmedBookingCount > 0} onClick={() => cancelSlot(slot)} className="btn btn-sm btn-outline-danger">
+                  Hủy
+                </button>
+              ) : (
+                <span className="status-pill">Đã đóng</span>
+              )}
+            </span>
+          </div>
+        )) : (
+          <div className="empty-state"><p>Không tìm thấy slot phù hợp.</p></div>
+        )}
+      </div>
+      <div className="admin-section-title report-title">
+        <h2>Báo cáo vi phạm</h2>
+        <span>{reports.filter((x) => x.status === 0).length} báo cáo đang mở</span>
+      </div>
+      <div className="section-toolbar">
+        <div className="section-search">
+          <i className="bi bi-search" />
+          <input
+            type="text"
+            placeholder="Tìm báo cáo theo đối tượng, người báo cáo, lý do..."
+            value={reportSearch}
+            onChange={(e) => setReportSearch(e.target.value)}
+          />
+          {reportSearch && (
+            <button className="search-clear" onClick={() => setReportSearch('')} title="Xóa tìm kiếm">
+              <i className="bi bi-x-lg" />
+            </button>
+          )}
+        </div>
+        {selectedReports.length > 0 && (
+          <div className="bulk-actions-bar">
+            <span className="bulk-count">Đã chọn <b>{selectedReports.length}</b></span>
+            <div className="bulk-buttons">
+              <button className="btn btn-sm btn-outline-success" onClick={bulkResolveReports}>
+                <i className="bi bi-check2-circle" /> Đánh dấu đã xử lý
+              </button>
+              <button className="btn btn-sm btn-outline-danger" onClick={bulkDeleteReports}>
+                <i className="bi bi-trash" /> Xóa báo cáo
+              </button>
+              <button className="btn btn-sm btn-outline-secondary" onClick={() => setSelectedReports([])}>
+                Bỏ chọn
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      {filteredReports.length > 0 && (
+        <label className="d-flex align-items-center gap-2 mb-2" style={{ cursor: 'pointer', fontSize: '13px', color: '#526075' }}>
+          <input
+            type="checkbox"
+            className="table-checkbox"
+            checked={filteredReports.length > 0 && selectedReports.length === filteredReports.length}
+            onChange={(e) => setSelectedReports(e.target.checked ? filteredReports.map((r) => r.id) : [])}
+          />
+          <span>Chọn tất cả ({filteredReports.length} báo cáo)</span>
+        </label>
+      )}
+      <div className="report-list">
+        {filteredReports.length ? filteredReports.map((report) => (
+          <article key={report.id}>
+            <div className="item-with-checkbox">
+              <input
+                type="checkbox"
+                className="table-checkbox"
+                checked={selectedReports.includes(report.id)}
+                onChange={(e) => {
+                  setSelectedReports((prev) =>
+                    e.target.checked ? [...prev, report.id] : prev.filter((id) => id !== report.id)
+                  )
+                }}
+                aria-label={`Chọn báo cáo ${report.id}`}
+              />
+              <div>
+                <b>{report.targetType} · {report.targetId}</b>
+                <small>{report.reporterName} ({report.reporterEmail}) · {formatTime(report.createdAtUtc)}</small>
+                <p>{report.reason}</p>
+              </div>
+            </div>
+            {report.status === 0 ? (
+              <button className="btn btn-sm btn-outline-success" onClick={() => resolve(report)}>
+                Đánh dấu đã xử lý
+              </button>
+            ) : (
+              <span className="status-pill">Đã xử lý</span>
+            )}
+          </article>
+        )) : (
+          <div className="empty-state"><p>Không tìm thấy báo cáo nào phù hợp.</p></div>
+        )}
+      </div>
     </>}
   </div>
 }
@@ -762,8 +1451,21 @@ function CategoryManagementPanel({ token, isAdmin }: { token: string; isAdmin?: 
   const [iconName, setIconName] = useState('tag')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [categorySearch, setCategorySearch] = useState('')
+  const [selectedCategories, setSelectedCategories] = useState<number[]>([])
+
   const refresh = () => { api.adminCategories(token).then(setCategories).catch((e: Error) => setError(e.message)) }
   useEffect(refresh, [token])
+
+  const filteredCategories = useMemo(() => {
+    if (!categorySearch.trim()) return categories
+    const q = normalizeSearch(categorySearch)
+    return categories.filter((c) =>
+      normalizeSearch(c.name).includes(q) ||
+      normalizeSearch(c.slug).includes(q)
+    )
+  }, [categories, categorySearch])
+
   const create = async (event: React.FormEvent) => {
     event.preventDefault()
     setError('')
@@ -791,6 +1493,35 @@ function CategoryManagementPanel({ token, isAdmin }: { token: string; isAdmin?: 
     try {
       await api.adminDeleteCategory(category.id, token)
       setMessage(`Đã xóa danh mục ${category.name}.`)
+      refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể xóa danh mục.')
+    }
+  }
+
+  const bulkToggleCategories = async (active: boolean) => {
+    const label = active ? 'mở lại' : 'tạm ngưng'
+    if (!window.confirm(`Xác nhận ${label} ${selectedCategories.length} danh mục đã chọn?`)) return
+    try {
+      const res = active
+        ? await api.bulkActivateCategories(selectedCategories, token)
+        : await api.bulkDeactivateCategories(selectedCategories, token)
+      setMessage(`Đã ${label} ${res.updatedCount} danh mục.`)
+      setSelectedCategories([])
+      refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể cập nhật danh mục.')
+    }
+  }
+
+  const bulkDeleteCategories = async () => {
+    if (!window.confirm(`Xác nhận xóa ${selectedCategories.length} danh mục đã chọn? Chỉ danh mục chưa có dịch vụ liên kết mới có thể xóa.`)) return
+    try {
+      const res = await api.bulkDeleteCategories(selectedCategories, token)
+      let msg = `Đã xóa ${res.deletedCount} danh mục.`
+      if (res.skippedCount > 0) msg += ` Bỏ qua ${res.skippedCount} danh mục do đang có dịch vụ liên kết.`
+      setMessage(msg)
+      setSelectedCategories([])
       refresh()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không thể xóa danh mục.')
@@ -869,14 +1600,77 @@ function CategoryManagementPanel({ token, isAdmin }: { token: string; isAdmin?: 
       {error && <div className="alert alert-danger mt-3">{error}</div>}
       {message && <div className="alert alert-success mt-3">{message}</div>}
 
+      <div className="section-toolbar">
+        <div className="section-search">
+          <i className="bi bi-search" />
+          <input
+            type="text"
+            placeholder="Tìm kiếm danh mục theo tên, slug..."
+            value={categorySearch}
+            onChange={(e) => setCategorySearch(e.target.value)}
+          />
+          {categorySearch && (
+            <button className="search-clear" onClick={() => setCategorySearch('')} title="Xóa tìm kiếm">
+              <i className="bi bi-x-lg" />
+            </button>
+          )}
+        </div>
+        {selectedCategories.length > 0 && (
+          <div className="bulk-actions-bar">
+            <span className="bulk-count">Đã chọn <b>{selectedCategories.length}</b></span>
+            <div className="bulk-buttons">
+              <button className="btn btn-sm btn-outline-success" onClick={() => bulkToggleCategories(true)}>
+                <i className="bi bi-check-lg" /> Mở lại
+              </button>
+              <button className="btn btn-sm btn-outline-warning" onClick={() => bulkToggleCategories(false)}>
+                <i className="bi bi-pause-fill" /> Tạm ngưng
+              </button>
+              {isAdmin && (
+                <button className="btn btn-sm btn-outline-danger" onClick={bulkDeleteCategories}>
+                  <i className="bi bi-trash" /> Xóa
+                </button>
+              )}
+              <button className="btn btn-sm btn-outline-secondary" onClick={() => setSelectedCategories([])}>
+                Bỏ chọn
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {filteredCategories.length > 0 && (
+        <label className="d-flex align-items-center gap-2 mb-2" style={{ cursor: 'pointer', fontSize: '13px', color: '#526075' }}>
+          <input
+            type="checkbox"
+            className="table-checkbox"
+            checked={filteredCategories.length > 0 && selectedCategories.length === filteredCategories.length}
+            onChange={(e) => setSelectedCategories(e.target.checked ? filteredCategories.map((c) => c.id) : [])}
+          />
+          <span>Chọn tất cả ({filteredCategories.length} danh mục)</span>
+        </label>
+      )}
+
       <div className="resource-list">
-        {categories.map((category) => (
+        {filteredCategories.length ? filteredCategories.map((category) => (
           <article className={!category.isActive ? 'inactive' : ''} key={category.id}>
-            <div>
-              <b>
-                <i className={`bi bi-${category.iconName}`} /> {category.name}
-              </b>
-              <span>{category.slug} · {category.serviceCount} dịch vụ đang phân loại</span>
+            <div className="item-with-checkbox">
+              <input
+                type="checkbox"
+                className="table-checkbox"
+                checked={selectedCategories.includes(category.id)}
+                onChange={(e) => {
+                  setSelectedCategories((prev) =>
+                    e.target.checked ? [...prev, category.id] : prev.filter((id) => id !== category.id)
+                  )
+                }}
+                aria-label={`Chọn danh mục ${category.name}`}
+              />
+              <div>
+                <b>
+                  <i className={`bi bi-${category.iconName}`} /> {category.name}
+                </b>
+                <span>{category.slug} · {category.serviceCount} dịch vụ đang phân loại</span>
+              </div>
             </div>
             <div className="category-actions">
               <button
@@ -897,19 +1691,21 @@ function CategoryManagementPanel({ token, isAdmin }: { token: string; isAdmin?: 
               )}
             </div>
           </article>
-        ))}
+        )) : (
+          <div className="empty-state"><p>Không tìm thấy danh mục phù hợp.</p></div>
+        )}
       </div>
     </section>
   )
 }
 
-function NotificationsPage({ session }: { session: Session }) {
+function NotificationsPage({ session, onRead }: { session: Session; onRead?: () => void }) {
   const navigate = useNavigate(); const [items, setItems] = useState<Notification[]>([]); const [error, setError] = useState(''); const [loading, setLoading] = useState(true)
   // oxlint-disable-next-line react/set-state-in-effect -- loading belongs to the request lifecycle
   const refresh = () => { setLoading(true); api.notifications(session.accessToken).then(setItems).catch((e: Error) => setError(e.message)).finally(() => setLoading(false)) }
   useEffect(refresh, [session.accessToken])
-  const read = async (item: Notification) => { if (!item.isRead) await api.readNotification(item.id, session.accessToken); if (item.link) { try { const url = new URL(item.link, window.location.origin); if (url.origin === window.location.origin) navigate(url.pathname + url.search + url.hash); else window.location.assign(item.link) } catch { refresh() } } else refresh() }
-  const readAll = async () => { await api.readAllNotifications(session.accessToken); refresh() }
+  const read = async (item: Notification) => { if (!item.isRead) { await api.readNotification(item.id, session.accessToken); onRead?.() }; if (item.link) { try { const url = new URL(item.link, window.location.origin); if (url.origin === window.location.origin) navigate(url.pathname + url.search + url.hash); else window.location.assign(item.link) } catch { refresh() } } else refresh() }
+  const readAll = async () => { await api.readAllNotifications(session.accessToken); onRead?.(); refresh() }
   return <div className="container dashboard"><div className="provider-heading"><div><p className="eyebrow">Trung tâm cập nhật</p><h1>Thông báo</h1></div>{items.some((x) => !x.isRead) && <button className="btn btn-outline-primary rounded-pill" onClick={readAll}>Đánh dấu đã đọc</button>}</div>{error && <div className="alert alert-danger">{error}</div>}{loading ? <div className="empty-state"><div className="spinner-border text-primary" /></div> : <div className="notification-list">{items.length ? items.map((item) => <button onClick={() => read(item)} className={item.isRead ? 'read' : ''} key={item.id}><i className={`bi ${item.isRead ? 'bi-check-circle' : 'bi-bell-fill'}`} /><span><b>{item.title}</b><small>{item.message}</small><time>{formatTime(item.createdAtUtc)}</time></span></button>) : <div className="empty-state"><i className="bi bi-bell-slash" /><h3>Chưa có thông báo</h3></div>}</div>}</div>
 }
 

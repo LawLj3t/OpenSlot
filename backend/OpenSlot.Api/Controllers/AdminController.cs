@@ -199,6 +199,28 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
     [HttpPost("services/{serviceId:guid}/deactivate")]
     public Task<IActionResult> DeactivateService(Guid serviceId, CancellationToken cancellationToken) => SetServiceActive(serviceId, false, cancellationToken);
 
+    [HttpPost("services/bulk-active")]
+    public async Task<IActionResult> BulkSetServiceActive(BulkActiveRequest request, CancellationToken cancellationToken)
+    {
+        var updatedCount = 0;
+        foreach (var id in request.Ids.Distinct())
+        {
+            var service = await db.ServiceOfferings.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+            if (service == null || service.IsActive == request.IsActive) continue;
+            service.IsActive = request.IsActive;
+            db.AuditLogs.Add(new AuditLog
+            {
+                ActorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
+                Action = request.IsActive ? "service.activated" : "service.deactivated",
+                EntityType = nameof(ServiceOffering),
+                EntityId = service.Id.ToString()
+            });
+            updatedCount++;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new { updatedCount });
+    }
+
     [HttpGet("slots")]
     public async Task<IActionResult> Slots(CancellationToken cancellationToken) => Ok(await db.DealSlots.AsNoTracking()
         .Include(x => x.ServiceOffering).ThenInclude(x => x.Venue).ThenInclude(x => x.ProviderProfile)
@@ -222,6 +244,47 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
         return NoContent();
     }
 
+    [HttpPost("slots/bulk-cancel")]
+    public async Task<IActionResult> BulkCancelSlots(BulkIdsRequest<Guid> request, CancellationToken cancellationToken)
+    {
+        var cancelledCount = 0;
+        var skipped = new List<string>();
+        foreach (var id in request.Ids.Distinct())
+        {
+            var slot = await db.DealSlots
+                .Include(x => x.ServiceOffering)
+                    .ThenInclude(s => s.Venue)
+                        .ThenInclude(v => v.ProviderProfile)
+                .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+            if (slot == null || slot.Status is DealSlotStatus.Cancelled or DealSlotStatus.Expired) continue;
+            if (slot.ConfirmedBookingCount > 0)
+            {
+                skipped.Add($"Slot “{slot.ServiceOffering.Name}” đã có khách đặt chỗ.");
+                continue;
+            }
+            slot.Status = DealSlotStatus.Cancelled;
+            slot.ConcurrencyToken = Guid.NewGuid();
+            db.AuditLogs.Add(new AuditLog
+            {
+                ActorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
+                Action = "slot.admin-cancelled",
+                EntityType = nameof(DealSlot),
+                EntityId = slot.Id.ToString()
+            });
+            db.Notifications.Add(new Notification
+            {
+                UserId = slot.ServiceOffering.Venue.ProviderProfile.UserId,
+                Title = "Slot bị quản trị viên hủy",
+                Message = $"Slot {slot.ServiceOffering.Name} đã bị hủy sau kiểm duyệt.",
+                Link = "/provider"
+            });
+            cancelledCount++;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new { cancelledCount, skippedCount = skipped.Count, skipped });
+    }
+
     [HttpPost("providers/{providerId:guid}/approve")]
     public Task<IActionResult> Approve(Guid providerId, CancellationToken cancellationToken) => SetProviderStatus(providerId, ProviderStatus.Approved, cancellationToken);
 
@@ -231,21 +294,46 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
     [HttpPost("providers/{providerId:guid}/reject")]
     public Task<IActionResult> Reject(Guid providerId, CancellationToken cancellationToken) => SetProviderStatus(providerId, ProviderStatus.Rejected, cancellationToken);
 
-    [Authorize(Roles = RoleNames.Admin)]
-    [HttpDelete("providers/{providerId:guid}")]
-    public async Task<IActionResult> DeleteProvider(Guid providerId, CancellationToken cancellationToken)
+    [HttpPost("providers/bulk-status")]
+    public async Task<IActionResult> BulkSetProviderStatus(BulkStatusRequest request, CancellationToken cancellationToken)
+    {
+        var updatedCount = 0;
+        foreach (var id in request.Ids.Distinct())
+        {
+            var provider = await db.ProviderProfiles.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+            if (provider == null || provider.Status == request.Status) continue;
+            provider.Status = request.Status;
+            db.AuditLogs.Add(new()
+            {
+                ActorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
+                Action = $"provider.{request.Status.ToString().ToLowerInvariant()}",
+                EntityType = nameof(ProviderProfile),
+                EntityId = id.ToString()
+            });
+            var (title, message) = request.Status switch
+            {
+                ProviderStatus.Approved => ("Hồ sơ đối tác đã được duyệt", "Bạn có thể phát hành slot trên OpenSlot."),
+                ProviderStatus.Rejected => ("Hồ sơ đối tác cần bổ sung", "Hãy cập nhật thông tin cửa hàng rồi gửi lại để Manager xét duyệt."),
+                ProviderStatus.Deleted => ("Hồ sơ đối tác đã bị xóa", "Hồ sơ của bạn đã bị xóa bởi quản trị viên hệ thống."),
+                _ => ("Hồ sơ đối tác bị tạm khóa", "Liên hệ quản trị viên nếu bạn cần hỗ trợ.")
+            };
+            db.Notifications.Add(new Notification { UserId = provider.UserId, Title = title, Message = message, Link = "/provider" });
+            updatedCount++;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new { updatedCount });
+    }
+
+    private async Task<(bool Success, string? Error)> TryDeleteProviderInternalAsync(Guid providerId, CancellationToken cancellationToken)
     {
         var provider = await db.ProviderProfiles
             .Include(x => x.Venues)
                 .ThenInclude(v => v.ServiceOfferings)
                     .ThenInclude(s => s.DealSlots)
-            .SingleOrDefaultAsync(x => x.Id == providerId, cancellationToken)
-            ?? throw new ApiException("Không tìm thấy đối tác.", StatusCodes.Status404NotFound);
+            .SingleOrDefaultAsync(x => x.Id == providerId, cancellationToken);
 
-        if (provider.Status == ProviderStatus.Deleted)
-        {
-            throw new ApiException("Đối tác này đã được xóa trước đó.", StatusCodes.Status400BadRequest);
-        }
+        if (provider == null) return (false, "Không tìm thấy đối tác.");
+        if (provider.Status == ProviderStatus.Deleted) return (false, "Đối tác này đã được xóa trước đó.");
 
         var activeBookingsCount = await db.Bookings.CountAsync(b =>
             b.DealSlot.ServiceOffering.Venue.ProviderProfileId == providerId &&
@@ -254,7 +342,7 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
 
         if (activeBookingsCount > 0)
         {
-            throw new ApiException($"Không thể xóa đối tác này vì còn {activeBookingsCount} booking đang hoạt động. Hãy đợi khách hàng hoàn tất hoặc hủy trước khi xóa.", StatusCodes.Status400BadRequest);
+            return (false, $"Đối tác “{provider.BusinessName}” còn {activeBookingsCount} booking đang hoạt động.");
         }
 
         var now = DateTime.UtcNow;
@@ -266,7 +354,7 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
 
         if (activeHoldsCount > 0)
         {
-            throw new ApiException("Không thể xóa đối tác này vì đang có khách hàng giữ chỗ thanh toán. Vui lòng thử lại sau ít phút.", StatusCodes.Status400BadRequest);
+            return (false, $"Đối tác “{provider.BusinessName}” đang có khách hàng giữ chỗ thanh toán.");
         }
 
         provider.Status = ProviderStatus.Deleted;
@@ -316,8 +404,33 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
             Link = "/provider"
         });
 
+        return (true, null);
+    }
+
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpDelete("providers/{providerId:guid}")]
+    public async Task<IActionResult> DeleteProvider(Guid providerId, CancellationToken cancellationToken)
+    {
+        var (success, error) = await TryDeleteProviderInternalAsync(providerId, cancellationToken);
+        if (!success) throw new ApiException(error ?? "Không thể xóa đối tác.", StatusCodes.Status400BadRequest);
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpPost("providers/bulk-delete")]
+    public async Task<IActionResult> BulkDeleteProviders(BulkIdsRequest<Guid> request, CancellationToken cancellationToken)
+    {
+        var deletedCount = 0;
+        var skipped = new List<string>();
+        foreach (var id in request.Ids.Distinct())
+        {
+            var (success, error) = await TryDeleteProviderInternalAsync(id, cancellationToken);
+            if (success) deletedCount++;
+            else if (error != null) skipped.Add(error);
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new { deletedCount, skippedCount = skipped.Count, skipped });
     }
 
     [HttpGet("categories")]
@@ -384,6 +497,105 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
         });
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpPost("categories/bulk-delete")]
+    public async Task<IActionResult> BulkDeleteCategories(BulkIdsRequest<int> request, CancellationToken cancellationToken)
+    {
+        var deletedCount = 0;
+        var skipped = new List<string>();
+        foreach (var id in request.Ids.Distinct())
+        {
+            var category = await db.Categories.Include(x => x.ServiceOfferings)
+                .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+            if (category == null) continue;
+            if (category.ServiceOfferings.Any())
+            {
+                skipped.Add($"Danh mục “{category.Name}” đang có {category.ServiceOfferings.Count} dịch vụ liên kết.");
+                continue;
+            }
+            db.Categories.Remove(category);
+            db.AuditLogs.Add(new AuditLog
+            {
+                ActorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
+                Action = "category.deleted",
+                EntityType = nameof(Category),
+                EntityId = category.Id.ToString()
+            });
+            deletedCount++;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new { deletedCount, skippedCount = skipped.Count, skipped });
+    }
+
+    [HttpPost("categories/bulk-activate")]
+    public async Task<IActionResult> BulkActivateCategories(BulkIdsRequest<int> request, CancellationToken cancellationToken)
+    {
+        var updatedCount = 0;
+        foreach (var id in request.Ids.Distinct())
+        {
+            var category = await db.Categories.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+            if (category == null || category.IsActive) continue;
+            category.IsActive = true;
+            db.AuditLogs.Add(new AuditLog { ActorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier), Action = "category.activated", EntityType = nameof(Category), EntityId = category.Id.ToString() });
+            updatedCount++;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new { updatedCount });
+    }
+
+    [HttpPost("categories/bulk-deactivate")]
+    public async Task<IActionResult> BulkDeactivateCategories(BulkIdsRequest<int> request, CancellationToken cancellationToken)
+    {
+        var updatedCount = 0;
+        var skipped = new List<string>();
+        var now = DateTime.UtcNow;
+        foreach (var id in request.Ids.Distinct())
+        {
+            var category = await db.Categories.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+            if (category == null || !category.IsActive) continue;
+            var hasFutureSlots = await db.DealSlots.AnyAsync(x => x.ServiceOffering.CategoryId == id && x.Status == DealSlotStatus.Published && x.StartAtUtc > now, cancellationToken);
+            if (hasFutureSlots)
+            {
+                skipped.Add($"Danh mục “{category.Name}” đang có slot công khai trong tương lai.");
+                continue;
+            }
+            category.IsActive = false;
+            db.AuditLogs.Add(new AuditLog { ActorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier), Action = "category.deactivated", EntityType = nameof(Category), EntityId = category.Id.ToString() });
+            updatedCount++;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new { updatedCount, skippedCount = skipped.Count, skipped });
+    }
+
+    [HttpPost("users/bulk-suspend")]
+    public async Task<IActionResult> BulkSetUserSuspended(BulkUserSuspendRequest request, CancellationToken cancellationToken)
+    {
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var isCurrentAdmin = User.IsInRole(RoleNames.Admin);
+        var updatedCount = 0;
+        foreach (var id in request.Ids.Distinct())
+        {
+            if (id == currentUserId) continue;
+            var user = await db.Users.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+            if (user == null || user.IsSuspended == request.IsSuspended) continue;
+            var targetRoles = await userManager.GetRolesAsync(user);
+            if (targetRoles.Contains(RoleNames.Admin)) continue;
+            if (!isCurrentAdmin && targetRoles.Contains(RoleNames.Manager)) continue;
+
+            user.IsSuspended = request.IsSuspended;
+            db.AuditLogs.Add(new()
+            {
+                ActorUserId = currentUserId,
+                Action = request.IsSuspended ? "user.suspended" : "user.restored",
+                EntityType = "ApplicationUser",
+                EntityId = user.Id
+            });
+            updatedCount++;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new { updatedCount });
     }
 
     private async Task<IActionResult> SetProviderStatus(Guid providerId, ProviderStatus status, CancellationToken cancellationToken)

@@ -36,6 +36,38 @@ public sealed class GmailApiEmailConfigurationTests
         Assert.False(service.IsConfigured);
     }
 
+    [Fact]
+    public void CompleteSmtpConfiguration_IsReadyToSend()
+    {
+        var service = CreateService(new EmailOptions
+        {
+            SmtpHost = "smtp.gmail.com",
+            SmtpPort = 587,
+            SmtpUsername = "support@openslot.vn",
+            SmtpPassword = "secret-password"
+        });
+
+        Assert.True(service.IsConfigured);
+    }
+
+    [Fact]
+    public async Task UnconfiguredService_LogsAndDoesNotThrow_OnSupportTicketResolution()
+    {
+        var service = CreateService(new EmailOptions());
+        Assert.False(service.IsConfigured);
+
+        var exception = await Record.ExceptionAsync(() => service.SendSupportTicketResolutionAsync(
+            "customer@example.com",
+            "Customer",
+            Guid.NewGuid(),
+            "Lỗi thanh toán",
+            "Tôi đã thanh toán nhưng chưa nhận được mã PIN.",
+            "CSKH đã kiểm tra và gửi lại mã PIN thành công.",
+            "CSKH Minh"));
+
+        Assert.Null(exception);
+    }
+
     private static GmailApiEmailVerificationService CreateService(EmailOptions options) =>
         new(new HttpClient(), Options.Create(options), NullLogger<GmailApiEmailVerificationService>.Instance);
 }

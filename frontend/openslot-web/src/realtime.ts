@@ -83,3 +83,49 @@ export function useChatRealtime(
     }
   }, [activeConversationId])
 }
+
+export type RealtimeNotificationPayload = {
+  targetUserId: string
+  title: string
+  message: string
+  link?: string | null
+}
+
+/** In-app real-time notification alerts (cancellations, new bookings, support ticket replies). */
+export function useRealtimeNotifications(
+  userId: string | undefined,
+  onNotification: (payload: RealtimeNotificationPayload) => void
+) {
+  const handlerRef = useRef(onNotification)
+
+  useEffect(() => {
+    handlerRef.current = onNotification
+  }, [onNotification])
+
+  useEffect(() => {
+    if (!userId) return
+
+    const connection = new HubConnectionBuilder()
+      .withUrl(realtimeHubUrl)
+      .withAutomaticReconnect([0, 2_000, 5_000, 10_000])
+      .configureLogging(LogLevel.Warning)
+      .build()
+
+    const handleUserNotification = (payload: RealtimeNotificationPayload) => {
+      if (payload && payload.targetUserId === userId) {
+        handlerRef.current(payload)
+      }
+    }
+
+    connection.on('userNotification', handleUserNotification)
+    void connection.start().catch(() => {})
+
+    return () => {
+      connection.off('userNotification', handleUserNotification)
+      if (connection.state !== HubConnectionState.Disconnected) {
+        void connection.stop()
+      }
+    }
+  }, [userId])
+}
+

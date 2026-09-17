@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using OpenSlot.Api.Contracts.Admin;
 using OpenSlot.Api.Contracts.Moderation;
 using OpenSlot.Api.Data;
 using OpenSlot.Api.Domain;
@@ -74,6 +75,63 @@ public sealed class ReportsController(AppDbContext db) : ControllerBase
         db.AuditLogs.Add(new AuditLog { ActorUserId = UserId, Action = "report.resolved", EntityType = nameof(Report), EntityId = report.Id.ToString(), Metadata = request.ResolutionNote.Trim() });
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+
+    [Authorize(Roles = RoleNames.ManagerOrAdmin)]
+    [HttpPost("bulk-resolve")]
+    public async Task<IActionResult> BulkResolve(BulkResolveReportsRequest request, CancellationToken cancellationToken)
+    {
+        var resolvedCount = 0;
+        var note = string.IsNullOrWhiteSpace(request.ResolutionNote)
+            ? "Đã kiểm tra và xử lý hàng loạt bởi quản trị viên."
+            : request.ResolutionNote.Trim();
+
+        foreach (var id in request.Ids.Distinct())
+        {
+            var report = await db.Reports.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+            if (report == null || report.Status == ReportStatus.Resolved) continue;
+            report.Status = ReportStatus.Resolved;
+            db.AuditLogs.Add(new AuditLog
+            {
+                ActorUserId = UserId,
+                Action = "report.resolved",
+                EntityType = nameof(Report),
+                EntityId = report.Id.ToString(),
+                Metadata = note
+            });
+            resolvedCount++;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new { resolvedCount });
+    }
+
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        var report = await db.Reports.SingleOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new ApiException("Không tìm thấy báo cáo.", StatusCodes.Status404NotFound);
+        db.Reports.Remove(report);
+        db.AuditLogs.Add(new AuditLog { ActorUserId = UserId, Action = "report.deleted", EntityType = nameof(Report), EntityId = report.Id.ToString() });
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpPost("bulk-delete")]
+    public async Task<IActionResult> BulkDelete(BulkIdsRequest<Guid> request, CancellationToken cancellationToken)
+    {
+        var deletedCount = 0;
+        foreach (var id in request.Ids.Distinct())
+        {
+            var report = await db.Reports.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+            if (report == null) continue;
+            db.Reports.Remove(report);
+            db.AuditLogs.Add(new AuditLog { ActorUserId = UserId, Action = "report.deleted", EntityType = nameof(Report), EntityId = report.Id.ToString() });
+            deletedCount++;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new { deletedCount });
     }
 
     private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier)

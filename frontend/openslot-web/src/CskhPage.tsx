@@ -275,15 +275,21 @@ export function CskhPage({ session }: { session: Session }) {
               </div>
 
               <div className="mb-3">
-                <label className="form-label fw-bold small">Ghi chú xử lý / Nội dung phản hồi:</label>
+                <label className="form-label fw-bold small">
+                  Nội dung phản hồi (sẽ gửi email tự động tới {selectedTicket.senderEmail}):
+                </label>
                 <textarea
                   className="form-control"
                   rows={4}
                   required
                   value={resolutionNote}
                   onChange={(e) => setResolutionNote(e.target.value)}
-                  placeholder="Ghi chú hướng giải quyết, hoàn tiền hoặc phản hồi cho người dùng..."
+                  placeholder="Nhập hướng giải quyết, kết quả đối soát hoặc hướng dẫn để gửi email cho người dùng..."
                 />
+                <div className="form-text" style={{ fontSize: 11.5 }}>
+                  <i className="bi bi-envelope-check me-1 text-success" />
+                  Nội dung phản hồi này sẽ được hệ thống gửi qua email tới <b>{selectedTicket.senderEmail}</b> và gửi thông báo in-app nếu người dùng có tài khoản.
+                </div>
               </div>
 
               <div className="d-flex justify-content-end gap-2">
