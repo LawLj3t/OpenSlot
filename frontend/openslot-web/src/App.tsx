@@ -159,7 +159,25 @@ function ExplorePage() {
   const locationSuggestions = useMemo(() => filterSuggestions(vietnamLocations, locationQuery), [locationQuery])
   const serviceSuggestions = useMemo(() => filterSuggestions([...popularServiceSearches, ...categories.map((item) => item.name), ...slots.flatMap((slot) => [slot.serviceName, slot.venueName])], keyword), [categories, keyword, slots])
   return <div className="explore-page">
-    <section className="hero-section"><div className="container"><p className="eyebrow"><i className="bi bi-stars" /> Ưu đãi sát giờ, có giới hạn</p><h1>Chỗ trống hôm nay,<br /><em>giá tốt ngay lúc này.</em></h1><p className="hero-copy">OpenSlot kết nối các khung giờ còn trống từ đối tác với người dùng sẵn sàng trải nghiệm. Không chờ sale dài ngày, chỉ chọn đúng thời điểm.</p><form className="search-box" onSubmit={search}><div><i className="bi bi-search" /><input aria-label="Tìm dịch vụ" list="service-search-suggestions" autoComplete="off" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Tìm sân, salon, chỗ ngồi..." /><datalist id="service-search-suggestions">{serviceSuggestions.map((suggestion) => <option value={suggestion} key={suggestion} />)}</datalist></div><div><i className="bi bi-geo-alt" /><input aria-label="Khu vực" list="location-search-suggestions" autoComplete="off" value={locationQuery} onChange={(e) => setLocationQuery(e.target.value)} placeholder="Địa điểm, ví dụ: Hà Nội" /><datalist id="location-search-suggestions">{locationSuggestions.map((suggestion) => <option value={suggestion} key={suggestion} />)}</datalist></div><button type="button" className={`location-button ${appliedLocation?.latitude != null ? 'active' : ''}`} onClick={useMyLocation} title="Dùng vị trí hiện tại" aria-label="Dùng vị trí hiện tại"><i className={`bi bi-${locating ? 'hourglass-split' : 'crosshair'}`} /></button><button disabled={locating} className="btn btn-primary rounded-pill">{locating ? 'Đang xác định...' : 'Khám phá ngay'} <i className="bi bi-arrow-right" /></button></form></div></section>
+    <section className="hero-section">
+      <div className="hero-decorations" aria-hidden="true">
+        <span className="hero-glow-ring ring-1" />
+        <span className="hero-glow-ring ring-2" />
+        <div className="hero-floating-badge badge-1"><i className="bi bi-fire" /> Giảm tới 50%</div>
+        <div className="hero-floating-badge badge-2"><i className="bi bi-lightning-charge-fill" /> Giữ chỗ tức thì</div>
+      </div>
+      <div className="container">
+        <p className="eyebrow"><i className="bi bi-stars" /> Ưu đãi sát giờ, có giới hạn</p>
+        <h1>Chỗ trống hôm nay,<br /><em>giá tốt ngay lúc này.</em></h1>
+        <p className="hero-copy">OpenSlot kết nối các khung giờ còn trống từ đối tác với người dùng sẵn sàng trải nghiệm. Không chờ sale dài ngày, chỉ chọn đúng thời điểm.</p>
+        <form className="search-box" onSubmit={search}>
+          <div><i className="bi bi-search" /><input aria-label="Tìm dịch vụ" list="service-search-suggestions" autoComplete="off" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Tìm sân, salon, chỗ ngồi..." /><datalist id="service-search-suggestions">{serviceSuggestions.map((suggestion) => <option value={suggestion} key={suggestion} />)}</datalist></div>
+          <div><i className="bi bi-geo-alt" /><input aria-label="Khu vực" list="location-search-suggestions" autoComplete="off" value={locationQuery} onChange={(e) => setLocationQuery(e.target.value)} placeholder="Địa điểm, ví dụ: Hà Nội" /><datalist id="location-search-suggestions">{locationSuggestions.map((suggestion) => <option value={suggestion} key={suggestion} />)}</datalist></div>
+          <button type="button" className={`location-button ${appliedLocation?.latitude != null ? 'active' : ''}`} onClick={useMyLocation} title="Dùng vị trí hiện tại" aria-label="Dùng vị trí hiện tại"><i className={`bi bi-${locating ? 'hourglass-split' : 'crosshair'}`} /></button>
+          <button disabled={locating} className="btn btn-primary rounded-pill">{locating ? 'Đang xác định...' : 'Khám phá ngay'} <i className="bi bi-arrow-right" /></button>
+        </form>
+      </div>
+    </section>
     <section className="container content-section">{hasSearched && <NearbyResults slots={recommendationSlots} location={appliedLocation} loading={loading || locating} />}<div className="category-row"><button className={!activeCategory ? 'category active' : 'category'} onClick={() => setActiveCategory('')}><i className="bi bi-grid" />Tất cả</button>{categories.map((item) => <button key={item.id} className={activeCategory === item.slug ? 'category active' : 'category'} onClick={() => setActiveCategory(item.slug)}><i className={`bi ${item.icon || 'bi-tag'}`} />{item.name}</button>)}</div><div className="section-heading"><div><p className="eyebrow">Sắp diễn ra</p><h2>Slot đáng săn gần bạn</h2></div><button className="view-toggle" onClick={() => setMapMode(!mapMode)}><i className={`bi bi-${mapMode ? 'list-ul' : 'map'}`} /> {mapMode ? 'Xem danh sách' : 'Xem trên bản đồ'}</button></div>{error && <div className="alert alert-warning">{error}</div>}{loading ? <div className="empty-state"><div className="spinner-border text-primary" /><p>Đang tìm slot tốt nhất...</p></div> : mapMode ? <SlotMap slots={slots} location={appliedLocation} /> : <SlotGrid slots={slots} />}</section>
     <section className="how-it-works"><div className="container"><p className="eyebrow">Đơn giản, minh bạch</p><h2>Săn slot trong 3 bước</h2><div className="steps"><Step icon="bi-search-heart" number="01" title="Tìm đúng lúc" text="Lọc dịch vụ, địa điểm và giờ phù hợp với lịch của bạn." /><Step icon="bi-ticket-perforated" number="02" title="Giữ chỗ nhanh" text="Xác nhận slot trước khi hết chỗ; giá và điều kiện luôn rõ ràng." /><Step icon="bi-qr-code-scan" number="03" title="Check-in gọn" text="Dùng mã QR hoặc PIN tại địa điểm để bắt đầu trải nghiệm." /></div></div></section>
   </div>
@@ -257,7 +275,36 @@ function ForgotPasswordPage() {
   const [email, setEmail] = useState(''); const [notice, setNotice] = useState(''); const [error, setError] = useState(''); const [loading, setLoading] = useState(false)
   const sendResetLink = async () => { setError(''); setNotice(''); if (!isValidGmail(email)) { setError('Vui lòng nhập địa chỉ Gmail hợp lệ, ví dụ: ten@gmail.com.'); return }; setLoading(true); try { const result = await api.forgotPassword(email); setNotice(result.message) } catch (e) { setError(e instanceof Error ? e.message : 'Không thể gửi email đặt lại mật khẩu.') } finally { setLoading(false) } }
   const submit = (event: React.FormEvent) => { event.preventDefault(); void sendResetLink() }
-  return <div className="auth-page"><section className="auth-pitch"><NavLink to="/" className="brand"><span className="brand-mark"><i className="bi bi-lightning-charge-fill" /></span>Open<span>Slot</span></NavLink><div><p className="eyebrow">Khôi phục tài khoản</p><h1>Quên mật khẩu<br />không sao cả.</h1><p>Chúng tôi sẽ gửi một link bảo mật để bạn đặt lại mật khẩu qua Gmail.</p></div></section><section className="auth-form-wrap"><form onSubmit={submit} className="auth-form"><p className="eyebrow">Quên mật khẩu</p><h1>Kiểm tra Gmail</h1><p className="form-hint">Nhập Gmail đã dùng để đăng ký OpenSlot. Link chỉ dùng được một lần trong 30 phút.</p><label>Gmail<input required type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="ten@gmail.com" /></label>{error && <div className="alert alert-danger">{error}</div>}{notice && <div className="alert alert-success">{notice}</div>}<button disabled={loading} className="btn btn-primary rounded-pill py-3">{loading ? 'Đang gửi...' : notice ? 'Chưa nhận được email? Gửi lại link' : 'Gửi link đặt lại mật khẩu'} <i className="bi bi-send" /></button><p className="switch-auth">Nhớ mật khẩu rồi? <NavLink to="/login">Đăng nhập</NavLink></p></form></section></div>
+  return <div className="auth-page auth-experience">
+    <section className="auth-pitch">
+      <NavLink to="/" className="brand" aria-label="OpenSlot - Trang chủ"><span className="brand-mark"><i className="bi bi-plus-lg" /></span><span className="brand-open">Open</span><span>Slot</span></NavLink>
+      <div className="auth-pitch-copy">
+        <p className="eyebrow">Khôi phục tài khoản</p>
+        <h1>Lấy lại mật khẩu,<br />tiếp tục săn slot</h1>
+        <p>Đừng lo lắng khi quên mật khẩu. Chúng tôi sẽ gửi liên kết bảo mật đến Gmail của bạn để tạo mật khẩu mới an toàn và nhanh chóng.</p>
+      </div>
+      <AuthVisuals mode="forgot" />
+      <div className="quote">Bảo vệ tài khoản của bạn<br />luôn là ưu tiên hàng đầu.<span /></div>
+    </section>
+    <section className="auth-form-wrap">
+      <form onSubmit={submit} className="auth-form">
+        <p className="eyebrow">Khôi phục tài khoản</p>
+        <h1>Quên mật khẩu</h1>
+        <p className="form-hint">Nhập Gmail đã dùng để đăng ký OpenSlot. Link chỉ dùng được 1 lần trong 30 phút.</p>
+        <label>
+          Gmail
+          <input required type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="ten@gmail.com" />
+          <small className="form-hint">Chỉ hỗ trợ địa chỉ @gmail.com.</small>
+        </label>
+        {error && <div className="alert alert-danger">{error}</div>}
+        {notice && <div className="alert alert-success">{notice}</div>}
+        <button disabled={loading} className="btn btn-primary rounded-pill py-3">
+          {loading ? 'Đang gửi...' : notice ? 'Chưa nhận được email? Gửi lại link' : 'Gửi link đặt lại mật khẩu'} <i className="bi bi-send" />
+        </button>
+        <p className="switch-auth">Nhớ mật khẩu rồi? <NavLink to="/login">Đăng nhập</NavLink></p>
+      </form>
+    </section>
+  </div>
 }
 
 function ResetPasswordPage() {
@@ -265,16 +312,55 @@ function ResetPasswordPage() {
   const userId = searchParams.get('userId') ?? ''; const token = searchParams.get('token') ?? ''
   useEffect(() => { if (!notice) return; const timeout = window.setTimeout(() => navigate('/login', { replace: true }), 3_000); return () => window.clearTimeout(timeout) }, [navigate, notice])
   const submit = async (event: React.FormEvent) => { event.preventDefault(); setError(''); if (!userId || !token) { setError('Link đặt lại mật khẩu không đầy đủ hoặc không hợp lệ.'); return }; if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}/.test(password)) { setError('Mật khẩu cần tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và số.'); return }; if (password !== confirmPassword) { setError('Mật khẩu xác nhận không khớp.'); return }; setLoading(true); try { const result = await api.resetPassword(userId, token, password, confirmPassword); setNotice(`${result.message} Bạn sẽ được chuyển đến trang đăng nhập.`) } catch (e) { setError(e instanceof Error ? e.message : 'Không thể đặt lại mật khẩu.') } finally { setLoading(false) } }
-  return <div className="auth-page"><section className="auth-pitch"><NavLink to="/" className="brand"><span className="brand-mark"><i className="bi bi-lightning-charge-fill" /></span>Open<span>Slot</span></NavLink><div><p className="eyebrow">Bảo mật tài khoản</p><h1>Đặt lại<br />mật khẩu mới.</h1><p>Đặt mật khẩu mạnh để tiếp tục sử dụng OpenSlot an toàn.</p></div></section><section className="auth-form-wrap"><form onSubmit={submit} className="auth-form"><p className="eyebrow">Đặt lại mật khẩu</p><h1>Tạo mật khẩu mới</h1><p className="form-hint">Link này chỉ dùng được một lần. Sau khi đổi, bạn sẽ cần đăng nhập lại.</p><label>Mật khẩu mới<input required disabled={!!notice} autoComplete="new-password" minLength={8} type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Tối thiểu 8 ký tự" /></label><label>Xác nhận mật khẩu mới<input required disabled={!!notice} autoComplete="new-password" minLength={8} type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Nhập lại mật khẩu mới" /></label>{error && <div className="alert alert-danger">{error}</div>}{notice && <div className="alert alert-success">{notice}</div>}<button disabled={loading || !!notice} className="btn btn-primary rounded-pill py-3">{loading ? 'Đang cập nhật...' : 'Xác nhận đổi mật khẩu'} <i className="bi bi-shield-check" /></button>{notice && <NavLink to="/login" className="btn btn-outline-primary rounded-pill py-3">Đến trang đăng nhập</NavLink>}</form></section></div>
+  return <div className="auth-page auth-experience">
+    <section className="auth-pitch">
+      <NavLink to="/" className="brand" aria-label="OpenSlot - Trang chủ"><span className="brand-mark"><i className="bi bi-plus-lg" /></span><span className="brand-open">Open</span><span>Slot</span></NavLink>
+      <div className="auth-pitch-copy">
+        <p className="eyebrow">Bảo mật tài khoản</p>
+        <h1>Đặt lại<br />mật khẩu mới</h1>
+        <p>Đặt mật khẩu mạnh tối thiểu 8 ký tự gồm chữ hoa, chữ thường và số để tiếp tục sử dụng OpenSlot an toàn.</p>
+      </div>
+      <AuthVisuals mode="forgot" />
+      <div className="quote">An toàn hôm nay,<br />trọn vẹn từng trải nghiệm.<span /></div>
+    </section>
+    <section className="auth-form-wrap">
+      <form onSubmit={submit} className="auth-form">
+        <p className="eyebrow">Đặt lại mật khẩu</p>
+        <h1>Tạo mật khẩu mới</h1>
+        <p className="form-hint">Link này chỉ dùng được một lần. Sau khi đổi, bạn sẽ được chuyển đến trang đăng nhập.</p>
+        <label>Mật khẩu mới
+          <input required disabled={!!notice} autoComplete="new-password" minLength={8} type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Tối thiểu 8 ký tự" />
+        </label>
+        <label>Xác nhận mật khẩu mới
+          <input required disabled={!!notice} autoComplete="new-password" minLength={8} type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Nhập lại mật khẩu mới" />
+        </label>
+        {error && <div className="alert alert-danger">{error}</div>}
+        {notice && <div className="alert alert-success">{notice}</div>}
+        <button disabled={loading || !!notice} className="btn btn-primary rounded-pill py-3">
+          {loading ? 'Đang cập nhật...' : 'Xác nhận đổi mật khẩu'} <i className="bi bi-shield-check" />
+        </button>
+        {notice && <NavLink to="/login" className="btn btn-outline-primary rounded-pill py-3 mt-2">Đến trang đăng nhập</NavLink>}
+      </form>
+    </section>
+  </div>
 }
 
-function AuthVisuals({ mode = 'login' }: { mode?: 'login' | 'register' }) {
+function AuthVisuals({ mode = 'login' }: { mode?: 'login' | 'register' | 'forgot' }) {
   if (mode === 'register') {
     return <div className="auth-visuals" aria-hidden="true">
       <article className="auth-visual-card spa-card"><img src="https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=700&q=80" alt="" /><span className="visual-category"><i className="bi bi-flower1" /></span><div><b>Gội đầu & Spa</b><small>Còn khung giờ trống</small></div></article>
       <article className="auth-visual-card studio-card"><img src="https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=700&q=80" alt="" /><span className="visual-category"><i className="bi bi-camera-fill" /></span><div><b>Studio chụp ảnh</b><small>Ưu đãi giờ chót</small></div></article>
       <article className="auth-visual-card workspace-card"><img src="https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=700&q=80" alt="" /><span className="visual-category"><i className="bi bi-laptop" /></span><div><b>Phòng họp & Workspace</b><small>Sẵn sàng đặt ngay</small></div></article>
       <article className="auth-deal-card register-deal-card"><div><b>Tài khoản mới</b><small>Săn slot ngay hôm nay</small></div><span><i className="bi bi-stars" /></span></article>
+      <span className="auth-glass-tile tile-one" /><span className="auth-glass-tile tile-two" /><span className="auth-glass-tile tile-three" />
+    </div>
+  }
+  if (mode === 'forgot') {
+    return <div className="auth-visuals" aria-hidden="true">
+      <article className="auth-visual-card security-card"><img src="https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&w=700&q=80" alt="" /><span className="visual-category"><i className="bi bi-shield-lock-fill" /></span><div><b>Bảo mật tài khoản</b><small>Mã hóa liên kết an toàn</small></div></article>
+      <article className="auth-visual-card mail-card"><img src="https://images.unsplash.com/photo-1596526131083-e8c633c948d2?auto=format&fit=crop&w=700&q=80" alt="" /><span className="visual-category"><i className="bi bi-envelope-check-fill" /></span><div><b>Xác nhận qua Gmail</b><small>Link 1 lần trong 30 phút</small></div></article>
+      <article className="auth-visual-card recovery-card"><img src="https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=700&q=80" alt="" /><span className="visual-category"><i className="bi bi-key-fill" /></span><div><b>Khôi phục tức thì</b><small>Tiếp tục săn slot giá tốt</small></div></article>
+      <article className="auth-deal-card forgot-deal-card"><div><b>Khôi phục 24/7</b><small>Bảo vệ tài khoản đa tầng</small></div><span><i className="bi bi-shield-check" /></span></article>
       <span className="auth-glass-tile tile-one" /><span className="auth-glass-tile tile-two" /><span className="auth-glass-tile tile-three" />
     </div>
   }
@@ -368,7 +454,14 @@ function ProviderCatalogPanel({ token, onServicesChanged }: { token: string; onS
 
 function ProviderProfileForm({ profile, token, onDone, onError }: { profile: MyProviderProfile; token: string; onDone: () => void; onError: (message: string) => void }) {
   const [businessName, setBusinessName] = useState(profile.businessName); const [contactPhone, setContactPhone] = useState(profile.contactPhone); const [description, setDescription] = useState(profile.description ?? ''); const submit = async (event: React.FormEvent) => { event.preventDefault(); if (!isValidPhone(contactPhone)) { onError('Số điện thoại không hợp lệ, vui lòng nhập lại.'); return }; try { await api.updateProviderProfile({ businessName, contactPhone, description }, token); onDone() } catch (e) { onError(e instanceof Error ? e.message : 'Không thể cập nhật hồ sơ.') } }
-  return <form className="provider-form catalog-form" onSubmit={submit}><h3>Sửa hồ sơ đối tác</h3><label>Tên doanh nghiệp<input required name="organization" autoComplete="organization" minLength={2} maxLength={160} value={businessName} onChange={(e) => setBusinessName(e.target.value)} /></label><label>Số điện thoại<input required name="tel" type="tel" autoComplete="tel" inputMode="numeric" minLength={10} maxLength={10} pattern="0[0-9]{9}" title="Gồm đúng 10 chữ số và bắt đầu bằng số 0" value={contactPhone} onChange={(e) => setContactPhone(normalizePhone(e.target.value))} /><small className="form-hint">Gồm đúng 10 chữ số và bắt đầu bằng số 0.</small></label><label>Mô tả<input maxLength={2000} list="profile-description-suggestions" value={description} onChange={(e) => setDescription(e.target.value)} /></label><datalist id="profile-description-suggestions">{descriptionSuggestions.map((value) => <option value={value} key={value} />)}</datalist><button className="btn btn-primary rounded-pill">Lưu hồ sơ</button></form>
+  return <form className="provider-form catalog-form" onSubmit={submit}>
+    <h3>Sửa hồ sơ đối tác</h3>
+    <label><span>Tên doanh nghiệp</span><input required name="organization" autoComplete="organization" minLength={2} maxLength={160} value={businessName} onChange={(e) => setBusinessName(e.target.value)} /></label>
+    <label><span>Số điện thoại</span><input required name="tel" type="tel" autoComplete="tel" inputMode="numeric" minLength={10} maxLength={10} pattern="0[0-9]{9}" title="Gồm đúng 10 chữ số và bắt đầu bằng số 0" value={contactPhone} onChange={(e) => setContactPhone(normalizePhone(e.target.value))} /><small className="form-hint">Gồm đúng 10 chữ số và bắt đầu bằng số 0.</small></label>
+    <label><span>Mô tả</span><input maxLength={2000} list="profile-description-suggestions" value={description} onChange={(e) => setDescription(e.target.value)} /></label>
+    <datalist id="profile-description-suggestions">{descriptionSuggestions.map((value) => <option value={value} key={value} />)}</datalist>
+    <button className="btn btn-primary rounded-pill">Lưu hồ sơ</button>
+  </form>
 }
 
 function VenueForm({ token, onDone, onError }: { token: string; onDone: () => void; onError: (message: string) => void }) {

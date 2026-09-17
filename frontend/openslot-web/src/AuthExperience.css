@@ -30,12 +30,16 @@
 .spa-card { top: 8%; right: 13px; width: 45%; height: 207px; transform: rotate(-4deg); }
 .studio-card { top: 37%; right: -49px; width: 47%; height: 242px; transform: rotate(3deg); }
 .workspace-card { right: 54px; bottom: 6%; width: 41%; height: 192px; transform: rotate(-5deg); }
+.security-card { top: 8%; right: 13px; width: 45%; height: 207px; transform: rotate(-4deg); }
+.mail-card { top: 37%; right: -49px; width: 47%; height: 242px; transform: rotate(3deg); }
+.recovery-card { right: 54px; bottom: 6%; width: 41%; height: 192px; transform: rotate(-5deg); }
 .auth-deal-card { top: 51%; right: 30%; display: flex; align-items: center; gap: 20px; padding: 15px 16px; color: #fff; transform: rotate(-7deg); }
 .register-deal-card { top: 51%; right: 28%; gap: 16px; transform: rotate(-6deg); }
+.forgot-deal-card { top: 51%; right: 28%; gap: 16px; transform: rotate(-6deg); }
 .auth-visual-card { transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease; }
-.coffee-card:hover, .spa-card:hover { transform: rotate(-2deg) scale(1.03); }
-.tennis-card:hover, .studio-card:hover { transform: rotate(1deg) scale(1.03); }
-.salon-card:hover, .workspace-card:hover { transform: rotate(-2deg) scale(1.03); }
+.coffee-card:hover, .spa-card:hover, .security-card:hover { transform: rotate(-2deg) scale(1.03); }
+.tennis-card:hover, .studio-card:hover, .mail-card:hover { transform: rotate(1deg) scale(1.03); }
+.salon-card:hover, .workspace-card:hover, .recovery-card:hover { transform: rotate(-2deg) scale(1.03); }
 .auth-deal-card:hover { transform: rotate(-3deg) scale(1.05); }
 .auth-deal-card > div { display: grid; gap: 3px; }
 .auth-deal-card b { font-size: 14px; }
