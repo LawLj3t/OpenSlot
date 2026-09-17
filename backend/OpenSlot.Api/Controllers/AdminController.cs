@@ -226,6 +226,95 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
     [HttpPost("providers/{providerId:guid}/reject")]
     public Task<IActionResult> Reject(Guid providerId, CancellationToken cancellationToken) => SetProviderStatus(providerId, ProviderStatus.Rejected, cancellationToken);
 
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpDelete("providers/{providerId:guid}")]
+    public async Task<IActionResult> DeleteProvider(Guid providerId, CancellationToken cancellationToken)
+    {
+        var provider = await db.ProviderProfiles
+            .Include(x => x.Venues)
+                .ThenInclude(v => v.ServiceOfferings)
+                    .ThenInclude(s => s.DealSlots)
+            .SingleOrDefaultAsync(x => x.Id == providerId, cancellationToken)
+            ?? throw new ApiException("Không tìm thấy đối tác.", StatusCodes.Status404NotFound);
+
+        if (provider.Status == ProviderStatus.Deleted)
+        {
+            throw new ApiException("Đối tác này đã được xóa trước đó.", StatusCodes.Status400BadRequest);
+        }
+
+        var activeBookingsCount = await db.Bookings.CountAsync(b =>
+            b.DealSlot.ServiceOffering.Venue.ProviderProfileId == providerId &&
+            (b.Status == BookingStatus.Confirmed || b.Status == BookingStatus.CheckedIn),
+            cancellationToken);
+
+        if (activeBookingsCount > 0)
+        {
+            throw new ApiException($"Không thể xóa đối tác này vì còn {activeBookingsCount} booking đang hoạt động. Hãy đợi khách hàng hoàn tất hoặc hủy trước khi xóa.", StatusCodes.Status400BadRequest);
+        }
+
+        var now = DateTime.UtcNow;
+        var activeHoldsCount = await db.SlotHolds.CountAsync(h =>
+            h.DealSlot.ServiceOffering.Venue.ProviderProfileId == providerId &&
+            h.Status == SlotHoldStatus.Active &&
+            h.ExpiresAtUtc > now,
+            cancellationToken);
+
+        if (activeHoldsCount > 0)
+        {
+            throw new ApiException("Không thể xóa đối tác này vì đang có khách hàng giữ chỗ thanh toán. Vui lòng thử lại sau ít phút.", StatusCodes.Status400BadRequest);
+        }
+
+        provider.Status = ProviderStatus.Deleted;
+
+        var slotsToCancel = provider.Venues
+            .SelectMany(v => v.ServiceOfferings)
+            .SelectMany(s => s.DealSlots)
+            .Where(s => s.Status is DealSlotStatus.Published or DealSlotStatus.Draft)
+            .ToList();
+
+        foreach (var slot in slotsToCancel)
+        {
+            slot.Status = DealSlotStatus.Cancelled;
+            slot.ConcurrencyToken = Guid.NewGuid();
+        }
+
+        foreach (var venue in provider.Venues)
+        {
+            foreach (var service in venue.ServiceOfferings)
+            {
+                service.IsActive = false;
+            }
+        }
+
+        var resources = await db.BookableResources
+            .Where(r => r.Venue.ProviderProfileId == providerId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var resource in resources)
+        {
+            resource.IsActive = false;
+        }
+
+        db.AuditLogs.Add(new AuditLog
+        {
+            ActorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
+            Action = "provider.deleted",
+            EntityType = nameof(ProviderProfile),
+            EntityId = provider.Id.ToString()
+        });
+
+        db.Notifications.Add(new Notification
+        {
+            UserId = provider.UserId,
+            Title = "Hồ sơ đối tác đã bị xóa",
+            Message = $"Hồ sơ đối tác {provider.BusinessName} đã bị xóa bởi quản trị viên hệ thống.",
+            Link = "/provider"
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
     [HttpGet("categories")]
     public async Task<IActionResult> Categories(CancellationToken cancellationToken) => Ok(await db.Categories.AsNoTracking()
         .OrderBy(x => x.Name)
@@ -267,6 +356,31 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
     [HttpPost("categories/{categoryId:int}/deactivate")]
     public Task<IActionResult> DeactivateCategory(int categoryId, CancellationToken cancellationToken) => SetCategoryActive(categoryId, false, cancellationToken);
 
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpDelete("categories/{categoryId:int}")]
+    public async Task<IActionResult> DeleteCategory(int categoryId, CancellationToken cancellationToken)
+    {
+        var category = await db.Categories.Include(x => x.ServiceOfferings)
+            .SingleOrDefaultAsync(x => x.Id == categoryId, cancellationToken)
+            ?? throw new ApiException("Không tìm thấy danh mục.", StatusCodes.Status404NotFound);
+
+        if (category.ServiceOfferings.Any())
+        {
+            throw new ApiException($"Không thể xóa danh mục “{category.Name}” vì đang có {category.ServiceOfferings.Count} dịch vụ liên kết. Hãy chuyển hoặc xóa dịch vụ trước.", StatusCodes.Status409Conflict);
+        }
+
+        db.Categories.Remove(category);
+        db.AuditLogs.Add(new AuditLog
+        {
+            ActorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
+            Action = "category.deleted",
+            EntityType = nameof(Category),
+            EntityId = category.Id.ToString()
+        });
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
     private async Task<IActionResult> SetProviderStatus(Guid providerId, ProviderStatus status, CancellationToken cancellationToken)
     {
         var provider = await db.ProviderProfiles.SingleOrDefaultAsync(x => x.Id == providerId, cancellationToken)
@@ -283,6 +397,7 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
         {
             ProviderStatus.Approved => ("Hồ sơ đối tác đã được duyệt", "Bạn có thể phát hành slot trên OpenSlot."),
             ProviderStatus.Rejected => ("Hồ sơ đối tác cần bổ sung", "Hãy cập nhật thông tin cửa hàng rồi gửi lại để Manager xét duyệt."),
+            ProviderStatus.Deleted => ("Hồ sơ đối tác đã bị xóa", "Hồ sơ của bạn đã bị xóa bởi quản trị viên hệ thống."),
             _ => ("Hồ sơ đối tác bị tạm khóa", "Liên hệ quản trị viên nếu bạn cần hỗ trợ.")
         };
         db.Notifications.Add(new OpenSlot.Api.Domain.Entities.Notification { UserId = provider.UserId, Title = title, Message = message, Link = "/provider" });

@@ -23,6 +23,7 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
         var services = await db.ServiceOfferings
             .AsNoTracking()
             .Include(x => x.Venue)
+            .Include(x => x.Category)
             .Where(x => x.IsActive && x.Venue.ProviderProfile.UserId == UserId)
             .OrderBy(x => x.Venue.Name).ThenBy(x => x.Name)
             .Select(x => new
@@ -31,6 +32,9 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
                 x.Name,
                 x.VenueId,
                 venueName = x.Venue.Name,
+                categoryId = x.CategoryId,
+                categorySlug = x.Category.Slug,
+                categoryName = x.Category.Name,
                 x.BasePriceVnd
             })
             .ToListAsync(cancellationToken);
@@ -232,9 +236,9 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
             .Select(x => (ProviderStatus?)x.Status)
             .SingleOrDefaultAsync(cancellationToken)
             ?? throw new ApiException("Không tìm thấy hồ sơ đối tác.", StatusCodes.Status404NotFound);
-        if (status == ProviderStatus.Suspended)
+        if (status is ProviderStatus.Suspended or ProviderStatus.Deleted)
         {
-            throw new ApiException("Hồ sơ đối tác đang bị tạm khóa nên không thể thay đổi slot.", StatusCodes.Status403Forbidden);
+            throw new ApiException("Hồ sơ đối tác đã bị xóa hoặc tạm khóa nên không thể thay đổi slot.", StatusCodes.Status403Forbidden);
         }
     }
 

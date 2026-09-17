@@ -156,9 +156,9 @@ public sealed class ProviderProfileController(AppDbContext db) : ControllerBase
     {
         var profile = await ProfileQuery().SingleOrDefaultAsync(cancellationToken)
             ?? throw new ApiException("Không tìm thấy hồ sơ đối tác.", StatusCodes.Status404NotFound);
-        if (profile.Status == ProviderStatus.Suspended)
+        if (profile.Status is ProviderStatus.Suspended or ProviderStatus.Deleted)
         {
-            throw new ApiException("Hồ sơ đối tác đang bị tạm khóa nên không thể thay đổi dữ liệu.", StatusCodes.Status403Forbidden);
+            throw new ApiException("Hồ sơ đối tác đã bị xóa hoặc tạm khóa nên không thể thay đổi dữ liệu.", StatusCodes.Status403Forbidden);
         }
         return profile;
     }

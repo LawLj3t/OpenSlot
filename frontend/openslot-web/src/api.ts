@@ -203,6 +203,7 @@ export const api = {
   adminSlots: (token: string) => request<AdminSlot[]>('/admin/slots', {}, token),
   adminCategories: (token: string) => request<AdminCategory[]>('/admin/categories', {}, token),
   createAdminCategory: (payload: object, token: string) => request<AdminCategory>('/admin/categories', { method: 'POST', body: JSON.stringify(payload) }, token),
+  adminDeleteCategory: (categoryId: number, token: string) => request<void>(`/admin/categories/${categoryId}`, { method: 'DELETE' }, token),
   setAdminCategoryActive: (categoryId: number, active: boolean, token: string) => request<void>(`/admin/categories/${categoryId}/${active ? 'activate' : 'deactivate'}`, { method: 'POST' }, token),
   setServiceActive: (serviceId: string, active: boolean, token: string) => request<void>(`/admin/services/${serviceId}/${active ? 'activate' : 'deactivate'}`, { method: 'POST' }, token),
   adminCancelSlot: (slotId: string, token: string) => request<void>(`/admin/slots/${slotId}/cancel`, { method: 'POST' }, token),
@@ -219,5 +220,6 @@ export const api = {
   approveProvider: (providerId: string, token: string) => request(`/admin/providers/${providerId}/approve`, { method: 'POST' }, token),
   suspendProvider: (providerId: string, token: string) => request(`/admin/providers/${providerId}/suspend`, { method: 'POST' }, token),
   rejectProvider: (providerId: string, token: string) => request(`/admin/providers/${providerId}/reject`, { method: 'POST' }, token),
+  adminDeleteProvider: (providerId: string, token: string) => request<void>(`/admin/providers/${providerId}`, { method: 'DELETE' }, token),
   resubmitProviderProfile: (token: string) => request('/provider/profile/resubmit', { method: 'POST' }, token),
 }

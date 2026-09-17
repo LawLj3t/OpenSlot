@@ -103,6 +103,9 @@ export type ProviderService = {
   venueId: string
   venueName: string
   basePriceVnd: number
+  categoryId?: number
+  categorySlug?: string
+  categoryName?: string
 }
 
 export type ProviderResource = {
