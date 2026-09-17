@@ -21,7 +21,7 @@ public class DebugController : ControllerBase
         var stats = new
         {
             Users = await _db.Users.CountAsync(),
-            Slots = await _db.Slots.CountAsync(),
+            Slots = await _db.DealSlots.CountAsync(),
             Bookings = await _db.Bookings.CountAsync(),
             Categories = await _db.Categories.CountAsync(),
             ProviderProfiles = await _db.ProviderProfiles.CountAsync(),
@@ -40,9 +40,10 @@ public class DebugController : ControllerBase
                 u.Id,
                 u.UserName,
                 u.Email,
+                u.DisplayName,
                 u.EmailConfirmed,
                 u.IsSuspended,
-                u.CreatedAt
+                u.CreatedAtUtc
             })
             .Take(10)
             .ToListAsync();
@@ -52,18 +53,20 @@ public class DebugController : ControllerBase
     [HttpGet("slots")]
     public async Task<IActionResult> GetSlots()
     {
-        var slots = await _db.Slots
-            .Include(s => s.Category)
+        var slots = await _db.DealSlots
+            .Include(s => s.ServiceOffering)
+                .ThenInclude(so => so.Category)
             .Select(s => new
             {
                 s.Id,
-                s.Title,
-                Category = s.Category.Name,
-                s.StartsAt,
-                s.EndsAt,
-                s.OriginalPrice,
-                s.DiscountedPrice,
+                Title = s.ServiceOffering.Name,
+                Category = s.ServiceOffering.Category.Name,
+                StartsAt = s.StartAtUtc,
+                EndsAt = s.EndAtUtc,
+                OriginalPrice = s.OriginalPriceVnd,
+                DiscountedPrice = s.DealPriceVnd,
                 s.Capacity,
+                s.ConfirmedBookingCount,
                 s.Status
             })
             .Take(10)
@@ -75,16 +78,18 @@ public class DebugController : ControllerBase
     public async Task<IActionResult> GetBookings()
     {
         var bookings = await _db.Bookings
-            .Include(b => b.Slot)
+            .Include(b => b.DealSlot)
+                .ThenInclude(s => s.ServiceOffering)
+            .Include(b => b.CustomerUser)
             .Select(b => new
             {
                 b.Id,
-                b.CustomerEmail,
-                SlotTitle = b.Slot.Title,
-                b.Quantity,
-                b.TotalPrice,
+                b.PublicCode,
+                CustomerEmail = b.CustomerUser.Email,
+                SlotTitle = b.DealSlot.ServiceOffering.Name,
+                TotalPrice = b.DealSlot.DealPriceVnd,
                 b.Status,
-                b.BookedAt
+                BookedAt = b.BookedAtUtc
             })
             .Take(10)
             .ToListAsync();
