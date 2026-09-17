@@ -20,6 +20,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ChatConversation> ChatConversations => Set<ChatConversation>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+    public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -172,6 +173,27 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .WithMany()
                 .HasForeignKey(x => x.SenderUserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<SupportTicket>(entity =>
+        {
+            entity.Property(x => x.UserRole).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.Category).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.SenderEmail).HasMaxLength(160).IsRequired();
+            entity.Property(x => x.Content).HasMaxLength(4000).IsRequired();
+            entity.Property(x => x.ResolutionNote).HasMaxLength(4000);
+            entity.Property(x => x.ResolvedByName).HasMaxLength(120);
+            entity.HasIndex(x => x.Status);
+            entity.HasIndex(x => x.CreatedAtUtc);
+            entity.HasIndex(x => x.SenderEmail);
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(x => x.ResolvedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.ResolvedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

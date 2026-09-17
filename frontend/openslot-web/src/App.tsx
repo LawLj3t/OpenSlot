@@ -5,8 +5,12 @@ import { Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams, 
 import { QRCodeSVG } from 'qrcode.react'
 import { api } from './api'
 import type { GeocodedLocation } from './api'
-import { useChatRealtime, useSlotAvailability } from './realtime'
-import type { AdminCategory, AdminDashboard, AdminProviderDetail, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, ChatMessage, Conversation, ConversationDetail, DealSlot, MyProviderProfile, Notification, PortalRole, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, Report, Session, SlotHold } from './types'
+import { useSlotAvailability } from './realtime'
+import type { AdminCategory, AdminDashboard, AdminProviderDetail, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, DealSlot, MyProviderProfile, Notification, PortalRole, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, Report, Session, SlotHold } from './types'
+import { HelpCenterPage } from './HelpCenterPage'
+import { SupportRequestPage } from './SupportRequestPage'
+import { CskhPage } from './CskhPage'
+import { ShopeeWebChat } from './ShopeeWebChat'
 import './App.css'
 import './AuthExperience.css'
 import './EmailVerification.css'
@@ -17,15 +21,15 @@ const formatTime = (value: string) => new Intl.DateTimeFormat('vi-VN', { timeZon
 const formatSlotWindow = (startAtUtc: string, endAtUtc: string) => `${formatTime(startAtUtc)} – ${new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit' }).format(new Date(endAtUtc))}`
 const formatCountdown = (seconds: number) => `${Math.floor(Math.max(0, seconds) / 60)}:${String(Math.max(0, seconds) % 60).padStart(2, '0')}`
 const hasRole = (session: Session | null, role: string) => session?.user.roles.includes(role) ?? false
-const portalRoles: PortalRole[] = ['Customer', 'Provider', 'Manager', 'Admin']
-const portalLabel = (role: PortalRole) => ({ Customer: 'Khách hàng', Provider: 'Đối tác', Manager: 'Quản lý vận hành', Admin: 'Quản trị viên' })[role]
-const roleLabel = (roles: string[]) => roles.includes('Admin') ? 'Quản trị viên' : roles.includes('Manager') ? 'Quản lý vận hành' : roles.includes('Provider') ? 'Đối tác' : 'Khách hàng'
+const portalRoles: PortalRole[] = ['Customer', 'Provider', 'Manager', 'Admin', 'CSKH']
+const portalLabel = (role: PortalRole) => ({ Customer: 'Khách hàng', Provider: 'Đối tác', Manager: 'Quản lý vận hành', Admin: 'Quản trị viên', CSKH: 'Chăm sóc khách hàng' })[role]
+const roleLabel = (roles: string[]) => roles.includes('Admin') ? 'Quản trị viên' : roles.includes('Manager') ? 'Quản lý vận hành' : roles.includes('CSKH') ? 'Chăm sóc khách hàng' : roles.includes('Provider') ? 'Đối tác' : 'Khách hàng'
 // A shop owner remains a customer too. A single login therefore starts in the
 // customer experience and lets the user deliberately switch to an operational
 // workspace when they need to manage their business.
-const defaultPortalRole = (roles: string[]): PortalRole => roles.includes('Customer') ? 'Customer' : roles.includes('Admin') ? 'Admin' : roles.includes('Manager') ? 'Manager' : 'Provider'
+const defaultPortalRole = (roles: string[]): PortalRole => roles.includes('Customer') ? 'Customer' : roles.includes('CSKH') ? 'CSKH' : roles.includes('Admin') ? 'Admin' : roles.includes('Manager') ? 'Manager' : 'Provider'
 const activePortalRole = (session: Session | null): PortalRole => session?.activeRole && session.user.roles.includes(session.activeRole) ? session.activeRole : defaultPortalRole(session?.user.roles ?? ['Customer'])
-const homeFor = (session: Session | null) => ({ Customer: '/', Provider: '/provider', Manager: '/manager', Admin: '/admin' })[activePortalRole(session)]
+const homeFor = (session: Session | null) => ({ Customer: '/', Provider: '/provider', Manager: '/manager', Admin: '/admin', CSKH: '/cskh' })[activePortalRole(session)]
 const isPortalRole = (value: string | null): value is PortalRole => portalRoles.includes(value as PortalRole)
 const vietnamLocations = ['Hà Nội', 'Hải Phòng', 'Huế', 'Đà Nẵng', 'Cần Thơ', 'Thành phố Hồ Chí Minh', 'Lai Châu', 'Điện Biên', 'Sơn La', 'Lào Cai', 'Tuyên Quang', 'Cao Bằng', 'Thái Nguyên', 'Lạng Sơn', 'Quảng Ninh', 'Bắc Ninh', 'Phú Thọ', 'Ninh Bình', 'Hưng Yên', 'Thanh Hóa', 'Nghệ An', 'Hà Tĩnh', 'Quảng Trị', 'Quảng Ngãi', 'Gia Lai', 'Khánh Hòa', 'Lâm Đồng', 'Đắk Lắk', 'Đồng Nai', 'Tây Ninh', 'Vĩnh Long', 'Đồng Tháp', 'Cà Mau', 'An Giang']
 const popularServiceSearches = ['Sân cầu lông', 'Sân pickleball', 'Gội đầu dưỡng sinh', 'Làm móng nhanh', 'Bàn làm việc', 'Phòng họp nhóm', 'Studio chụp ảnh', 'Phòng podcast', 'Bàn bi-a', 'Phòng karaoke mini', 'Rửa xe máy', 'Máy giặt tự phục vụ']
@@ -77,8 +81,14 @@ function App() {
   return <>
     <header className="site-header">
       <NavLink to="/" className="brand" aria-label="OpenSlot - Trang chủ"><span className="brand-mark"><i className="bi bi-plus-lg" /></span><span className="brand-open">Open</span><span>Slot</span></NavLink>
-      <nav className="main-nav">{!session ? <NavLink to="/" end>Khám phá</NavLink> : <>{activeRole === 'Customer' && <><NavLink to="/" end>Khám phá</NavLink><NavLink to="/bookings">Lịch của tôi</NavLink>{isProvider ? <NavLink to="/provider" onClick={(event) => { event.preventDefault(); switchPortal('Provider') }}>Khu vực đối tác</NavLink> : <NavLink to="/provider-application">Đăng ký cửa hàng</NavLink>}</>}{activeRole === 'Provider' && <><NavLink to="/" onClick={(event) => { event.preventDefault(); switchPortal('Customer') }}>Khám phá & đặt chỗ</NavLink><NavLink to="/provider">Quản lý cửa hàng</NavLink></>}{activeRole === 'Manager' && <NavLink to="/manager">Vận hành nền tảng</NavLink>}{activeRole === 'Admin' && <NavLink to="/admin">Quản trị hệ thống</NavLink>}</>}</nav>
-      <div className="user-actions">{session ? <><NavLink to="/notifications" className="notification-link" aria-label="Thông báo"><i className="bi bi-bell" /></NavLink><span className="user-label"><b>{session.user.displayName}</b>{session.user.roles.filter((role) => isPortalRole(role)).length > 1 ? <select aria-label="Chuyển khu vực sử dụng" value={activeRole} onChange={(event) => switchPortal(event.target.value as PortalRole)}>{session.user.roles.filter(isPortalRole).map((role) => <option key={role} value={role}>{portalLabel(role)}</option>)}</select> : <small>{portalLabel(activeRole)}</small>}</span><button className="btn btn-link text-decoration-none" onClick={() => saveSession(null)}>Đăng xuất</button></> : <><NavLink className="btn btn-link text-decoration-none" to="/login">Đăng nhập</NavLink><NavLink className="btn btn-primary rounded-pill px-4" to="/register">Tạo tài khoản</NavLink></>}</div>
+      <nav className="main-nav">{!session ? <NavLink to="/" end>Khám phá</NavLink> : <>{activeRole === 'Customer' && <><NavLink to="/" end>Khám phá</NavLink><NavLink to="/bookings">Lịch của tôi</NavLink>{isProvider ? <NavLink to="/provider" onClick={(event) => { event.preventDefault(); switchPortal('Provider') }}>Khu vực đối tác</NavLink> : <NavLink to="/provider-application">Đăng ký cửa hàng</NavLink>}</>}{activeRole === 'Provider' && <><NavLink to="/" onClick={(event) => { event.preventDefault(); switchPortal('Customer') }}>Khám phá & đặt chỗ</NavLink><NavLink to="/provider">Quản lý cửa hàng</NavLink></>}{activeRole === 'Manager' && <NavLink to="/manager">Vận hành nền tảng</NavLink>}{activeRole === 'Admin' && <NavLink to="/admin">Quản trị hệ thống</NavLink>}{activeRole === 'CSKH' && <NavLink to="/cskh">Xử lý yêu cầu hỗ trợ (CSKH)</NavLink>}</>}</nav>
+      <div className="user-actions">
+        <NavLink to="/help" className="help-header-link" aria-label="Trung tâm hỗ trợ">
+          <i className="bi bi-question-circle" />
+          <span>Hỗ Trợ</span>
+        </NavLink>
+        {session ? <><NavLink to="/notifications" className="notification-link" aria-label="Thông báo"><i className="bi bi-bell" /></NavLink><span className="user-label"><b>{session.user.displayName}</b>{session.user.roles.filter((role) => isPortalRole(role)).length > 1 ? <select aria-label="Chuyển khu vực sử dụng" value={activeRole} onChange={(event) => switchPortal(event.target.value as PortalRole)}>{session.user.roles.filter(isPortalRole).map((role) => <option key={role} value={role}>{portalLabel(role)}</option>)}</select> : <small>{portalLabel(activeRole)}</small>}</span><button className="btn btn-link text-decoration-none" onClick={() => saveSession(null)}>Đăng xuất</button></> : <><NavLink className="btn btn-link text-decoration-none" to="/login">Đăng nhập</NavLink><NavLink className="btn btn-primary rounded-pill px-4" to="/register">Tạo tài khoản</NavLink></>}
+      </div>
     </header>
     <main><Routes>
       <Route path="/" element={activeRole === 'Customer' ? <ExplorePage /> : <Navigate to={homeFor(session)} replace />} />
@@ -94,11 +104,14 @@ function App() {
       <Route path="/provider" element={hasRole(session, 'Provider') && activeRole === 'Provider' ? <ProviderPage session={session!} /> : <Navigate to={session ? homeFor(session) : '/login'} replace />} />
       <Route path="/manager" element={hasRole(session, 'Manager') && activeRole === 'Manager' ? <AdminPage session={session!} mode="manager" /> : <Navigate to={session ? homeFor(session) : '/login'} replace />} />
       <Route path="/admin" element={hasRole(session, 'Admin') && activeRole === 'Admin' ? <AdminPage session={session!} mode="admin" /> : <Navigate to={session ? homeFor(session) : '/login'} replace />} />
+      <Route path="/help" element={<HelpCenterPage />} />
+      <Route path="/help/request" element={<SupportRequestPage session={session} />} />
+      <Route path="/cskh" element={(hasRole(session, 'CSKH') || hasRole(session, 'Manager') || hasRole(session, 'Admin')) ? <CskhPage session={session!} /> : <Navigate to={session ? homeFor(session) : '/login'} replace />} />
       <Route path="/notifications" element={session ? <NotificationsPage session={session} /> : <Navigate to="/login" replace />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes></main>
     <footer><div><b>OpenSlot</b><span>Săn thời điểm trống. Tận hưởng giá hợp lý.</span></div><small>Demo đồ án cá nhân · ASP.NET Core + React</small></footer>
-    <ShopeeChatWidget session={session} />
+    <ShopeeWebChat session={session} />
   </>
 }
 
@@ -237,7 +250,13 @@ function SlotDetailPage({ session }: { session: Session | null }) {
         providerId: slot.providerId,
         providerBusinessName: slot.providerBusinessName || slot.venueName,
         topic: `Tư vấn: ${slot.serviceName} (${slot.venueName})`,
-        initialMessage: `Chào bạn, mình đang xem ưu đãi "${slot.serviceName}" tại ${slot.venueName} và muốn tư vấn thêm.`
+        initialMessage: `Chào bạn, mình đang xem ưu đãi "${slot.serviceName}" tại ${slot.venueName} và muốn tư vấn thêm.`,
+        slotSnippet: {
+          id: slot.id,
+          serviceName: slot.serviceName,
+          venueName: slot.venueName,
+          dealPriceVnd: slot.dealPriceVnd
+        }
       }
     }))
   }
@@ -718,371 +737,5 @@ function NotificationsPage({ session }: { session: Session }) {
 }
 
 function NotFoundPage() { return <div className="container confirmation-page"><div className="confirmation-card"><span className="success-mark not-found-mark"><i className="bi bi-signpost-split" /></span><p className="eyebrow">404 · Không tìm thấy</p><h1>Trang này không còn ở đây</h1><p>Đường dẫn có thể đã thay đổi hoặc slot không tồn tại.</p><NavLink to="/" className="btn btn-primary rounded-pill px-4">Về trang khám phá</NavLink></div></div> }
-
-function ShopeeChatWidget({ session }: { session: Session | null }) {
-  const navigate = useNavigate()
-  const [isOpen, setIsOpen] = useState(false)
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
-  const [activeDetail, setActiveDetail] = useState<ConversationDetail | null>(null)
-  const [messageText, setMessageText] = useState('')
-  const [sending, setSending] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [supportLoading, setSupportLoading] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement | null>(null)
-
-  const loadConversations = useCallback(() => {
-    if (!session) return
-    api.chatConversations(session.accessToken)
-      .then(setConversations)
-      .catch(() => setConversations([]))
-  }, [session])
-
-  useEffect(() => {
-    if (session) {
-      loadConversations()
-    }
-  }, [loadConversations, session])
-
-  const selectConversation = useCallback(async (id: string) => {
-    if (!session) return
-    setActiveConversationId(id)
-    setLoading(true)
-    try {
-      const detail = await api.chatConversation(id, session.accessToken)
-      setActiveDetail(detail)
-      void api.markConversationRead(id, session.accessToken).catch(() => {})
-      setConversations((prev) => prev.map((c) => c.id === id ? { ...c, unreadCount: 0 } : c))
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false)
-    }
-  }, [session])
-
-  const handleMessageReceived = useCallback((msg: ChatMessage) => {
-    setActiveDetail((current) => {
-      if (current && current.conversation.id === msg.conversationId) {
-        if (current.messages.some((m) => m.id === msg.id)) return current
-        return {
-          ...current,
-          messages: [...current.messages, msg],
-          conversation: {
-            ...current.conversation,
-            lastMessageText: msg.content,
-            lastMessageAtUtc: msg.sentAtUtc
-          }
-        }
-      }
-      return current
-    })
-
-    setConversations((prev) => prev.map((c) => {
-      if (c.id === msg.conversationId) {
-        const isCurrentOpen = activeConversationId === msg.conversationId
-        return {
-          ...c,
-          lastMessageText: msg.content,
-          lastMessageAtUtc: msg.sentAtUtc,
-          unreadCount: isCurrentOpen || msg.senderUserId === session?.user.id ? 0 : c.unreadCount + 1
-        }
-      }
-      return c
-    }))
-
-    if (activeConversationId === msg.conversationId && session && msg.senderUserId !== session.user.id) {
-      void api.markConversationRead(msg.conversationId, session.accessToken).catch(() => {})
-    }
-  }, [activeConversationId, session])
-
-  const handleConversationUpdated = useCallback((conv: Conversation) => {
-    setConversations((prev) => {
-      const idx = prev.findIndex((c) => c.id === conv.id)
-      if (idx >= 0) {
-        const next = [...prev]
-        next[idx] = { ...next[idx], ...conv }
-        return next
-      }
-      return [conv, ...prev]
-    })
-  }, [])
-
-  useChatRealtime(session?.accessToken, activeConversationId, handleMessageReceived, handleConversationUpdated)
-
-  useEffect(() => {
-    if (activeDetail?.messages) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [activeDetail?.messages])
-
-  useEffect(() => {
-    const handler = async (event: Event) => {
-      const customEvent = event as CustomEvent<{ providerId?: string | null; providerBusinessName?: string; topic?: string; initialMessage?: string }>
-      if (!session?.accessToken) return
-      setIsOpen(true)
-      const { providerId, topic = 'Tư vấn dịch vụ', initialMessage = 'Xin chào' } = customEvent.detail
-      const existing = conversations.find((c) => (providerId ? c.providerId === providerId : !c.providerId))
-      if (existing) {
-        void selectConversation(existing.id)
-      } else {
-        setLoading(true)
-        try {
-          const created = await api.createConversation({ providerId, topic, initialMessage }, session.accessToken)
-          setConversations((prev) => [created.conversation, ...prev.filter((c) => c.id !== created.conversation.id)])
-          setActiveConversationId(created.conversation.id)
-          setActiveDetail(created)
-        } catch {
-          // ignore
-        } finally {
-          setLoading(false)
-        }
-      }
-    }
-    window.addEventListener('openslot:open-chat', handler)
-    return () => window.removeEventListener('openslot:open-chat', handler)
-  }, [conversations, selectConversation, session])
-
-  const sendMessage = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!messageText.trim() || !activeConversationId || !session?.accessToken || sending) return
-    const text = messageText.trim()
-    setMessageText('')
-    setSending(true)
-    try {
-      const sent = await api.sendChatMessage(activeConversationId, text, session.accessToken)
-      setActiveDetail((current) => {
-        if (!current) return null
-        if (current.messages.some((m) => m.id === sent.id)) return current
-        return {
-          ...current,
-          messages: [...current.messages, sent],
-          conversation: {
-            ...current.conversation,
-            lastMessageText: sent.content,
-            lastMessageAtUtc: sent.sentAtUtc
-          }
-        }
-      })
-      setConversations((prev) => prev.map((c) => c.id === activeConversationId ? {
-        ...c,
-        lastMessageText: sent.content,
-        lastMessageAtUtc: sent.sentAtUtc
-      } : c))
-    } catch {
-      setMessageText(text)
-    } finally {
-      setSending(false)
-    }
-  }
-
-  const openSupportChat = async () => {
-    if (!session?.accessToken) return
-    setSupportLoading(true)
-    try {
-      const existing = conversations.find((c) => !c.providerId)
-      if (existing) {
-        await selectConversation(existing.id)
-      } else {
-        const created = await api.createConversation({
-          providerId: null,
-          topic: 'Hỗ trợ khách hàng OpenSlot',
-          initialMessage: 'Xin chào bộ phận CSKH OpenSlot, tôi cần hỗ trợ.'
-        }, session.accessToken)
-        setConversations((prev) => [created.conversation, ...prev])
-        setActiveConversationId(created.conversation.id)
-        setActiveDetail(created)
-      }
-    } catch {
-      // ignore
-    } finally {
-      setSupportLoading(false)
-    }
-  }
-
-  const totalUnread = conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0)
-
-  const roleTag = (role: string) => {
-    if (role === 'Admin') return <span className="chat-message-role-tag admin">Admin</span>
-    if (role === 'Manager') return <span className="chat-message-role-tag manager">CSKH</span>
-    if (role === 'Provider') return <span className="chat-message-role-tag provider">Cửa hàng</span>
-    return null
-  }
-
-  const conversationDisplayTitle = (c: Conversation) => {
-    const isCustomer = session ? hasRole(session, 'Customer') && activePortalRole(session) === 'Customer' : true
-    if (isCustomer) {
-      return c.providerBusinessName || 'Hỗ trợ CSKH OpenSlot'
-    }
-    const isProvider = session ? hasRole(session, 'Provider') && activePortalRole(session) === 'Provider' : false
-    if (isProvider) {
-      return c.customerName || 'Khách hàng'
-    }
-    return `${c.customerName}${c.providerBusinessName ? ` · ${c.providerBusinessName}` : ' · CSKH'}`
-  }
-
-  return (
-    <>
-      <button
-        type="button"
-        className="shopee-chat-trigger"
-        onClick={() => {
-          if (!session) {
-            navigate('/login')
-            return
-          }
-          setIsOpen(!isOpen)
-          if (!isOpen) loadConversations()
-        }}
-        aria-label="Mở cửa sổ chat hỗ trợ"
-      >
-        <i className="bi bi-chat-dots-fill" />
-        <span>Chat</span>
-        {totalUnread > 0 && (
-          <span className="chat-unread-badge">
-            {totalUnread > 99 ? '99+' : totalUnread}
-          </span>
-        )}
-      </button>
-
-      {isOpen && (
-        <div className="shopee-chat-window" role="dialog" aria-label="Khung chat CSKH OpenSlot">
-          <div className="chat-header">
-            <div className="chat-header-title">
-              {activeConversationId && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveConversationId(null)
-                    setActiveDetail(null)
-                    loadConversations()
-                  }}
-                  title="Quay lại danh sách"
-                  className="btn btn-link text-white p-0 me-2"
-                >
-                  <i className="bi bi-arrow-left" />
-                </button>
-              )}
-              <div>
-                <h4>
-                  {activeDetail
-                    ? conversationDisplayTitle(activeDetail.conversation)
-                    : 'Tin nhắn OpenSlot'}
-                </h4>
-                <small>
-                  {activeDetail
-                    ? activeDetail.conversation.topic
-                    : `${conversations.length} cuộc hội thoại`}
-                </small>
-              </div>
-            </div>
-            <div className="chat-header-actions">
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                title="Đóng chat"
-                aria-label="Đóng"
-              >
-                <i className="bi bi-x-lg" />
-              </button>
-            </div>
-          </div>
-
-          {activeConversationId ? (
-            <div className="chat-conversation-view">
-              <div className="chat-messages-area">
-                {loading ? (
-                  <div className="empty-state py-4"><div className="spinner-border text-primary spinner-border-sm" /></div>
-                ) : activeDetail?.messages.length ? (
-                  activeDetail.messages.map((msg) => {
-                    const isMine = msg.senderUserId === session?.user.id
-                    return (
-                      <div key={msg.id} className={`chat-message-row ${isMine ? 'mine' : 'theirs'}`}>
-                        {!isMine && (
-                          <span className="chat-message-author">
-                            {msg.senderName}
-                            {roleTag(msg.senderRole)}
-                          </span>
-                        )}
-                        <div className="chat-message-bubble">{msg.content}</div>
-                        <time className="chat-message-time">{formatTime(msg.sentAtUtc)}</time>
-                      </div>
-                    )
-                  })
-                ) : (
-                  <div className="empty-state py-4">
-                    <i className="bi bi-chat-heart" />
-                    <p className="small mb-0">Chưa có tin nhắn nào. Hãy gửi lời chào đầu tiên!</p>
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-              <form className="chat-input-bar" onSubmit={sendMessage}>
-                <input
-                  type="text"
-                  placeholder="Nhập tin nhắn..."
-                  value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
-                  disabled={sending}
-                  maxLength={1000}
-                />
-                <button type="submit" disabled={sending || !messageText.trim()} title="Gửi tin nhắn">
-                  <i className="bi bi-send-fill" />
-                </button>
-              </form>
-            </div>
-          ) : (
-            <div className="chat-list-body">
-              <div
-                role="button"
-                tabIndex={0}
-                className="chat-support-banner"
-                onClick={openSupportChat}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void openSupportChat() }}
-              >
-                <div>
-                  <b><i className="bi bi-headset" /> CSKH OpenSlot</b>
-                  <small>{supportLoading ? 'Đang kết nối...' : 'Hỗ trợ sự cố & giải đáp 24/7'}</small>
-                </div>
-                <i className="bi bi-chevron-right text-muted" />
-              </div>
-
-              {conversations.length > 0 ? (
-                conversations.map((c) => (
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    key={c.id}
-                    className="chat-thread-item"
-                    onClick={() => selectConversation(c.id)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void selectConversation(c.id) }}
-                  >
-                    <div className={`chat-thread-avatar ${c.providerId ? 'provider' : 'support'}`}>
-                      <i className={`bi bi-${c.providerId ? 'shop' : 'headset'}`} />
-                    </div>
-                    <div className="chat-thread-info">
-                      <div className="chat-thread-info-top">
-                        <b>{conversationDisplayTitle(c)}</b>
-                        <time>{formatTime(c.lastMessageAtUtc)}</time>
-                      </div>
-                      <p className="chat-thread-snippet">{c.lastMessageText || c.topic}</p>
-                    </div>
-                    {c.unreadCount > 0 && (
-                      <span className="chat-thread-badge">{c.unreadCount}</span>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <div className="empty-state py-5">
-                  <i className="bi bi-chat-dots" />
-                  <p className="small">Bạn chưa có cuộc trò chuyện nào.<br />Nhấn vào CSKH ở trên hoặc nhắn tin từ trang ưu đãi của cửa hàng.</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </>
-  )
-}
 
 export default App

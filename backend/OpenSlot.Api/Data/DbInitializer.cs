@@ -93,6 +93,7 @@ public static class DbInitializer
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         var admin = await EnsureUserAsync(userManager, "admin@openslot.local", "OpenSlot Admin", "Admin@12345", RoleNames.Admin);
         _ = await EnsureUserAsync(userManager, "manager@openslot.local", "OpenSlot Manager", "Manager@12345", RoleNames.Manager);
+        _ = await EnsureUserAsync(userManager, "cskh@openslot.local", "OpenSlot CSKH", "Cskh@12345", RoleNames.Cskh);
         _ = await EnsureUserAsync(userManager, "customer@openslot.local", "Lâm Demo", "Customer@12345", RoleNames.Customer);
 
         var categories = await EnsureCategoriesAsync(db, cancellationToken);

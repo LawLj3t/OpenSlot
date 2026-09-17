@@ -1,4 +1,4 @@
-import type { AdminCategory, AdminDashboard, AdminProviderDetail, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, ChatMessage, Conversation, ConversationDetail, DealSlot, EmailConfirmationResponse, MyProviderProfile, Notification, PasswordResetRequestResponse, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, RegistrationResponse, Report, Session, SlotHold } from './types'
+import type { AdminCategory, AdminDashboard, AdminProviderDetail, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, ChatMessage, Conversation, ConversationDetail, DealSlot, EmailConfirmationResponse, MyProviderProfile, Notification, PasswordResetRequestResponse, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, RegistrationResponse, Report, Session, SlotHold, SupportTicket } from './types'
 
 const apiBase = import.meta.env.VITE_API_URL ?? '/api'
 const geocodingBase = import.meta.env.VITE_GEOCODING_URL ?? 'https://nominatim.openstreetmap.org'
@@ -229,4 +229,8 @@ export const api = {
   sendChatMessage: (id: string, content: string, token: string) => request<ChatMessage>(`/chat/conversations/${id}/messages`, { method: 'POST', body: JSON.stringify({ content }) }, token),
   markConversationRead: (id: string, token: string) => request<void>(`/chat/conversations/${id}/read`, { method: 'POST' }, token),
   closeConversation: (id: string, token: string) => request<void>(`/chat/conversations/${id}/close`, { method: 'POST' }, token),
+  createSupportTicket: (payload: { userRole: string; category: string; senderEmail: string; content: string }, token?: string) => request<SupportTicket>('/support-tickets', { method: 'POST', body: JSON.stringify(payload) }, token),
+  supportTickets: (token: string, status?: number, userRole?: string) => request<SupportTicket[]>(`/support-tickets?${status !== undefined ? `status=${status}&` : ''}${userRole ? `userRole=${encodeURIComponent(userRole)}` : ''}`, {}, token),
+  supportTicket: (id: string, token: string) => request<SupportTicket>(`/support-tickets/${id}`, {}, token),
+  resolveSupportTicket: (id: string, payload: { resolutionNote: string; status?: number }, token: string) => request<SupportTicket>(`/support-tickets/${id}/resolve`, { method: 'POST', body: JSON.stringify(payload) }, token),
 }

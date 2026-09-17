@@ -58,7 +58,7 @@ export type PasswordResetRequestResponse = {
   message: string
 }
 
-export type PortalRole = 'Customer' | 'Provider' | 'Manager' | 'Admin'
+export type PortalRole = 'Customer' | 'Provider' | 'Manager' | 'Admin' | 'CSKH'
 
 export type Booking = {
   id: string
@@ -336,5 +336,19 @@ export type ChatMessage = {
 export type ConversationDetail = {
   conversation: Conversation
   messages: ChatMessage[]
+}
+
+export type SupportTicket = {
+  id: string
+  userId?: string | null
+  userRole: 'Buyer' | 'Seller' | string
+  category: string
+  senderEmail: string
+  content: string
+  status: number
+  resolutionNote?: string | null
+  resolvedByName?: string | null
+  createdAtUtc: string
+  resolvedAtUtc?: string | null
 }
 

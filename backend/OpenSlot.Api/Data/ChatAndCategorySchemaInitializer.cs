@@ -85,6 +85,26 @@ public static class ChatAndCategorySchemaInitializer
             );
             CREATE INDEX IF NOT EXISTS "IX_ChatMessages_ConversationId_SentAtUtc" ON "ChatMessages" ("ConversationId", "SentAtUtc");
             CREATE INDEX IF NOT EXISTS "IX_ChatMessages_SenderUserId" ON "ChatMessages" ("SenderUserId");
+
+            CREATE TABLE IF NOT EXISTS "SupportTickets" (
+                "Id" TEXT NOT NULL CONSTRAINT "PK_SupportTickets" PRIMARY KEY,
+                "UserId" TEXT NULL,
+                "UserRole" TEXT NOT NULL,
+                "Category" TEXT NOT NULL,
+                "SenderEmail" TEXT NOT NULL,
+                "Content" TEXT NOT NULL,
+                "Status" INTEGER NOT NULL DEFAULT 0,
+                "ResolutionNote" TEXT NULL,
+                "ResolvedByUserId" TEXT NULL,
+                "ResolvedByName" TEXT NULL,
+                "CreatedAtUtc" TEXT NOT NULL,
+                "ResolvedAtUtc" TEXT NULL,
+                CONSTRAINT "FK_SupportTickets_AspNetUsers_UserId" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE SET NULL,
+                CONSTRAINT "FK_SupportTickets_AspNetUsers_ResolvedByUserId" FOREIGN KEY ("ResolvedByUserId") REFERENCES "AspNetUsers" ("Id") ON DELETE SET NULL
+            );
+            CREATE INDEX IF NOT EXISTS "IX_SupportTickets_Status" ON "SupportTickets" ("Status");
+            CREATE INDEX IF NOT EXISTS "IX_SupportTickets_CreatedAtUtc" ON "SupportTickets" ("CreatedAtUtc");
+            CREATE INDEX IF NOT EXISTS "IX_SupportTickets_SenderEmail" ON "SupportTickets" ("SenderEmail");
             """,
             cancellationToken);
     }
@@ -133,6 +153,29 @@ public static class ChatAndCategorySchemaInitializer
             );
             CREATE INDEX IF NOT EXISTS "IX_ChatMessages_ConversationId_SentAtUtc" ON "ChatMessages" ("ConversationId", "SentAtUtc");
             CREATE INDEX IF NOT EXISTS "IX_ChatMessages_SenderUserId" ON "ChatMessages" ("SenderUserId");
+
+            CREATE TABLE IF NOT EXISTS "SupportTickets" (
+                "Id" uuid NOT NULL,
+                "UserId" text NULL,
+                "UserRole" character varying(30) NOT NULL,
+                "Category" character varying(120) NOT NULL,
+                "SenderEmail" character varying(160) NOT NULL,
+                "Content" character varying(4000) NOT NULL,
+                "Status" integer NOT NULL DEFAULT 0,
+                "ResolutionNote" character varying(4000) NULL,
+                "ResolvedByUserId" text NULL,
+                "ResolvedByName" character varying(120) NULL,
+                "CreatedAtUtc" timestamp with time zone NOT NULL,
+                "ResolvedAtUtc" timestamp with time zone NULL,
+                CONSTRAINT "PK_SupportTickets" PRIMARY KEY ("Id"),
+                CONSTRAINT "FK_SupportTickets_AspNetUsers_UserId"
+                    FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE SET NULL,
+                CONSTRAINT "FK_SupportTickets_AspNetUsers_ResolvedByUserId"
+                    FOREIGN KEY ("ResolvedByUserId") REFERENCES "AspNetUsers" ("Id") ON DELETE SET NULL
+            );
+            CREATE INDEX IF NOT EXISTS "IX_SupportTickets_Status" ON "SupportTickets" ("Status");
+            CREATE INDEX IF NOT EXISTS "IX_SupportTickets_CreatedAtUtc" ON "SupportTickets" ("CreatedAtUtc");
+            CREATE INDEX IF NOT EXISTS "IX_SupportTickets_SenderEmail" ON "SupportTickets" ("SenderEmail");
             """,
             cancellationToken);
     }
