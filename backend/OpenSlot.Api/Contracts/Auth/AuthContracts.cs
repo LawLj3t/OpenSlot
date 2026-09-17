@@ -64,6 +64,8 @@ public sealed class ApplyForProviderRequest
 
     [MaxLength(2000)]
     public string? Description { get; init; }
+
+    public int? CategoryId { get; init; }
 }
 
 public sealed class LoginRequest

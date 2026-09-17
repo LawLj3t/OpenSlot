@@ -28,6 +28,8 @@ export type DealSlot = {
   remainingCapacity: number
   status: number
   distanceKm: number | null
+  providerId?: string | null
+  providerBusinessName?: string | null
 }
 
 export type CurrentUser = {
@@ -137,6 +139,9 @@ export type MyProviderProfile = {
   contactPhone: string
   description: string | null
   status: number
+  categoryId?: number | null
+  categoryName?: string | null
+  categorySlug?: string | null
 }
 
 export type ProviderSlot = {
@@ -163,6 +168,9 @@ export type ProviderProfile = {
   contactPhone: string
   description: string | null
   status: number
+  categoryId?: number | null
+  categoryName?: string | null
+  categorySlug?: string | null
   createdAtUtc: string
   ownerName: string
   ownerEmail: string
@@ -174,6 +182,8 @@ export type AdminProviderDetail = {
   contactPhone: string
   description: string | null
   status: number
+  categoryId?: number | null
+  categoryName?: string | null
   createdAtUtc: string
   ownerName: string
   ownerEmail: string
@@ -297,3 +307,34 @@ export type AdminCategory = {
   isActive: boolean
   serviceCount: number
 }
+
+export type Conversation = {
+  id: string
+  customerId: string
+  customerName: string
+  providerId?: string | null
+  providerBusinessName?: string | null
+  topic: string
+  lastMessageText?: string | null
+  lastMessageAtUtc: string
+  createdAtUtc: string
+  isClosed: boolean
+  unreadCount: number
+}
+
+export type ChatMessage = {
+  id: string
+  conversationId: string
+  senderUserId: string
+  senderName: string
+  senderRole: string
+  content: string
+  sentAtUtc: string
+  isRead: boolean
+}
+
+export type ConversationDetail = {
+  conversation: Conversation
+  messages: ChatMessage[]
+}
+

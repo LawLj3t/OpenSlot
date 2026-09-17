@@ -81,7 +81,7 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
     [HttpGet("providers")]
     public async Task<IActionResult> GetProviders([FromQuery] ProviderStatus? status, CancellationToken cancellationToken)
     {
-        var query = db.ProviderProfiles.AsNoTracking().Include(x => x.User).AsQueryable();
+        var query = db.ProviderProfiles.AsNoTracking().Include(x => x.User).Include(x => x.Category).AsQueryable();
         if (status.HasValue)
         {
             query = query.Where(x => x.Status == status);
@@ -94,6 +94,8 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
             x.ContactPhone,
             x.Description,
             x.Status,
+            x.CategoryId,
+            categoryName = x.Category != null ? x.Category.Name : null,
             x.CreatedAtUtc,
             ownerName = x.User.DisplayName,
             ownerEmail = x.User.Email
@@ -106,6 +108,7 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
     {
         var provider = await db.ProviderProfiles.AsNoTracking()
             .Include(x => x.User)
+            .Include(x => x.Category)
             .Include(x => x.Venues).ThenInclude(x => x.Resources)
             .Include(x => x.Venues).ThenInclude(x => x.ServiceOfferings).ThenInclude(x => x.Category)
             .Include(x => x.Venues).ThenInclude(x => x.ServiceOfferings).ThenInclude(x => x.DealSlots).ThenInclude(x => x.BookableResource)
@@ -138,6 +141,8 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
             provider.ContactPhone,
             provider.Description,
             provider.Status,
+            provider.CategoryId,
+            categoryName = provider.Category != null ? provider.Category.Name : null,
             provider.CreatedAtUtc,
             ownerName = provider.User.DisplayName,
             ownerEmail = provider.User.Email,

@@ -5,8 +5,8 @@ import { Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams, 
 import { QRCodeSVG } from 'qrcode.react'
 import { api } from './api'
 import type { GeocodedLocation } from './api'
-import { useSlotAvailability } from './realtime'
-import type { AdminCategory, AdminDashboard, AdminProviderDetail, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, DealSlot, MyProviderProfile, Notification, PortalRole, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, Report, Session, SlotHold } from './types'
+import { useChatRealtime, useSlotAvailability } from './realtime'
+import type { AdminCategory, AdminDashboard, AdminProviderDetail, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, ChatMessage, Conversation, ConversationDetail, DealSlot, MyProviderProfile, Notification, PortalRole, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, Report, Session, SlotHold } from './types'
 import './App.css'
 import './AuthExperience.css'
 import './EmailVerification.css'
@@ -98,6 +98,7 @@ function App() {
       <Route path="*" element={<NotFoundPage />} />
     </Routes></main>
     <footer><div><b>OpenSlot</b><span>Săn thời điểm trống. Tận hưởng giá hợp lý.</span></div><small>Demo đồ án cá nhân · ASP.NET Core + React</small></footer>
+    <ShopeeChatWidget session={session} />
   </>
 }
 
@@ -229,8 +230,19 @@ function SlotDetailPage({ session }: { session: Session | null }) {
   if (!slot) return <div className="container detail-shell"><div className="empty-state"><p>{error || 'Đang tải thông tin slot...'}</p></div></div>
   const beginPayment = async () => { if (!session) { navigate('/login'); return }; if (!canBook) return; setHolding(true); setError(''); try { const hold = await api.createHold(slot.id, session.accessToken); navigate(`/payment/${slot.id}`, { state: { slot, hold } }) } catch (e) { setError(e instanceof Error ? e.message : 'Không thể giữ chỗ lúc này. Vui lòng thử lại.'); void refreshSlot() } finally { setHolding(false) } }
   const report = async () => { if (!session) { navigate('/login'); return }; const reason = window.prompt('Mô tả vấn đề bạn muốn báo cáo (tối thiểu 10 ký tự):'); if (!reason) return; try { await api.createReport('slot', slot.id, reason, session.accessToken); window.alert('Cảm ơn bạn. Báo cáo đã được gửi tới quản trị viên.') } catch (e) { setError(e instanceof Error ? e.message : 'Không thể gửi báo cáo.') } }
+  const startChatWithShop = () => {
+    if (!session) { navigate('/login'); return }
+    window.dispatchEvent(new CustomEvent('openslot:open-chat', {
+      detail: {
+        providerId: slot.providerId,
+        providerBusinessName: slot.providerBusinessName || slot.venueName,
+        topic: `Tư vấn: ${slot.serviceName} (${slot.venueName})`,
+        initialMessage: `Chào bạn, mình đang xem ưu đãi "${slot.serviceName}" tại ${slot.venueName} và muốn tư vấn thêm.`
+      }
+    }))
+  }
   const visualStyle = serviceImageStyle(slot.imageUrl, slot.categorySlug, slot.serviceName)
-  return <div className="container detail-shell"><NavLink to="/" className="back-link"><i className="bi bi-arrow-left" /> Quay lại khám phá</NavLink><div className="detail-grid"><section className="detail-main"><div style={visualStyle} className={`detail-visual visual-${slot.categorySlug}${visualStyle ? ' has-service-image' : ''}`}><span className="discount">-{Math.round((1 - slot.dealPriceVnd / slot.originalPriceVnd) * 100)}%</span><i className="bi bi-lightning-charge-fill" /></div><p className="eyebrow mt-4">{slot.categoryName}</p><h1>{slot.serviceName}</h1><p className="detail-venue"><i className="bi bi-building" /> {slot.venueName} · {slot.district}, {slot.city}</p><div className="detail-facts"><Fact icon="bi-calendar-event" label="Bắt đầu" value={formatTime(slot.startAtUtc)} /><Fact icon="bi-clock" label="Kết thúc" value={formatTime(slot.endAtUtc)} /><Fact icon="bi-geo-alt" label="Địa điểm" value={`${slot.district}, ${slot.city}`} />{slot.resourceName && <Fact icon="bi-pin-map" label="Đơn vị đã đặt" value={`${slot.resourceName}${slot.resourceCode ? ` · ${slot.resourceCode}` : ''}${slot.resourceLocation ? ` · ${slot.resourceLocation}` : ''}`} />}</div><article className="info-box"><h3><i className="bi bi-shield-check" /> Chính sách OpenSlot</h3><p>Giữ chỗ chỉ hợp lệ trước giờ bắt đầu ít nhất 15 phút. Hủy sát giờ hoặc không đến có thể được tính strike để bảo vệ đối tác và cộng đồng.</p></article><button onClick={report} className="report-button"><i className="bi bi-flag" /> Báo cáo thông tin không chính xác</button></section><aside className="booking-panel"><p>Giá ưu đãi sát giờ</p><div className="detail-price"><del>{formatMoney(slot.originalPriceVnd)}</del><strong>{formatMoney(slot.dealPriceVnd)}</strong></div><div className="seat-note"><i className="bi bi-people" /> Còn <b>{slot.remainingCapacity}/{slot.capacity}</b> chỗ khả dụng</div>{error && <div className="alert alert-danger py-2 small">{error}</div>}<button disabled={holding || !slot.remainingCapacity || (!!session && !canBook)} onClick={beginPayment} className="btn btn-primary w-100 rounded-pill py-3">{holding ? 'Đang giữ chỗ...' : !session ? 'Đăng nhập để tiếp tục' : canBook ? 'Tiếp tục thanh toán' : 'Chỉ tài khoản khách hàng được đặt'} <i className="bi bi-arrow-right" /></button><small className="d-block text-center mt-3">Vào thanh toán sẽ giữ chỗ cho bạn tối đa 10 phút.</small></aside></div></div>
+  return <div className="container detail-shell"><NavLink to="/" className="back-link"><i className="bi bi-arrow-left" /> Quay lại khám phá</NavLink><div className="detail-grid"><section className="detail-main"><div style={visualStyle} className={`detail-visual visual-${slot.categorySlug}${visualStyle ? ' has-service-image' : ''}`}><span className="discount">-{Math.round((1 - slot.dealPriceVnd / slot.originalPriceVnd) * 100)}%</span><i className="bi bi-lightning-charge-fill" /></div><p className="eyebrow mt-4">{slot.categoryName}</p><h1>{slot.serviceName}</h1><p className="detail-venue"><i className="bi bi-building" /> {slot.venueName} · {slot.district}, {slot.city}</p><div className="detail-facts"><Fact icon="bi-calendar-event" label="Bắt đầu" value={formatTime(slot.startAtUtc)} /><Fact icon="bi-clock" label="Kết thúc" value={formatTime(slot.endAtUtc)} /><Fact icon="bi-geo-alt" label="Địa điểm" value={`${slot.district}, ${slot.city}`} />{slot.resourceName && <Fact icon="bi-pin-map" label="Đơn vị đã đặt" value={`${slot.resourceName}${slot.resourceCode ? ` · ${slot.resourceCode}` : ''}${slot.resourceLocation ? ` · ${slot.resourceLocation}` : ''}`} />}</div><article className="info-box"><h3><i className="bi bi-shield-check" /> Chính sách OpenSlot</h3><p>Giữ chỗ chỉ hợp lệ trước giờ bắt đầu ít nhất 15 phút. Hủy sát giờ hoặc không đến có thể được tính strike để bảo vệ đối tác và cộng đồng.</p></article><button onClick={report} className="report-button"><i className="bi bi-flag" /> Báo cáo thông tin không chính xác</button></section><aside className="booking-panel"><p>Giá ưu đãi sát giờ</p><div className="detail-price"><del>{formatMoney(slot.originalPriceVnd)}</del><strong>{formatMoney(slot.dealPriceVnd)}</strong></div><div className="seat-note"><i className="bi bi-people" /> Còn <b>{slot.remainingCapacity}/{slot.capacity}</b> chỗ khả dụng</div>{error && <div className="alert alert-danger py-2 small">{error}</div>}<button disabled={holding || !slot.remainingCapacity || (!!session && !canBook)} onClick={beginPayment} className="btn btn-primary w-100 rounded-pill py-3">{holding ? 'Đang giữ chỗ...' : !session ? 'Đăng nhập để tiếp tục' : canBook ? 'Tiếp tục thanh toán' : 'Chỉ tài khoản khách hàng được đặt'} <i className="bi bi-arrow-right" /></button><button type="button" onClick={startChatWithShop} className="btn btn-outline-secondary w-100 rounded-pill py-2 mt-2"><i className="bi bi-chat-dots-fill me-2" /> Chat với cửa hàng</button><small className="d-block text-center mt-3">Vào thanh toán sẽ giữ chỗ cho bạn tối đa 10 phút.</small></aside></div></div>
 }
 
 function BookingConfirmationPage({ confirmation, venueName }: { confirmation: BookingConfirmation; venueName: string }) {
@@ -404,9 +416,10 @@ function AuthPage({ mode, onAuthenticated }: { mode: 'login' | 'register'; onAut
 }
 
 function ProviderApplicationPage({ session, onAuthenticated }: { session: Session; onAuthenticated: (session: Session) => void }) {
-  const navigate = useNavigate(); const [businessName, setBusinessName] = useState(''); const [contactPhone, setContactPhone] = useState(''); const [description, setDescription] = useState(''); const [error, setError] = useState(''); const [saving, setSaving] = useState(false)
-  const submit = async (event: React.FormEvent) => { event.preventDefault(); setError(''); if (!isValidPhone(contactPhone)) { setError('Số điện thoại không hợp lệ, vui lòng nhập lại.'); return }; setSaving(true); try { const next = await api.applyForProvider({ businessName, contactPhone, description }, session.accessToken); onAuthenticated({ ...next, activeRole: 'Provider' }); navigate('/provider') } catch (e) { setError(e instanceof Error ? e.message : 'Không thể gửi hồ sơ đối tác.') } finally { setSaving(false) } }
-  return <div className="container application-page"><section className="application-intro"><p className="eyebrow">Dành cho chủ cửa hàng</p><h1>Đưa khung giờ trống của bạn lên OpenSlot</h1><p>Hồ sơ sẽ được Manager kiểm tra trước khi bạn phát hành slot. Sau khi gửi, bạn vẫn có thể hoàn thiện địa điểm, dịch vụ và đơn vị nhận đặt chỗ.</p><div className="application-steps"><span><b>01</b> Gửi hồ sơ cửa hàng</span><span><b>02</b> Manager xét duyệt</span><span><b>03</b> Phát hành slot sát giờ</span></div></section><form className="provider-application-form" onSubmit={submit}><p className="eyebrow">Hồ sơ đối tác</p><h2>Thông tin cửa hàng</h2><label>Tên cửa hàng/doanh nghiệp<input required minLength={2} maxLength={160} value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Ví dụ: Cà phê Mây" /></label><label>Số điện thoại liên hệ<input required type="tel" inputMode="numeric" autoComplete="tel" minLength={10} maxLength={10} pattern="0[0-9]{9}" title="Gồm đúng 10 chữ số và bắt đầu bằng số 0" value={contactPhone} onChange={(e) => setContactPhone(normalizePhone(e.target.value))} placeholder="0900000000" /><small className="form-hint">Gồm đúng 10 chữ số và bắt đầu bằng số 0.</small></label><label>Mô tả ngắn<input maxLength={2000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Bạn cung cấp dịch vụ gì, ở khu vực nào?" /></label>{error && <div className="alert alert-danger">{error}</div>}<button disabled={saving} className="btn btn-primary rounded-pill py-3">{saving ? 'Đang gửi...' : 'Gửi hồ sơ để xét duyệt'} <i className="bi bi-arrow-right" /></button><small>Tài khoản sẽ được bổ sung quyền Đối tác, vẫn giữ quyền Khách hàng để đặt dịch vụ khi cần.</small></form></div>
+  const navigate = useNavigate(); const [businessName, setBusinessName] = useState(''); const [contactPhone, setContactPhone] = useState(''); const [description, setDescription] = useState(''); const [categoryId, setCategoryId] = useState(''); const [categories, setCategories] = useState<Category[]>([]); const [error, setError] = useState(''); const [saving, setSaving] = useState(false)
+  useEffect(() => { api.categories().then(setCategories).catch(() => setCategories([])) }, [])
+  const submit = async (event: React.FormEvent) => { event.preventDefault(); setError(''); if (!isValidPhone(contactPhone)) { setError('Số điện thoại không hợp lệ, vui lòng nhập lại.'); return }; setSaving(true); try { const next = await api.applyForProvider({ businessName, contactPhone, description, categoryId: categoryId ? Number(categoryId) : undefined }, session.accessToken); onAuthenticated({ ...next, activeRole: 'Provider' }); navigate('/provider') } catch (e) { setError(e instanceof Error ? e.message : 'Không thể gửi hồ sơ đối tác.') } finally { setSaving(false) } }
+  return <div className="container application-page"><section className="application-intro"><p className="eyebrow">Dành cho chủ cửa hàng</p><h1>Đưa khung giờ trống của bạn lên OpenSlot</h1><p>Hồ sơ sẽ được Manager kiểm tra trước khi bạn phát hành slot. Sau khi gửi, bạn vẫn có thể hoàn thiện địa điểm, dịch vụ và đơn vị nhận đặt chỗ.</p><div className="application-steps"><span><b>01</b> Gửi hồ sơ cửa hàng</span><span><b>02</b> Manager xét duyệt</span><span><b>03</b> Phát hành slot sát giờ</span></div></section><form className="provider-application-form" onSubmit={submit}><p className="eyebrow">Hồ sơ đối tác</p><h2>Thông tin cửa hàng</h2><label>Tên cửa hàng/doanh nghiệp<input required minLength={2} maxLength={160} value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Ví dụ: Cà phê Mây" /></label><label>Số điện thoại liên hệ<input required type="tel" inputMode="numeric" autoComplete="tel" minLength={10} maxLength={10} pattern="0[0-9]{9}" title="Gồm đúng 10 chữ số và bắt đầu bằng số 0" value={contactPhone} onChange={(e) => setContactPhone(normalizePhone(e.target.value))} placeholder="0900000000" /><small className="form-hint">Gồm đúng 10 chữ số và bắt đầu bằng số 0.</small></label><label>Lĩnh vực kinh doanh chính<select required value={categoryId} onChange={(e) => setCategoryId(e.target.value)}><option value="">-- Chọn lĩnh vực kinh doanh --</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select><small className="form-hint">Cửa hàng sẽ được khóa theo lĩnh vực này khi tạo dịch vụ và chỗ đặt.</small></label><label>Mô tả ngắn<input maxLength={2000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Bạn cung cấp dịch vụ gì, ở khu vực nào?" /></label>{error && <div className="alert alert-danger">{error}</div>}<button disabled={saving} className="btn btn-primary rounded-pill py-3">{saving ? 'Đang gửi...' : 'Gửi hồ sơ để xét duyệt'} <i className="bi bi-arrow-right" /></button><small>Tài khoản sẽ được bổ sung quyền Đối tác, vẫn giữ quyền Khách hàng để đặt dịch vụ khi cần.</small></form></div>
 }
 
 function BookingsPage({ session }: { session: Session }) {
@@ -449,15 +462,25 @@ function ProviderCatalogPanel({ token, onServicesChanged }: { token: string; onS
   const deactivate = async (resource: ProviderResource) => { if (!window.confirm(`Ngưng sử dụng chỗ đặt ${resource.name}?`)) return; try { await api.deactivateProviderResource(resource.id, token); success(`Đã ngưng sử dụng chỗ đặt ${resource.name}.`) } catch (e) { setError(e instanceof Error ? e.message : 'Không thể ngưng chỗ đặt.') } }
   const isSuspended = profile?.status === 2
   const providerStatusText = profile?.status === 0 ? 'Chờ duyệt' : profile?.status === 1 ? 'Đã duyệt' : profile?.status === 2 ? 'Tạm khóa' : profile?.status === 3 ? 'Cần bổ sung' : 'Đang tải'
-  return <section className="catalog-panel"><div className="admin-section-title"><div><p className="eyebrow">Thiết lập gian hàng</p><h2>Hồ sơ, địa điểm và chỗ đặt</h2></div><div className="catalog-actions"><button disabled={isSuspended} onClick={() => setMode('profile')} className="btn btn-sm btn-outline-secondary">Sửa hồ sơ</button><button disabled={isSuspended} onClick={() => setMode('venue')} className="btn btn-sm btn-outline-secondary">Thêm địa điểm</button><button disabled={isSuspended} onClick={() => setMode('resource')} className="btn btn-sm btn-outline-secondary">Thêm chỗ đặt</button><button disabled={isSuspended} onClick={() => setMode('service')} className="btn btn-sm btn-outline-primary">Thêm dịch vụ</button></div></div>{error && <div className="alert alert-danger mt-3">{error}</div>}{message && <div className="alert alert-success mt-3">{message}</div>}<div className="catalog-summary"><article><small>Đối tác</small><b>{profile?.businessName ?? 'Đang tải...'}</b><span>{profile?.contactPhone}</span></article><article><small>Trạng thái hồ sơ</small><b>{providerStatusText}</b><span>{isSuspended ? 'Tạm dừng thao tác' : 'Manager quản lý xét duyệt'}</span></article><article><small>Địa điểm</small><b>{venues.length}</b><span>{venues.map((x) => x.name).join(', ') || 'Chưa có địa điểm'}</span></article><article><small>Chỗ có thể đặt (Sân/Bàn/Phòng)</small><b>{resources.filter((x) => x.isActive).length}</b><span>{resources.filter((x) => x.isActive).map((x) => x.name).join(', ') || 'Chưa có chỗ đặt'}</span></article></div>{resources.length > 0 && <div className="resource-list">{resources.map((resource) => <article key={resource.id} className={!resource.isActive ? 'inactive' : ''}><div><b>{resource.name}{resource.code ? ` · ${resource.code}` : ''}</b><span>{resource.venueName} · {resource.resourceType} · {resource.maxCapacity} chỗ{resource.floorOrZone ? ` · ${resource.floorOrZone}` : ''}{resource.positionDescription ? ` · ${resource.positionDescription}` : ''}</span></div>{resource.isActive ? <button disabled={isSuspended} onClick={() => deactivate(resource)} className="btn btn-sm btn-outline-secondary">Ngưng sử dụng</button> : <small>Đã ngưng</small>}</article>)}</div>}{mode === 'profile' && profile && <ProviderProfileForm profile={profile} token={token} onDone={() => success('Đã cập nhật hồ sơ đối tác.')} onError={setError} />}{mode === 'venue' && <VenueForm token={token} onDone={() => success('Đã thêm địa điểm.')} onError={setError} />}{mode === 'resource' && <ResourceForm token={token} venues={venues} services={services} categories={categories} onDone={() => success('Đã thêm chỗ đặt.')} onError={setError} />}{mode === 'service' && <ServiceForm token={token} venues={venues} categories={categories} onDone={() => success('Đã thêm dịch vụ.')} onError={setError} />}</section>
+  return <section className="catalog-panel"><div className="admin-section-title"><div><p className="eyebrow">Thiết lập gian hàng</p><h2>Hồ sơ, địa điểm và chỗ đặt</h2></div><div className="catalog-actions"><button disabled={isSuspended} onClick={() => setMode('profile')} className="btn btn-sm btn-outline-secondary">Sửa hồ sơ</button><button disabled={isSuspended} onClick={() => setMode('venue')} className="btn btn-sm btn-outline-secondary">Thêm địa điểm</button><button disabled={isSuspended} onClick={() => setMode('resource')} className="btn btn-sm btn-outline-secondary">Thêm chỗ đặt</button><button disabled={isSuspended} onClick={() => setMode('service')} className="btn btn-sm btn-outline-primary">Thêm dịch vụ</button></div></div>{error && <div className="alert alert-danger mt-3">{error}</div>}{message && <div className="alert alert-success mt-3">{message}</div>}<div className="catalog-summary"><article><small>Đối tác</small><b>{profile?.businessName ?? 'Đang tải...'}</b><span>{profile?.contactPhone}</span></article><article><small>Lĩnh vực kinh doanh</small><b>{profile?.categoryName ?? 'Chưa phân loại'}</b><span className="category-locked-badge"><i className="bi bi-shield-lock" /> Dịch vụ tự động khóa</span></article><article><small>Trạng thái hồ sơ</small><b>{providerStatusText}</b><span>{isSuspended ? 'Tạm dừng thao tác' : 'Manager quản lý xét duyệt'}</span></article><article><small>Địa điểm</small><b>{venues.length}</b><span>{venues.map((x) => x.name).join(', ') || 'Chưa có địa điểm'}</span></article><article><small>Chỗ có thể đặt (Sân/Bàn/Phòng)</small><b>{resources.filter((x) => x.isActive).length}</b><span>{resources.filter((x) => x.isActive).map((x) => x.name).join(', ') || 'Chưa có chỗ đặt'}</span></article></div>{resources.length > 0 && <div className="resource-list">{resources.map((resource) => <article key={resource.id} className={!resource.isActive ? 'inactive' : ''}><div><b>{resource.name}{resource.code ? ` · ${resource.code}` : ''}</b><span>{resource.venueName} · {resource.resourceType} · {resource.maxCapacity} chỗ{resource.floorOrZone ? ` · ${resource.floorOrZone}` : ''}{resource.positionDescription ? ` · ${resource.positionDescription}` : ''}</span></div>{resource.isActive ? <button disabled={isSuspended} onClick={() => deactivate(resource)} className="btn btn-sm btn-outline-secondary">Ngưng sử dụng</button> : <small>Đã ngưng</small>}</article>)}</div>}{mode === 'profile' && profile && <ProviderProfileForm profile={profile} token={token} categories={categories} onDone={() => success('Đã cập nhật hồ sơ đối tác.')} onError={setError} />}{mode === 'venue' && <VenueForm token={token} onDone={() => success('Đã thêm địa điểm.')} onError={setError} />}{mode === 'resource' && <ResourceForm token={token} venues={venues} services={services} categories={categories} onDone={() => success('Đã thêm chỗ đặt.')} onError={setError} />}{mode === 'service' && <ServiceForm token={token} venues={venues} categories={categories} profile={profile} onDone={() => success('Đã thêm dịch vụ.')} onError={setError} />}</section>
 }
 
-function ProviderProfileForm({ profile, token, onDone, onError }: { profile: MyProviderProfile; token: string; onDone: () => void; onError: (message: string) => void }) {
-  const [businessName, setBusinessName] = useState(profile.businessName); const [contactPhone, setContactPhone] = useState(profile.contactPhone); const [description, setDescription] = useState(profile.description ?? ''); const submit = async (event: React.FormEvent) => { event.preventDefault(); if (!isValidPhone(contactPhone)) { onError('Số điện thoại không hợp lệ, vui lòng nhập lại.'); return }; try { await api.updateProviderProfile({ businessName, contactPhone, description }, token); onDone() } catch (e) { onError(e instanceof Error ? e.message : 'Không thể cập nhật hồ sơ.') } }
+function ProviderProfileForm({ profile, token, categories, onDone, onError }: { profile: MyProviderProfile; token: string; categories?: Category[]; onDone: () => void; onError: (message: string) => void }) {
+  const [businessName, setBusinessName] = useState(profile.businessName); const [contactPhone, setContactPhone] = useState(profile.contactPhone); const [description, setDescription] = useState(profile.description ?? ''); const [categoryId, setCategoryId] = useState(profile.categoryId ? String(profile.categoryId) : ''); const submit = async (event: React.FormEvent) => { event.preventDefault(); if (!isValidPhone(contactPhone)) { onError('Số điện thoại không hợp lệ, vui lòng nhập lại.'); return }; try { await api.updateProviderProfile({ businessName, contactPhone, description, categoryId: categoryId ? Number(categoryId) : undefined }, token); onDone() } catch (e) { onError(e instanceof Error ? e.message : 'Không thể cập nhật hồ sơ.') } }
   return <form className="provider-form catalog-form" onSubmit={submit}>
     <h3>Sửa hồ sơ đối tác</h3>
     <label><span>Tên doanh nghiệp</span><input required name="organization" autoComplete="organization" minLength={2} maxLength={160} value={businessName} onChange={(e) => setBusinessName(e.target.value)} /></label>
     <label><span>Số điện thoại</span><input required name="tel" type="tel" autoComplete="tel" inputMode="numeric" minLength={10} maxLength={10} pattern="0[0-9]{9}" title="Gồm đúng 10 chữ số và bắt đầu bằng số 0" value={contactPhone} onChange={(e) => setContactPhone(normalizePhone(e.target.value))} /><small className="form-hint">Gồm đúng 10 chữ số và bắt đầu bằng số 0.</small></label>
+    {categories && categories.length > 0 && (
+      <label>
+        <span>Lĩnh vực kinh doanh</span>
+        <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+          <option value="">{profile.categoryName ? `Hiện tại: ${profile.categoryName}` : '-- Chọn danh mục kinh doanh --'}</option>
+          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <small className="form-hint">{profile.categoryName ? `Lĩnh vực đã khóa: ${profile.categoryName}` : 'Chọn danh mục kinh doanh chính cho cửa hàng.'}</small>
+      </label>
+    )}
     <label><span>Mô tả</span><input maxLength={2000} list="profile-description-suggestions" value={description} onChange={(e) => setDescription(e.target.value)} /></label>
     <datalist id="profile-description-suggestions">{descriptionSuggestions.map((value) => <option value={value} key={value} />)}</datalist>
     <button className="btn btn-primary rounded-pill">Lưu hồ sơ</button>
@@ -594,12 +617,14 @@ function ResourceForm({ token, venues, services, categories, onDone, onError }: 
   </form>
 }
 
-function ServiceForm({ token, venues, categories, onDone, onError }: { token: string; venues: ProviderVenue[]; categories: Category[]; onDone: () => void; onError: (message: string) => void }) {
-  const [venueId, setVenueId] = useState(''); const [categoryId, setCategoryId] = useState(''); const [name, setName] = useState(''); const [description, setDescription] = useState(''); const [basePrice, setBasePrice] = useState(''); const [imageUrl, setImageUrl] = useState(''); const [saving, setSaving] = useState(false)
-  const selectedCategory = categories.find((category) => category.id === categoryId)
-  const automaticImage = defaultServiceImage(selectedCategory?.slug ?? 'workspace', name || selectedCategory?.name || 'OpenSlot')
-  const submit = async (event: React.FormEvent) => { event.preventDefault(); const suppliedImage = imageUrl.trim(); if (suppliedImage) { if (!suppliedImage.startsWith('https://')) { onError('Link ảnh cần bắt đầu bằng https:// để hiển thị an toàn.'); return }; try { const url = new URL(suppliedImage); if (url.hostname === 'localhost' || url.hostname.endsWith('.local') || /^(10|127|172\.(1[6-9]|2[0-9]|3[01])|192\.168)\./.test(url.hostname)) { onError('Link ảnh không được trỏ đến địa chỉ nội bộ hoặc localhost.'); return } } catch { onError('Link ảnh không hợp lệ.'); return } }; setSaving(true); try { await api.createProviderService({ venueId, categoryId: Number(categoryId), name, description, basePriceVnd: Number(basePrice), imageUrl: suppliedImage || automaticImage }, token); onDone() } catch (e) { onError(e instanceof Error ? e.message : 'Không thể thêm dịch vụ.') } finally { setSaving(false) } }
-  return <form className="provider-form catalog-form" onSubmit={submit}><h3>Thêm dịch vụ</h3><p className="form-hint">Ảnh thuộc về dịch vụ; mọi slot tạo từ dịch vụ này sẽ tự dùng cùng ảnh. Nếu không nhập, OpenSlot tự gán ảnh theo danh mục.</p><label>Địa điểm<select required value={venueId} onChange={(e) => setVenueId(e.target.value)}><option value="">Chọn địa điểm</option>{venues.map((venue) => <option value={venue.id} key={venue.id}>{venue.name}</option>)}</select></label><label>Danh mục<select required value={categoryId} onChange={(e) => setCategoryId(e.target.value)}><option value="">Chọn danh mục</option>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label><label>Tên dịch vụ<input required minLength={2} list="service-form-suggestions" value={name} onChange={(e) => setName(e.target.value)} /></label><label>Mô tả<input maxLength={2000} list="service-description-suggestions" value={description} onChange={(e) => setDescription(e.target.value)} /></label><label>Giá niêm yết tham khảo (VND)<input required type="number" min="1" list="service-price-suggestions" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} /></label><label>Link ảnh đại diện (không bắt buộc)<input type="url" inputMode="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." /><small>{imageUrl.trim() ? 'Ảnh này sẽ hiển thị cho mọi slot của dịch vụ.' : 'Chưa có ảnh riêng: OpenSlot sẽ tự gán ảnh theo danh mục.'}</small></label><datalist id="service-form-suggestions">{popularServiceSearches.map((value) => <option value={value} key={value} />)}</datalist><datalist id="service-description-suggestions">{descriptionSuggestions.map((value) => <option value={value} key={value} />)}</datalist><datalist id="service-price-suggestions">{priceSuggestions.map((value) => <option value={value} key={value} />)}</datalist><button disabled={saving || !venues.length} className="btn btn-primary rounded-pill">{saving ? 'Đang lưu...' : 'Lưu dịch vụ'}</button>{!venues.length && <small>Hãy tạo địa điểm trước khi thêm dịch vụ.</small>}</form>
+function ServiceForm({ token, venues, categories, profile, onDone, onError }: { token: string; venues: ProviderVenue[]; categories: Category[]; profile?: MyProviderProfile | null; onDone: () => void; onError: (message: string) => void }) {
+  const lockedCategoryId = profile?.categoryId ? String(profile.categoryId) : ''
+  const [venueId, setVenueId] = useState(''); const [categoryId, setCategoryId] = useState(lockedCategoryId); const [name, setName] = useState(''); const [description, setDescription] = useState(''); const [basePrice, setBasePrice] = useState(''); const [imageUrl, setImageUrl] = useState(''); const [saving, setSaving] = useState(false)
+  const activeCategoryId = lockedCategoryId || categoryId
+  const selectedCategory = categories.find((category) => String(category.id) === activeCategoryId)
+  const automaticImage = defaultServiceImage(selectedCategory?.slug ?? profile?.categorySlug ?? 'workspace', name || selectedCategory?.name || 'OpenSlot')
+  const submit = async (event: React.FormEvent) => { event.preventDefault(); if (!activeCategoryId) { onError('Vui lòng chọn danh mục cho dịch vụ.'); return }; const suppliedImage = imageUrl.trim(); if (suppliedImage) { if (!suppliedImage.startsWith('https://')) { onError('Link ảnh cần bắt đầu bằng https:// để hiển thị an toàn.'); return }; try { const url = new URL(suppliedImage); if (url.hostname === 'localhost' || url.hostname.endsWith('.local') || /^(10|127|172\.(1[6-9]|2[0-9]|3[01])|192\.168)\./.test(url.hostname)) { onError('Link ảnh không được trỏ đến địa chỉ nội bộ hoặc localhost.'); return } } catch { onError('Link ảnh không hợp lệ.'); return } }; setSaving(true); try { await api.createProviderService({ venueId, categoryId: Number(activeCategoryId), name, description, basePriceVnd: Number(basePrice), imageUrl: suppliedImage || automaticImage }, token); onDone() } catch (e) { onError(e instanceof Error ? e.message : 'Không thể thêm dịch vụ.') } finally { setSaving(false) } }
+  return <form className="provider-form catalog-form" onSubmit={submit}><h3>Thêm dịch vụ</h3><p className="form-hint">Ảnh thuộc về dịch vụ; mọi slot tạo từ dịch vụ này sẽ tự dùng cùng ảnh. Nếu không nhập, OpenSlot tự gán ảnh theo danh mục.</p><label>Địa điểm<select required value={venueId} onChange={(e) => setVenueId(e.target.value)}><option value="">Chọn địa điểm</option>{venues.map((venue) => <option value={venue.id} key={venue.id}>{venue.name}</option>)}</select></label>{lockedCategoryId ? <label><span>Danh mục dịch vụ <span className="category-locked-badge"><i className="bi bi-lock-fill" /> Đã khóa theo cửa hàng</span></span><input type="text" readOnly disabled value={profile?.categoryName || selectedCategory?.name || 'Danh mục đã khóa'} /></label> : <label>Danh mục<select required value={categoryId} onChange={(e) => setCategoryId(e.target.value)}><option value="">Chọn danh mục</option>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>}<label>Tên dịch vụ<input required minLength={2} list="service-form-suggestions" value={name} onChange={(e) => setName(e.target.value)} /></label><label>Mô tả<input maxLength={2000} list="service-description-suggestions" value={description} onChange={(e) => setDescription(e.target.value)} /></label><label>Giá niêm yết tham khảo (VND)<input required type="number" min="1" list="service-price-suggestions" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} /></label><label>Link ảnh đại diện (không bắt buộc)<input type="url" inputMode="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." /><small>{imageUrl.trim() ? 'Ảnh này sẽ hiển thị cho mọi slot của dịch vụ.' : 'Chưa có ảnh riêng: OpenSlot sẽ tự gán ảnh theo danh mục.'}</small></label><datalist id="service-form-suggestions">{popularServiceSearches.map((value) => <option value={value} key={value} />)}</datalist><datalist id="service-description-suggestions">{descriptionSuggestions.map((value) => <option value={value} key={value} />)}</datalist><datalist id="service-price-suggestions">{priceSuggestions.map((value) => <option value={value} key={value} />)}</datalist><button disabled={saving || !venues.length} className="btn btn-primary rounded-pill">{saving ? 'Đang lưu...' : 'Lưu dịch vụ'}</button>{!venues.length && <small>Hãy tạo địa điểm trước khi thêm dịch vụ.</small>}</form>
 }
 
 function CheckInPanel({ token }: { token: string }) { const [code, setCode] = useState(''); const [pin, setPin] = useState(''); const [message, setMessage] = useState(''); const checkIn = async (event: React.FormEvent) => { event.preventDefault(); if (!/^[A-Z0-9-]{10,15}$/.test(code)) { setMessage('Mã booking không hợp lệ.'); return }; if (!/^\d{6}$/.test(pin)) { setMessage('PIN phải có đúng 6 chữ số.'); return }; try { await api.checkIn(code, pin, token); setMessage('Check-in thành công. Giữ mã để hoàn tất dịch vụ.') } catch (e) { setMessage(e instanceof Error ? e.message : 'Không thể check-in.') } }; const complete = async () => { if (!code) { setMessage('Nhập mã booking cần hoàn tất.'); return }; try { await api.completeBooking(code, token); setMessage('Dịch vụ đã được đánh dấu hoàn tất.'); setCode(''); setPin('') } catch (e) { setMessage(e instanceof Error ? e.message : 'Không thể hoàn tất booking.') } }; return <form onSubmit={checkIn} className="checkin-panel"><div><b><i className="bi bi-qr-code-scan" /> Check-in khách</b><span>Nhập mã OpenSlot và PIN của khách.</span></div><input required value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="OS-XXXXXXXX" /><input required value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" placeholder="PIN 6 số" maxLength={6} /><button className="btn btn-outline-primary rounded-pill">Check-in</button><button type="button" onClick={complete} className="btn btn-outline-success rounded-pill">Hoàn tất</button>{message && <small>{message}</small>}</form> }
@@ -693,5 +718,371 @@ function NotificationsPage({ session }: { session: Session }) {
 }
 
 function NotFoundPage() { return <div className="container confirmation-page"><div className="confirmation-card"><span className="success-mark not-found-mark"><i className="bi bi-signpost-split" /></span><p className="eyebrow">404 · Không tìm thấy</p><h1>Trang này không còn ở đây</h1><p>Đường dẫn có thể đã thay đổi hoặc slot không tồn tại.</p><NavLink to="/" className="btn btn-primary rounded-pill px-4">Về trang khám phá</NavLink></div></div> }
+
+function ShopeeChatWidget({ session }: { session: Session | null }) {
+  const navigate = useNavigate()
+  const [isOpen, setIsOpen] = useState(false)
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
+  const [activeDetail, setActiveDetail] = useState<ConversationDetail | null>(null)
+  const [messageText, setMessageText] = useState('')
+  const [sending, setSending] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [supportLoading, setSupportLoading] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement | null>(null)
+
+  const loadConversations = useCallback(() => {
+    if (!session) return
+    api.chatConversations(session.accessToken)
+      .then(setConversations)
+      .catch(() => setConversations([]))
+  }, [session])
+
+  useEffect(() => {
+    if (session) {
+      loadConversations()
+    }
+  }, [loadConversations, session])
+
+  const selectConversation = useCallback(async (id: string) => {
+    if (!session) return
+    setActiveConversationId(id)
+    setLoading(true)
+    try {
+      const detail = await api.chatConversation(id, session.accessToken)
+      setActiveDetail(detail)
+      void api.markConversationRead(id, session.accessToken).catch(() => {})
+      setConversations((prev) => prev.map((c) => c.id === id ? { ...c, unreadCount: 0 } : c))
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
+  }, [session])
+
+  const handleMessageReceived = useCallback((msg: ChatMessage) => {
+    setActiveDetail((current) => {
+      if (current && current.conversation.id === msg.conversationId) {
+        if (current.messages.some((m) => m.id === msg.id)) return current
+        return {
+          ...current,
+          messages: [...current.messages, msg],
+          conversation: {
+            ...current.conversation,
+            lastMessageText: msg.content,
+            lastMessageAtUtc: msg.sentAtUtc
+          }
+        }
+      }
+      return current
+    })
+
+    setConversations((prev) => prev.map((c) => {
+      if (c.id === msg.conversationId) {
+        const isCurrentOpen = activeConversationId === msg.conversationId
+        return {
+          ...c,
+          lastMessageText: msg.content,
+          lastMessageAtUtc: msg.sentAtUtc,
+          unreadCount: isCurrentOpen || msg.senderUserId === session?.user.id ? 0 : c.unreadCount + 1
+        }
+      }
+      return c
+    }))
+
+    if (activeConversationId === msg.conversationId && session && msg.senderUserId !== session.user.id) {
+      void api.markConversationRead(msg.conversationId, session.accessToken).catch(() => {})
+    }
+  }, [activeConversationId, session])
+
+  const handleConversationUpdated = useCallback((conv: Conversation) => {
+    setConversations((prev) => {
+      const idx = prev.findIndex((c) => c.id === conv.id)
+      if (idx >= 0) {
+        const next = [...prev]
+        next[idx] = { ...next[idx], ...conv }
+        return next
+      }
+      return [conv, ...prev]
+    })
+  }, [])
+
+  useChatRealtime(session?.accessToken, activeConversationId, handleMessageReceived, handleConversationUpdated)
+
+  useEffect(() => {
+    if (activeDetail?.messages) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [activeDetail?.messages])
+
+  useEffect(() => {
+    const handler = async (event: Event) => {
+      const customEvent = event as CustomEvent<{ providerId?: string | null; providerBusinessName?: string; topic?: string; initialMessage?: string }>
+      if (!session?.accessToken) return
+      setIsOpen(true)
+      const { providerId, topic = 'Tư vấn dịch vụ', initialMessage = 'Xin chào' } = customEvent.detail
+      const existing = conversations.find((c) => (providerId ? c.providerId === providerId : !c.providerId))
+      if (existing) {
+        void selectConversation(existing.id)
+      } else {
+        setLoading(true)
+        try {
+          const created = await api.createConversation({ providerId, topic, initialMessage }, session.accessToken)
+          setConversations((prev) => [created.conversation, ...prev.filter((c) => c.id !== created.conversation.id)])
+          setActiveConversationId(created.conversation.id)
+          setActiveDetail(created)
+        } catch {
+          // ignore
+        } finally {
+          setLoading(false)
+        }
+      }
+    }
+    window.addEventListener('openslot:open-chat', handler)
+    return () => window.removeEventListener('openslot:open-chat', handler)
+  }, [conversations, selectConversation, session])
+
+  const sendMessage = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!messageText.trim() || !activeConversationId || !session?.accessToken || sending) return
+    const text = messageText.trim()
+    setMessageText('')
+    setSending(true)
+    try {
+      const sent = await api.sendChatMessage(activeConversationId, text, session.accessToken)
+      setActiveDetail((current) => {
+        if (!current) return null
+        if (current.messages.some((m) => m.id === sent.id)) return current
+        return {
+          ...current,
+          messages: [...current.messages, sent],
+          conversation: {
+            ...current.conversation,
+            lastMessageText: sent.content,
+            lastMessageAtUtc: sent.sentAtUtc
+          }
+        }
+      })
+      setConversations((prev) => prev.map((c) => c.id === activeConversationId ? {
+        ...c,
+        lastMessageText: sent.content,
+        lastMessageAtUtc: sent.sentAtUtc
+      } : c))
+    } catch {
+      setMessageText(text)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const openSupportChat = async () => {
+    if (!session?.accessToken) return
+    setSupportLoading(true)
+    try {
+      const existing = conversations.find((c) => !c.providerId)
+      if (existing) {
+        await selectConversation(existing.id)
+      } else {
+        const created = await api.createConversation({
+          providerId: null,
+          topic: 'Hỗ trợ khách hàng OpenSlot',
+          initialMessage: 'Xin chào bộ phận CSKH OpenSlot, tôi cần hỗ trợ.'
+        }, session.accessToken)
+        setConversations((prev) => [created.conversation, ...prev])
+        setActiveConversationId(created.conversation.id)
+        setActiveDetail(created)
+      }
+    } catch {
+      // ignore
+    } finally {
+      setSupportLoading(false)
+    }
+  }
+
+  const totalUnread = conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0)
+
+  const roleTag = (role: string) => {
+    if (role === 'Admin') return <span className="chat-message-role-tag admin">Admin</span>
+    if (role === 'Manager') return <span className="chat-message-role-tag manager">CSKH</span>
+    if (role === 'Provider') return <span className="chat-message-role-tag provider">Cửa hàng</span>
+    return null
+  }
+
+  const conversationDisplayTitle = (c: Conversation) => {
+    const isCustomer = session ? hasRole(session, 'Customer') && activePortalRole(session) === 'Customer' : true
+    if (isCustomer) {
+      return c.providerBusinessName || 'Hỗ trợ CSKH OpenSlot'
+    }
+    const isProvider = session ? hasRole(session, 'Provider') && activePortalRole(session) === 'Provider' : false
+    if (isProvider) {
+      return c.customerName || 'Khách hàng'
+    }
+    return `${c.customerName}${c.providerBusinessName ? ` · ${c.providerBusinessName}` : ' · CSKH'}`
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className="shopee-chat-trigger"
+        onClick={() => {
+          if (!session) {
+            navigate('/login')
+            return
+          }
+          setIsOpen(!isOpen)
+          if (!isOpen) loadConversations()
+        }}
+        aria-label="Mở cửa sổ chat hỗ trợ"
+      >
+        <i className="bi bi-chat-dots-fill" />
+        <span>Chat</span>
+        {totalUnread > 0 && (
+          <span className="chat-unread-badge">
+            {totalUnread > 99 ? '99+' : totalUnread}
+          </span>
+        )}
+      </button>
+
+      {isOpen && (
+        <div className="shopee-chat-window" role="dialog" aria-label="Khung chat CSKH OpenSlot">
+          <div className="chat-header">
+            <div className="chat-header-title">
+              {activeConversationId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveConversationId(null)
+                    setActiveDetail(null)
+                    loadConversations()
+                  }}
+                  title="Quay lại danh sách"
+                  className="btn btn-link text-white p-0 me-2"
+                >
+                  <i className="bi bi-arrow-left" />
+                </button>
+              )}
+              <div>
+                <h4>
+                  {activeDetail
+                    ? conversationDisplayTitle(activeDetail.conversation)
+                    : 'Tin nhắn OpenSlot'}
+                </h4>
+                <small>
+                  {activeDetail
+                    ? activeDetail.conversation.topic
+                    : `${conversations.length} cuộc hội thoại`}
+                </small>
+              </div>
+            </div>
+            <div className="chat-header-actions">
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                title="Đóng chat"
+                aria-label="Đóng"
+              >
+                <i className="bi bi-x-lg" />
+              </button>
+            </div>
+          </div>
+
+          {activeConversationId ? (
+            <div className="chat-conversation-view">
+              <div className="chat-messages-area">
+                {loading ? (
+                  <div className="empty-state py-4"><div className="spinner-border text-primary spinner-border-sm" /></div>
+                ) : activeDetail?.messages.length ? (
+                  activeDetail.messages.map((msg) => {
+                    const isMine = msg.senderUserId === session?.user.id
+                    return (
+                      <div key={msg.id} className={`chat-message-row ${isMine ? 'mine' : 'theirs'}`}>
+                        {!isMine && (
+                          <span className="chat-message-author">
+                            {msg.senderName}
+                            {roleTag(msg.senderRole)}
+                          </span>
+                        )}
+                        <div className="chat-message-bubble">{msg.content}</div>
+                        <time className="chat-message-time">{formatTime(msg.sentAtUtc)}</time>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <div className="empty-state py-4">
+                    <i className="bi bi-chat-heart" />
+                    <p className="small mb-0">Chưa có tin nhắn nào. Hãy gửi lời chào đầu tiên!</p>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+              <form className="chat-input-bar" onSubmit={sendMessage}>
+                <input
+                  type="text"
+                  placeholder="Nhập tin nhắn..."
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  disabled={sending}
+                  maxLength={1000}
+                />
+                <button type="submit" disabled={sending || !messageText.trim()} title="Gửi tin nhắn">
+                  <i className="bi bi-send-fill" />
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div className="chat-list-body">
+              <div
+                role="button"
+                tabIndex={0}
+                className="chat-support-banner"
+                onClick={openSupportChat}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void openSupportChat() }}
+              >
+                <div>
+                  <b><i className="bi bi-headset" /> CSKH OpenSlot</b>
+                  <small>{supportLoading ? 'Đang kết nối...' : 'Hỗ trợ sự cố & giải đáp 24/7'}</small>
+                </div>
+                <i className="bi bi-chevron-right text-muted" />
+              </div>
+
+              {conversations.length > 0 ? (
+                conversations.map((c) => (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    key={c.id}
+                    className="chat-thread-item"
+                    onClick={() => selectConversation(c.id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void selectConversation(c.id) }}
+                  >
+                    <div className={`chat-thread-avatar ${c.providerId ? 'provider' : 'support'}`}>
+                      <i className={`bi bi-${c.providerId ? 'shop' : 'headset'}`} />
+                    </div>
+                    <div className="chat-thread-info">
+                      <div className="chat-thread-info-top">
+                        <b>{conversationDisplayTitle(c)}</b>
+                        <time>{formatTime(c.lastMessageAtUtc)}</time>
+                      </div>
+                      <p className="chat-thread-snippet">{c.lastMessageText || c.topic}</p>
+                    </div>
+                    {c.unreadCount > 0 && (
+                      <span className="chat-thread-badge">{c.unreadCount}</span>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="empty-state py-5">
+                  <i className="bi bi-chat-dots" />
+                  <p className="small">Bạn chưa có cuộc trò chuyện nào.<br />Nhấn vào CSKH ở trên hoặc nhắn tin từ trang ưu đãi của cửa hàng.</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  )
+}
 
 export default App

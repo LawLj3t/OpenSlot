@@ -19,9 +19,19 @@ public sealed class ProviderProfileController(AppDbContext db) : ControllerBase
     [HttpGet("profile")]
     public async Task<IActionResult> Profile(CancellationToken cancellationToken)
     {
-        var profile = await ProfileQuery().AsNoTracking().SingleOrDefaultAsync(cancellationToken)
+        var profile = await ProfileQuery().Include(x => x.Category).AsNoTracking().SingleOrDefaultAsync(cancellationToken)
             ?? throw new ApiException("Không tìm thấy hồ sơ đối tác.", StatusCodes.Status404NotFound);
-        return Ok(new { profile.Id, profile.BusinessName, profile.Description, profile.ContactPhone, profile.Status });
+        return Ok(new
+        {
+            profile.Id,
+            profile.BusinessName,
+            profile.Description,
+            profile.ContactPhone,
+            profile.Status,
+            profile.CategoryId,
+            categoryName = profile.Category?.Name,
+            categorySlug = profile.Category?.Slug
+        });
     }
 
     [HttpPut("profile")]
@@ -31,6 +41,12 @@ public sealed class ProviderProfileController(AppDbContext db) : ControllerBase
         profile.BusinessName = request.BusinessName.Trim();
         profile.Description = request.Description?.Trim();
         profile.ContactPhone = request.ContactPhone.Trim();
+        if (request.CategoryId.HasValue)
+        {
+            if (!await db.Categories.AnyAsync(x => x.Id == request.CategoryId.Value && x.IsActive, cancellationToken))
+                throw new ApiException("Danh mục ngành kinh doanh không hợp lệ.");
+            profile.CategoryId = request.CategoryId.Value;
+        }
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
@@ -125,12 +141,35 @@ public sealed class ProviderProfileController(AppDbContext db) : ControllerBase
     [HttpPost("services")]
     public async Task<IActionResult> CreateService(UpsertServiceRequest request, CancellationToken cancellationToken)
     {
-        await EnsureCanConfigure(cancellationToken);
-        await ValidateReferences(request, cancellationToken);
+        var profile = await GetConfigurableProfile(cancellationToken);
+        var effectiveCategoryId = profile.CategoryId ?? request.CategoryId;
+        if (profile.CategoryId.HasValue && request.CategoryId != 0 && request.CategoryId != profile.CategoryId.Value)
+        {
+            var categoryName = await db.Categories.Where(c => c.Id == profile.CategoryId.Value).Select(c => c.Name).FirstOrDefaultAsync(cancellationToken);
+            throw new ApiException($"Dịch vụ phải thuộc đúng ngành kinh doanh của đối tác ({categoryName ?? "ngành đã đăng ký"}).", StatusCodes.Status400BadRequest);
+        }
+
+        var normalizedRequest = new UpsertServiceRequest
+        {
+            VenueId = request.VenueId,
+            CategoryId = effectiveCategoryId,
+            Name = request.Name,
+            Description = request.Description,
+            BasePriceVnd = request.BasePriceVnd,
+            ImageUrl = request.ImageUrl
+        };
+
+        await ValidateReferences(normalizedRequest, cancellationToken);
         var service = new ServiceOffering();
-        MapService(service, request);
+        MapService(service, normalizedRequest);
         service.IsActive = true;
         db.ServiceOfferings.Add(service);
+
+        if (!profile.CategoryId.HasValue && effectiveCategoryId > 0)
+        {
+            profile.CategoryId = effectiveCategoryId;
+        }
+
         await db.SaveChangesAsync(cancellationToken);
         return Created(string.Empty, new { service.Id });
     }
@@ -138,14 +177,32 @@ public sealed class ProviderProfileController(AppDbContext db) : ControllerBase
     [HttpPut("services/{id:guid}")]
     public async Task<IActionResult> UpdateService(Guid id, UpsertServiceRequest request, CancellationToken cancellationToken)
     {
-        await EnsureCanConfigure(cancellationToken);
+        var profile = await GetConfigurableProfile(cancellationToken);
         var service = await db.ServiceOfferings.Include(x => x.Venue).ThenInclude(x => x.ProviderProfile).SingleOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new ApiException("Không tìm thấy dịch vụ.", StatusCodes.Status404NotFound);
         EnsureOwner(service.Venue.ProviderProfile.UserId);
         if (await db.DealSlots.AnyAsync(x => x.ServiceOfferingId == id && x.ConfirmedBookingCount > 0, cancellationToken))
             throw new ApiException("Không thể sửa dịch vụ đang có booking.", StatusCodes.Status409Conflict);
-        await ValidateReferences(request, cancellationToken);
-        MapService(service, request);
+
+        var effectiveCategoryId = profile.CategoryId ?? request.CategoryId;
+        if (profile.CategoryId.HasValue && request.CategoryId != 0 && request.CategoryId != profile.CategoryId.Value)
+        {
+            var categoryName = await db.Categories.Where(c => c.Id == profile.CategoryId.Value).Select(c => c.Name).FirstOrDefaultAsync(cancellationToken);
+            throw new ApiException($"Dịch vụ phải thuộc đúng ngành kinh doanh của đối tác ({categoryName ?? "ngành đã đăng ký"}).", StatusCodes.Status400BadRequest);
+        }
+
+        var normalizedRequest = new UpsertServiceRequest
+        {
+            VenueId = request.VenueId,
+            CategoryId = effectiveCategoryId,
+            Name = request.Name,
+            Description = request.Description,
+            BasePriceVnd = request.BasePriceVnd,
+            ImageUrl = request.ImageUrl
+        };
+
+        await ValidateReferences(normalizedRequest, cancellationToken);
+        MapService(service, normalizedRequest);
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();
     }

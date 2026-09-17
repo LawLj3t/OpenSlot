@@ -119,7 +119,9 @@ public sealed class SlotsController(AppDbContext db) : ControllerBase
             slot.DealPriceVnd,
             slot.Capacity,
             SlotAvailabilityPolicy.RemainingCapacity(slot.Capacity, slot.ConfirmedBookingCount, activeHoldCount),
-            slot.Status));
+            slot.Status,
+            slot.ServiceOffering.Venue.ProviderProfile.Id,
+            slot.ServiceOffering.Venue.ProviderProfile.BusinessName));
     }
 
     private async Task<Dictionary<Guid, int>> GetActiveHoldCountsAsync(IEnumerable<Guid> slotIds, DateTime now, CancellationToken cancellationToken)
@@ -165,7 +167,9 @@ public sealed class SlotsController(AppDbContext db) : ControllerBase
             slot.Capacity,
             SlotAvailabilityPolicy.RemainingCapacity(slot.Capacity, slot.ConfirmedBookingCount, activeHoldCount),
             slot.Status,
-            distanceKm);
+            distanceKm,
+            slot.ServiceOffering.Venue.ProviderProfile.Id,
+            slot.ServiceOffering.Venue.ProviderProfile.BusinessName);
     }
 
     private static string? ResourceLocation(Domain.Entities.BookableResource? resource) => resource is null

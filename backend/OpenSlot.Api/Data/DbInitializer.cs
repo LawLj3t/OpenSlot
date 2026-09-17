@@ -9,7 +9,7 @@ namespace OpenSlot.Api.Data;
 public static class DbInitializer
 {
     private sealed record CategorySeed(string Slug, string Name, string IconName);
-    private sealed record ProviderSeed(string Email, string DisplayName, string Password, string BusinessName, string Phone, string Description);
+    private sealed record ProviderSeed(string Email, string DisplayName, string Password, string BusinessName, string Phone, string Description, string CategorySlug);
     private sealed record VenueSeed(string ProviderEmail, string Name, string Address, string District, double Latitude, double Longitude, string? LegacyName = null);
     private sealed record ResourceSeed(string VenueName, string Name, string ResourceType, string Code, string FloorOrZone, string PositionDescription, int MaxCapacity, string? LegacyName = null, string? LegacyCode = null);
     private sealed record ServiceSeed(string VenueName, string CategorySlug, string Name, string Description, long BasePriceVnd, string ImageUrl, string[]? LegacyNames = null);
@@ -23,12 +23,12 @@ public static class DbInitializer
 
     private static readonly ProviderSeed[] ProviderSeeds =
     {
-        new("provider@openslot.local", "Campus Active", "Provider@12345", "Campus Active", "0901000001", "Đối tác thể thao với các sân trống theo giờ tại Cầu Giấy."),
-        new("beauty@openslot.local", "Glow Wellness", "Beauty@12345", "Glow Wellness", "0901000002", "Chăm sóc cá nhân và làm đẹp linh hoạt tại Đống Đa."),
-        new("workspace@openslot.local", "Focus Hub", "Workspace@12345", "Focus Hub", "0901000003", "Không gian làm việc và họp nhóm cho người cần chỗ ngay."),
-        new("creative@openslot.local", "Frame Lab", "Creative@12345", "Frame Lab", "0901000004", "Studio sáng tạo cho chụp ảnh và thu âm theo khung giờ."),
-        new("entertainment@openslot.local", "Play Loft", "Entertainment@12345", "Play Loft", "0901000005", "Không gian giải trí nhóm với các suất trống sát giờ."),
-        new("utility@openslot.local", "Care Express", "Utility@12345", "Care Express", "0901000006", "Dịch vụ tiện ích nhanh cho nhu cầu phát sinh trong ngày.")
+        new("provider@openslot.local", "Campus Active", "Provider@12345", "Campus Active", "0901000001", "Đối tác thể thao với các sân trống theo giờ tại Cầu Giấy.", "sports"),
+        new("beauty@openslot.local", "Glow Wellness", "Beauty@12345", "Glow Wellness", "0901000002", "Chăm sóc cá nhân và làm đẹp linh hoạt tại Đống Đa.", "beauty"),
+        new("workspace@openslot.local", "Focus Hub", "Workspace@12345", "Focus Hub", "0901000003", "Không gian làm việc và họp nhóm cho người cần chỗ ngay.", "workspace"),
+        new("creative@openslot.local", "Frame Lab", "Creative@12345", "Frame Lab", "0901000004", "Studio sáng tạo cho chụp ảnh và thu âm theo khung giờ.", "creative"),
+        new("entertainment@openslot.local", "Play Loft", "Entertainment@12345", "Play Loft", "0901000005", "Không gian giải trí nhóm với các suất trống sát giờ.", "entertainment"),
+        new("utility@openslot.local", "Care Express", "Utility@12345", "Care Express", "0901000006", "Dịch vụ tiện ích nhanh cho nhu cầu phát sinh trong ngày.", "utilities")
     };
 
     private static readonly VenueSeed[] VenueSeeds =
@@ -96,7 +96,7 @@ public static class DbInitializer
         _ = await EnsureUserAsync(userManager, "customer@openslot.local", "Lâm Demo", "Customer@12345", RoleNames.Customer);
 
         var categories = await EnsureCategoriesAsync(db, cancellationToken);
-        var providers = await EnsureProvidersAsync(db, userManager, cancellationToken);
+        var providers = await EnsureProvidersAsync(db, userManager, categories, cancellationToken);
         await EnsureProviderUsersCanBookAsync(userManager);
         var venues = await EnsureVenuesAsync(db, providers, cancellationToken);
         var resources = await EnsureResourcesAsync(db, venues, cancellationToken);
@@ -123,7 +123,7 @@ public static class DbInitializer
         return await db.Categories.ToDictionaryAsync(x => x.Slug, cancellationToken);
     }
 
-    private static async Task<Dictionary<string, ProviderProfile>> EnsureProvidersAsync(AppDbContext db, UserManager<ApplicationUser> userManager, CancellationToken cancellationToken)
+    private static async Task<Dictionary<string, ProviderProfile>> EnsureProvidersAsync(AppDbContext db, UserManager<ApplicationUser> userManager, IReadOnlyDictionary<string, Category> categories, CancellationToken cancellationToken)
     {
         var providers = new Dictionary<string, ProviderProfile>(StringComparer.OrdinalIgnoreCase);
         foreach (var seed in ProviderSeeds)
@@ -132,6 +132,7 @@ public static class DbInitializer
             var profile = await db.ProviderProfiles.SingleOrDefaultAsync(x => x.UserId == user.Id, cancellationToken);
             if (profile is null) { profile = new ProviderProfile { UserId = user.Id }; db.ProviderProfiles.Add(profile); }
             profile.BusinessName = seed.BusinessName; profile.ContactPhone = seed.Phone; profile.Description = seed.Description; profile.Status = ProviderStatus.Approved;
+            if (categories.TryGetValue(seed.CategorySlug, out var cat)) profile.CategoryId = cat.Id;
             providers.Add(seed.Email, profile);
         }
         await db.SaveChangesAsync(cancellationToken);

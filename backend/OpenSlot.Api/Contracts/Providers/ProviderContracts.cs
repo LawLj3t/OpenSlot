@@ -7,6 +7,7 @@ public sealed class UpdateProviderProfileRequest
     [Required, MinLength(2), MaxLength(160)] public string BusinessName { get; init; } = string.Empty;
     [MaxLength(2000)] public string? Description { get; init; }
     [Required, RegularExpression(@"^0\d{9}$", ErrorMessage = "Số điện thoại không hợp lệ, vui lòng nhập lại.")] public string ContactPhone { get; init; } = string.Empty;
+    public int? CategoryId { get; init; }
 }
 
 public sealed class UpsertVenueRequest

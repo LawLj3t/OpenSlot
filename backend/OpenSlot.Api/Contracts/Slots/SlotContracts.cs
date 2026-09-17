@@ -48,7 +48,9 @@ public sealed record DealSlotListItem(
     int Capacity,
     int RemainingCapacity,
     DealSlotStatus Status,
-    double? DistanceKm);
+    double? DistanceKm,
+    Guid? ProviderId = null,
+    string? ProviderBusinessName = null);
 
 public sealed record DealSlotDetails(
     Guid Id,
@@ -74,4 +76,6 @@ public sealed record DealSlotDetails(
     long DealPriceVnd,
     int Capacity,
     int RemainingCapacity,
-    DealSlotStatus Status);
+    DealSlotStatus Status,
+    Guid? ProviderId = null,
+    string? ProviderBusinessName = null);

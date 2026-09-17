@@ -94,6 +94,16 @@ builder.Services
         };
         options.Events = new JwtBearerEvents
         {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            },
             OnTokenValidated = async context =>
             {
                 var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -158,7 +168,8 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddCors(options => options.AddPolicy("OpenSlotWeb", policy =>
     policy.WithOrigins("http://localhost:5173", "http://127.0.0.1:5173")
         .AllowAnyHeader()
-        .AllowAnyMethod()));
+        .AllowAnyMethod()
+        .AllowCredentials()));
 builder.Services.AddControllers();
 builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
@@ -189,10 +200,12 @@ await using (var scope = app.Services.CreateAsyncScope())
     {
         await db.Database.EnsureCreatedAsync();
         await CheckoutHoldSchemaInitializer.EnsureCreatedAsync(db);
+        await ChatAndCategorySchemaInitializer.EnsureCreatedAsync(db);
     }
     else
     {
         await db.Database.MigrateAsync();
+        await ChatAndCategorySchemaInitializer.EnsureCreatedAsync(db);
     }
     if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("SeedDemoData"))
     {
@@ -253,6 +266,7 @@ app.UseAuthorization();
 app.UseRateLimiter();
 app.MapControllers();
 app.MapHub<AvailabilityHub>("/hubs/availability");
+app.MapHub<ChatHub>("/hubs/chat");
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "OpenSlot.Api", utcNow = DateTime.UtcNow }));
 if (File.Exists(spaIndexPath))
 {

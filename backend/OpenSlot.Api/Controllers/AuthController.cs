@@ -232,6 +232,11 @@ public sealed class AuthController(
             throw new ApiException("Tài khoản này đã có hồ sơ đối tác.", StatusCodes.Status409Conflict);
         }
 
+        if (request.CategoryId.HasValue && !await db.Categories.AnyAsync(x => x.Id == request.CategoryId.Value && x.IsActive, cancellationToken))
+        {
+            throw new ApiException("Danh mục ngành kinh doanh không hợp lệ.");
+        }
+
         var addRoleResult = await userManager.AddToRoleAsync(user, RoleNames.Provider);
         if (!addRoleResult.Succeeded)
         {
@@ -244,6 +249,7 @@ public sealed class AuthController(
             BusinessName = request.BusinessName.Trim(),
             ContactPhone = request.ContactPhone.Trim(),
             Description = request.Description?.Trim(),
+            CategoryId = request.CategoryId,
             Status = ProviderStatus.Pending
         };
         db.ProviderProfiles.Add(profile);

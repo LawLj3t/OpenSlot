@@ -1,8 +1,9 @@
-import type { AdminCategory, AdminDashboard, AdminProviderDetail, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, DealSlot, EmailConfirmationResponse, MyProviderProfile, Notification, PasswordResetRequestResponse, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, RegistrationResponse, Report, Session, SlotHold } from './types'
+import type { AdminCategory, AdminDashboard, AdminProviderDetail, AdminService, AdminSlot, AdminUser, Booking, BookingConfirmation, Category, ChatMessage, Conversation, ConversationDetail, DealSlot, EmailConfirmationResponse, MyProviderProfile, Notification, PasswordResetRequestResponse, ProviderProfile, ProviderResource, ProviderService, ProviderSlot, ProviderVenue, RegistrationResponse, Report, Session, SlotHold } from './types'
 
 const apiBase = import.meta.env.VITE_API_URL ?? '/api'
 const geocodingBase = import.meta.env.VITE_GEOCODING_URL ?? 'https://nominatim.openstreetmap.org'
 export const realtimeHubUrl = apiBase.replace(/\/api\/?$/, '') + '/hubs/availability'
+export const chatHubUrl = apiBase.replace(/\/api\/?$/, '') + '/hubs/chat'
 
 export type GeocodedLocation = {
   label: string
@@ -222,4 +223,10 @@ export const api = {
   rejectProvider: (providerId: string, token: string) => request(`/admin/providers/${providerId}/reject`, { method: 'POST' }, token),
   adminDeleteProvider: (providerId: string, token: string) => request<void>(`/admin/providers/${providerId}`, { method: 'DELETE' }, token),
   resubmitProviderProfile: (token: string) => request('/provider/profile/resubmit', { method: 'POST' }, token),
+  chatConversations: (token: string) => request<Conversation[]>('/chat/conversations', {}, token),
+  createConversation: (payload: { providerId?: string | null; topic: string; initialMessage: string }, token: string) => request<ConversationDetail>('/chat/conversations', { method: 'POST', body: JSON.stringify(payload) }, token),
+  chatConversation: (id: string, token: string) => request<ConversationDetail>(`/chat/conversations/${id}`, {}, token),
+  sendChatMessage: (id: string, content: string, token: string) => request<ChatMessage>(`/chat/conversations/${id}/messages`, { method: 'POST', body: JSON.stringify({ content }) }, token),
+  markConversationRead: (id: string, token: string) => request<void>(`/chat/conversations/${id}/read`, { method: 'POST' }, token),
+  closeConversation: (id: string, token: string) => request<void>(`/chat/conversations/${id}/close`, { method: 'POST' }, token),
 }

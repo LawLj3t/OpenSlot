@@ -18,6 +18,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Report> Reports => Set<Report>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<ChatConversation> ChatConversations => Set<ChatConversation>();
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -37,6 +39,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(x => x.BusinessName).HasMaxLength(160).IsRequired();
             entity.Property(x => x.ContactPhone).HasMaxLength(30).IsRequired();
             entity.HasIndex(x => x.UserId).IsUnique();
+            entity.HasOne(x => x.Category)
+                .WithMany()
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         builder.Entity<Category>(entity =>
@@ -130,6 +136,42 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(x => x.EntityId).HasMaxLength(100).IsRequired();
             entity.Property(x => x.Metadata).HasMaxLength(2000);
             entity.HasIndex(x => new { x.EntityType, x.EntityId, x.CreatedAtUtc });
+        });
+
+        builder.Entity<ChatConversation>(entity =>
+        {
+            entity.Property(x => x.CustomerName).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.ProviderBusinessName).HasMaxLength(160);
+            entity.Property(x => x.Topic).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.LastMessageText).HasMaxLength(2000);
+            entity.HasIndex(x => x.CustomerId);
+            entity.HasIndex(x => x.ProviderId);
+            entity.HasIndex(x => x.LastMessageAtUtc);
+            entity.HasOne(x => x.Customer)
+                .WithMany()
+                .HasForeignKey(x => x.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Provider)
+                .WithMany()
+                .HasForeignKey(x => x.ProviderId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<ChatMessage>(entity =>
+        {
+            entity.Property(x => x.SenderName).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.SenderRole).HasMaxLength(40).IsRequired();
+            entity.Property(x => x.Content).HasMaxLength(2000).IsRequired();
+            entity.HasIndex(x => new { x.ConversationId, x.SentAtUtc });
+            entity.HasIndex(x => x.SenderUserId);
+            entity.HasOne(x => x.Conversation)
+                .WithMany(x => x.Messages)
+                .HasForeignKey(x => x.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.SenderUser)
+                .WithMany()
+                .HasForeignKey(x => x.SenderUserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
