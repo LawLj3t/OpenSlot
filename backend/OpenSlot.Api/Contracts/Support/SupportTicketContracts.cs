@@ -21,6 +21,11 @@ public sealed class CreateSupportTicketRequest
     [MinLength(10)]
     [MaxLength(4000)]
     public string Content { get; init; } = string.Empty;
+
+    [MaxLength(260)]
+    public string? AttachmentFileName { get; init; }
+
+    public string? AttachmentData { get; init; }
 }
 
 public sealed class ResolveSupportTicketRequest
@@ -40,6 +45,8 @@ public sealed record SupportTicketDto(
     string Category,
     string SenderEmail,
     string Content,
+    string? AttachmentFileName,
+    string? AttachmentData,
     int Status,
     string? ResolutionNote,
     string? ResolvedByName,

@@ -52,6 +52,8 @@ public sealed class SupportTicketsController(AppDbContext db) : ControllerBase
             Category = category,
             SenderEmail = email,
             Content = content,
+            AttachmentFileName = string.IsNullOrWhiteSpace(request.AttachmentFileName) ? null : request.AttachmentFileName.Trim(),
+            AttachmentData = string.IsNullOrWhiteSpace(request.AttachmentData) ? null : request.AttachmentData.Trim(),
             Status = 0, // Pending
             CreatedAtUtc = DateTime.UtcNow
         };
@@ -158,6 +160,8 @@ public sealed class SupportTicketsController(AppDbContext db) : ControllerBase
             ticket.Category,
             ticket.SenderEmail,
             ticket.Content,
+            ticket.AttachmentFileName,
+            ticket.AttachmentData,
             ticket.Status,
             ticket.ResolutionNote,
             ticket.ResolvedByName,

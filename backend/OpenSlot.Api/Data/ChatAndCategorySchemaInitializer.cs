@@ -93,6 +93,8 @@ public static class ChatAndCategorySchemaInitializer
                 "Category" TEXT NOT NULL,
                 "SenderEmail" TEXT NOT NULL,
                 "Content" TEXT NOT NULL,
+                "AttachmentFileName" TEXT NULL,
+                "AttachmentData" TEXT NULL,
                 "Status" INTEGER NOT NULL DEFAULT 0,
                 "ResolutionNote" TEXT NULL,
                 "ResolvedByUserId" TEXT NULL,
@@ -107,6 +109,9 @@ public static class ChatAndCategorySchemaInitializer
             CREATE INDEX IF NOT EXISTS "IX_SupportTickets_SenderEmail" ON "SupportTickets" ("SenderEmail");
             """,
             cancellationToken);
+
+        try { await db.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""SupportTickets"" ADD COLUMN ""AttachmentFileName"" TEXT NULL;", cancellationToken); } catch { }
+        try { await db.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""SupportTickets"" ADD COLUMN ""AttachmentData"" TEXT NULL;", cancellationToken); } catch { }
     }
 
     private static async Task EnsurePostgreSqlAsync(AppDbContext db, CancellationToken cancellationToken)
@@ -161,6 +166,8 @@ public static class ChatAndCategorySchemaInitializer
                 "Category" character varying(120) NOT NULL,
                 "SenderEmail" character varying(160) NOT NULL,
                 "Content" character varying(4000) NOT NULL,
+                "AttachmentFileName" character varying(260) NULL,
+                "AttachmentData" text NULL,
                 "Status" integer NOT NULL DEFAULT 0,
                 "ResolutionNote" character varying(4000) NULL,
                 "ResolvedByUserId" text NULL,
@@ -173,6 +180,8 @@ public static class ChatAndCategorySchemaInitializer
                 CONSTRAINT "FK_SupportTickets_AspNetUsers_ResolvedByUserId"
                     FOREIGN KEY ("ResolvedByUserId") REFERENCES "AspNetUsers" ("Id") ON DELETE SET NULL
             );
+            ALTER TABLE "SupportTickets" ADD COLUMN IF NOT EXISTS "AttachmentFileName" character varying(260) NULL;
+            ALTER TABLE "SupportTickets" ADD COLUMN IF NOT EXISTS "AttachmentData" text NULL;
             CREATE INDEX IF NOT EXISTS "IX_SupportTickets_Status" ON "SupportTickets" ("Status");
             CREATE INDEX IF NOT EXISTS "IX_SupportTickets_CreatedAtUtc" ON "SupportTickets" ("CreatedAtUtc");
             CREATE INDEX IF NOT EXISTS "IX_SupportTickets_SenderEmail" ON "SupportTickets" ("SenderEmail");

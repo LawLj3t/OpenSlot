@@ -170,6 +170,12 @@ export function CskhPage({ session }: { session: Session }) {
                 <p className="mb-1 fw-bold text-dark">{ticket.content}</p>
                 <div className="small text-muted">
                   <span>Người gửi: <b>{ticket.senderEmail}</b></span> · <span>Thời gian: {formatTime(ticket.createdAtUtc)}</span>
+                  {ticket.attachmentFileName && (
+                    <span className="ms-2 badge bg-light text-dark border">
+                      <i className="bi bi-paperclip me-1" />
+                      {ticket.attachmentFileName}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -221,6 +227,38 @@ export function CskhPage({ session }: { session: Session }) {
               <div className="mb-1"><b>Thời gian:</b> {formatTime(selectedTicket.createdAtUtc)}</div>
               <hr className="my-2" />
               <div><b>Nội dung:</b> {selectedTicket.content}</div>
+              {selectedTicket.attachmentFileName && (
+                <div className="mt-2 pt-2 border-top">
+                  <b><i className="bi bi-paperclip me-1 text-danger" />Tệp đính kèm chứng minh:</b>
+                  <div className="d-flex align-items-center gap-2 mt-1">
+                    <span className="badge bg-white text-dark border">
+                      {selectedTicket.attachmentFileName}
+                    </span>
+                    {selectedTicket.attachmentData && (
+                      <a
+                        href={selectedTicket.attachmentData}
+                        download={selectedTicket.attachmentFileName}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-sm btn-outline-secondary py-0 px-2"
+                        style={{ fontSize: 12 }}
+                      >
+                        <i className="bi bi-download me-1" />
+                        Tải xuống / Xem
+                      </a>
+                    )}
+                  </div>
+                  {selectedTicket.attachmentData && (selectedTicket.attachmentData.startsWith('data:image/') || /\.(jpe?g|png|webp|gif)$/i.test(selectedTicket.attachmentFileName)) && (
+                    <div className="mt-2 text-center">
+                      <img
+                        src={selectedTicket.attachmentData}
+                        alt={selectedTicket.attachmentFileName}
+                        style={{ maxHeight: 200, maxWidth: '100%', objectFit: 'contain', borderRadius: 8, border: '1px solid #cbd5e1' }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleResolve}>

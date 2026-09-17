@@ -12,6 +12,8 @@ public sealed class SupportTicket
     public string? ResolutionNote { get; set; }
     public string? ResolvedByUserId { get; set; }
     public string? ResolvedByName { get; set; }
+    public string? AttachmentFileName { get; set; }
+    public string? AttachmentData { get; set; }
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime? ResolvedAtUtc { get; set; }
 

@@ -111,7 +111,7 @@ function App() {
       <Route path="*" element={<NotFoundPage />} />
     </Routes></main>
     <footer><div><b>OpenSlot</b><span>Săn thời điểm trống. Tận hưởng giá hợp lý.</span></div><small>Demo đồ án cá nhân · ASP.NET Core + React</small></footer>
-    <ShopeeWebChat session={session} />
+    <ShopeeWebChat session={session} activeRole={activeRole} />
   </>
 }
 

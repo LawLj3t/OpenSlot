@@ -12,13 +12,17 @@ public sealed class SupportTicketContractsTests
             UserRole = "Buyer",
             Category = "Đặt chỗ & Giữ chỗ",
             SenderEmail = "user@gmail.com",
-            Content = "Tôi gặp lỗi khi giữ chỗ cho slot bóng đá chiều nay."
+            Content = "Tôi gặp lỗi khi giữ chỗ cho slot bóng đá chiều nay.",
+            AttachmentFileName = "bien-lai.png",
+            AttachmentData = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
         };
 
         Assert.Equal("Buyer", request.UserRole);
         Assert.Equal("Đặt chỗ & Giữ chỗ", request.Category);
         Assert.Equal("user@gmail.com", request.SenderEmail);
         Assert.StartsWith("Tôi gặp lỗi", request.Content);
+        Assert.Equal("bien-lai.png", request.AttachmentFileName);
+        Assert.NotNull(request.AttachmentData);
     }
 
     [Fact]

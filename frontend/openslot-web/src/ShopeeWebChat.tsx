@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from './api'
 import { useChatRealtime } from './realtime'
-import type { ChatMessage, Conversation, ConversationDetail, Session } from './types'
+import type { ChatMessage, Conversation, ConversationDetail, PortalRole, Session } from './types'
 
 const formatMoney = (value: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(value)
 const formatTime = (value: string) => new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
@@ -13,7 +13,9 @@ export type PinnedSlotSnippet = {
   dealPriceVnd: number
 }
 
-export function ShopeeWebChat({ session }: { session: Session | null }) {
+export function ShopeeWebChat({ session, activeRole }: { session: Session | null; activeRole?: PortalRole }) {
+  const currentRole: PortalRole = activeRole ?? (session?.activeRole as PortalRole | undefined) ?? 'Customer'
+
   const [isOpen, setIsOpen] = useState(false)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
@@ -30,16 +32,21 @@ export function ShopeeWebChat({ session }: { session: Session | null }) {
 
   const loadConversations = useCallback(() => {
     if (!session) return
-    api.chatConversations(session.accessToken)
+    api.chatConversations(session.accessToken, currentRole)
       .then(setConversations)
       .catch(() => setConversations([]))
-  }, [session])
+  }, [currentRole, session])
 
+  // When switching between Customer and Provider, isolate conversations and close open detail
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- reset selected conversation when role changes
+    setActiveConversationId(null)
+    // oxlint-disable-next-line react/set-state-in-effect -- reset selected conversation when role changes
+    setActiveDetail(null)
     if (session && isEligible) {
       loadConversations()
     }
-  }, [isEligible, loadConversations, session])
+  }, [currentRole, isEligible, loadConversations, session])
 
   const selectConversation = useCallback(async (id: string) => {
     if (!session) return
@@ -56,6 +63,21 @@ export function ShopeeWebChat({ session }: { session: Session | null }) {
       setLoading(false)
     }
   }, [session])
+
+  const handleDeleteConversation = useCallback(async (id: string, name: string) => {
+    if (!session) return
+    if (!window.confirm(`Bạn có chắc muốn xóa cuộc trò chuyện với "${name}"?`)) return
+    try {
+      await api.deleteConversation(id, session.accessToken)
+      setConversations((prev) => prev.filter((c) => c.id !== id))
+      if (activeConversationId === id) {
+        setActiveConversationId(null)
+        setActiveDetail(null)
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Không thể xóa cuộc trò chuyện.')
+    }
+  }, [activeConversationId, session])
 
   const handleMessageReceived = useCallback((msg: ChatMessage) => {
     setActiveDetail((current) => {
@@ -181,13 +203,22 @@ export function ShopeeWebChat({ session }: { session: Session | null }) {
     }
   }
 
+  // Display counterpart name depending on active role:
+  // Provider mode -> display customerName
+  // Customer mode -> display providerBusinessName
+  const conversationDisplayTitle = useCallback((c: Conversation) => {
+    if (currentRole === 'Provider') {
+      return c.customerName || 'Khách hàng'
+    }
+    return c.providerBusinessName || 'Cửa hàng đối tác'
+  }, [currentRole])
+
   // Filter conversations for P2P customer <-> partner
   const p2pConversations = conversations.filter((c) => {
-    if (!c.providerId && !c.providerBusinessName) return false
     if (unreadOnly && (c.unreadCount ?? 0) <= 0) return false
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
-      const title = (c.providerBusinessName || c.customerName || c.topic).toLowerCase()
+      const title = (currentRole === 'Provider' ? c.customerName : c.providerBusinessName || c.topic).toLowerCase()
       return title.includes(q)
     }
     return true
@@ -198,14 +229,6 @@ export function ShopeeWebChat({ session }: { session: Session | null }) {
   const roleTag = (role: string) => {
     if (role === 'Provider') return <span className="chat-message-role-tag provider">Cửa hàng</span>
     return null
-  }
-
-  const conversationDisplayTitle = (c: Conversation) => {
-    const isCustomer = session ? session.activeRole === 'Customer' || (!session.activeRole && session.user.roles.includes('Customer')) : true
-    if (isCustomer) {
-      return c.providerBusinessName || 'Cửa hàng đối tác'
-    }
-    return c.customerName || 'Khách hàng'
   }
 
   // Strictly do NOT render on public external screens for unauthenticated users!
@@ -226,7 +249,7 @@ export function ShopeeWebChat({ session }: { session: Session | null }) {
           aria-label="Mở khung chat trực tiếp Shopee"
         >
           <i className="bi bi-chat-dots-fill" />
-          <span>Chat</span>
+          <span>Chat {currentRole === 'Provider' ? '(Đối tác)' : ''}</span>
           {totalUnread > 0 && (
             <span className="chat-unread-badge">
               {totalUnread > 99 ? '99+' : totalUnread}
@@ -242,7 +265,7 @@ export function ShopeeWebChat({ session }: { session: Session | null }) {
             <div className="shopee-webchat-sidebar-header">
               <div className="d-flex align-items-center gap-2">
                 <i className="bi bi-chat-text-fill text-danger fs-5" />
-                <h3>Trò chuyện</h3>
+                <h3>Trò chuyện {currentRole === 'Provider' ? '(Đối tác)' : '(Khách)'}</h3>
                 {totalUnread > 0 && (
                   <span className="badge bg-danger rounded-pill">{totalUnread}</span>
                 )}
@@ -258,7 +281,7 @@ export function ShopeeWebChat({ session }: { session: Session | null }) {
             <div className="shopee-webchat-search">
               <input
                 type="text"
-                placeholder="Tìm kiếm đối tác, khách hàng..."
+                placeholder={currentRole === 'Provider' ? 'Tìm kiếm khách hàng...' : 'Tìm kiếm đối tác, cửa hàng...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -270,7 +293,7 @@ export function ShopeeWebChat({ session }: { session: Session | null }) {
                 className={!unreadOnly ? 'active' : ''}
                 onClick={() => setUnreadOnly(false)}
               >
-                Tất cả ({conversations.filter((c) => c.providerId || c.providerBusinessName).length})
+                Tất cả ({conversations.length})
               </button>
               <button
                 type="button"
@@ -285,6 +308,7 @@ export function ShopeeWebChat({ session }: { session: Session | null }) {
               {p2pConversations.length > 0 ? (
                 p2pConversations.map((c) => {
                   const isActive = activeConversationId === c.id
+                  const title = conversationDisplayTitle(c)
                   return (
                     <div
                       role="button"
@@ -294,12 +318,12 @@ export function ShopeeWebChat({ session }: { session: Session | null }) {
                       onClick={() => selectConversation(c.id)}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void selectConversation(c.id) }}
                     >
-                      <div className="chat-thread-avatar provider">
-                        <i className="bi bi-shop" />
+                      <div className={`chat-thread-avatar ${currentRole === 'Provider' ? 'customer' : 'provider'}`}>
+                        <i className={currentRole === 'Provider' ? 'bi bi-person-fill' : 'bi bi-shop'} />
                       </div>
                       <div className="chat-thread-info">
                         <div className="chat-thread-info-top">
-                          <b>{conversationDisplayTitle(c)}</b>
+                          <b>{title}</b>
                           <time>{formatTime(c.lastMessageAtUtc)}</time>
                         </div>
                         <p className="chat-thread-snippet">{c.lastMessageText || c.topic}</p>
@@ -307,13 +331,29 @@ export function ShopeeWebChat({ session }: { session: Session | null }) {
                       {c.unreadCount > 0 && (
                         <span className="chat-thread-badge">{c.unreadCount}</span>
                       )}
+                      <button
+                        type="button"
+                        className="chat-thread-delete-btn"
+                        title="Xóa cuộc trò chuyện"
+                        aria-label={`Xóa trò chuyện với ${title}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void handleDeleteConversation(c.id, title)
+                        }}
+                      >
+                        <i className="bi bi-trash" />
+                      </button>
                     </div>
                   )
                 })
               ) : (
                 <div className="text-center py-5 text-muted small px-3">
                   <i className="bi bi-chat-dots fs-3 d-block mb-2 text-secondary opacity-50" />
-                  <span>Chưa có hội thoại nào.<br />Bấm &ldquo;Chat với cửa hàng&rdquo; tại trang chi tiết slot để bắt đầu trò chuyện.</span>
+                  <span>
+                    {currentRole === 'Provider'
+                      ? 'Chưa có khách hàng nào nhắn tin cho cửa hàng của bạn.'
+                      : <>Chưa có hội thoại nào.<br />Bấm &ldquo;Chat với cửa hàng&rdquo; tại trang chi tiết slot để bắt đầu trò chuyện.</>}
+                  </span>
                 </div>
               )}
             </div>
@@ -329,6 +369,15 @@ export function ShopeeWebChat({ session }: { session: Session | null }) {
                     <small><i className="bi bi-dot" />Đang hoạt động</small>
                   </div>
                   <div className="shopee-webchat-controls">
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteConversation(activeDetail.conversation.id, conversationDisplayTitle(activeDetail.conversation))}
+                      title="Xóa cuộc trò chuyện này"
+                      aria-label="Xóa cuộc trò chuyện này"
+                      className="text-danger"
+                    >
+                      <i className="bi bi-trash" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => setIsOpen(false)}
@@ -389,7 +438,11 @@ export function ShopeeWebChat({ session }: { session: Session | null }) {
                   ) : (
                     <div className="empty-state py-4">
                       <i className="bi bi-chat-heart text-danger" />
-                      <p className="small mb-0">Chưa có tin nhắn nào. Hãy gửi lời chào đầu tiên tới cửa hàng!</p>
+                      <p className="small mb-0">
+                        {currentRole === 'Provider'
+                          ? 'Chưa có tin nhắn nào từ khách hàng.'
+                          : 'Chưa có tin nhắn nào. Hãy gửi lời chào đầu tiên tới cửa hàng!'}
+                      </p>
                     </div>
                   )}
                   <div ref={messagesEndRef} />
@@ -398,7 +451,7 @@ export function ShopeeWebChat({ session }: { session: Session | null }) {
                 <form className="chat-input-bar" onSubmit={sendMessage}>
                   <input
                     type="text"
-                    placeholder="Nhập tin nhắn trao đổi với cửa hàng..."
+                    placeholder={currentRole === 'Provider' ? 'Nhập tin nhắn trao đổi với khách hàng...' : 'Nhập tin nhắn trao đổi với cửa hàng...'}
                     value={messageText}
                     onChange={(e) => setMessageText(e.target.value)}
                     disabled={sending}
@@ -420,8 +473,12 @@ export function ShopeeWebChat({ session }: { session: Session | null }) {
                   />
                 </div>
                 <i className="bi bi-chat-dots-fill" />
-                <h4>Shopee Web Chat</h4>
-                <p>Chào mừng bạn đến với kênh trò chuyện trực tiếp giữa Khách hàng và Cửa hàng đối tác trên OpenSlot.</p>
+                <h4>Shopee Web Chat ({currentRole === 'Provider' ? 'Khu vực Đối tác' : 'Khu vực Khách hàng'})</h4>
+                <p>
+                  {currentRole === 'Provider'
+                    ? 'Hộp thư trực tiếp nhận phản hồi và tư vấn khách hàng đặt slot tại cửa hàng của bạn.'
+                    : 'Chào mừng bạn đến với kênh trò chuyện trực tiếp giữa Khách hàng và Cửa hàng đối tác trên OpenSlot.'}
+                </p>
                 <small className="text-muted">Chọn một cuộc trò chuyện ở danh sách bên trái hoặc nhắn tin từ trang ưu đãi của cửa hàng.</small>
               </div>
             )}

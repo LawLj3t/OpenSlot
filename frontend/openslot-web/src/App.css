@@ -76,6 +76,7 @@ footer{border-top:1px solid #edece8;padding:27px max(5vw,32px);color:#7a8492;fon
 .chat-thread-item:hover{border-color:#cbd5e1;background:#fdfefe}
 .chat-thread-avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:#e2e8f0;color:#475569;font-size:16px;flex-shrink:0}
 .chat-thread-avatar.provider{background:#e0f2fe;color:#0284c7}
+.chat-thread-avatar.customer{background:#f3e8ff;color:#9333ea}
 .chat-thread-avatar.support{background:#fef3c7;color:#d97706}
 .chat-thread-info{flex:1;min-width:0;display:grid;gap:2px}
 .chat-thread-info-top{display:flex;align-items:center;justify-content:space-between;gap:6px}
@@ -169,6 +170,9 @@ footer{border-top:1px solid #edece8;padding:27px max(5vw,32px);color:#7a8492;fon
 .shopee-webchat-thread-list{flex:1;overflow-y:auto}
 .shopee-webchat-thread{padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;border-bottom:1px solid #f8fafc;transition:background .15s}
 .shopee-webchat-thread:hover,.shopee-webchat-thread.active{background:#fff6f3}
+.chat-thread-delete-btn{opacity:0;transition:opacity .15s;background:transparent;border:0;color:#94a3b8;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.shopee-webchat-thread:hover .chat-thread-delete-btn{opacity:1}
+.chat-thread-delete-btn:hover{color:#ef4444;background:#fee2e2}
 
 .shopee-webchat-main{display:flex;flex-direction:column;background:#f8fafc;position:relative;min-width:0}
 .shopee-webchat-main-header{padding:12px 18px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between}

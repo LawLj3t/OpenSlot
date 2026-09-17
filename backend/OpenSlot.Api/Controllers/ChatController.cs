@@ -22,7 +22,9 @@ public sealed class ChatController(
     IHubContext<ChatHub> hubContext) : ControllerBase
 {
     [HttpGet("conversations")]
-    public async Task<ActionResult<IReadOnlyList<ConversationDto>>> GetConversations(CancellationToken cancellationToken)
+    public async Task<ActionResult<IReadOnlyList<ConversationDto>>> GetConversations(
+        [FromQuery] string? role,
+        CancellationToken cancellationToken)
     {
         var user = await userManager.GetUserAsync(User)
             ?? throw new ApiException("Phiên đăng nhập không hợp lệ.", StatusCodes.Status401Unauthorized);
@@ -35,7 +37,22 @@ public sealed class ChatController(
 
         IQueryable<ChatConversation> query = db.ChatConversations.AsNoTracking();
 
-        if (isStaff)
+        if (string.Equals(role, "Customer", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(x => x.CustomerId == user.Id);
+        }
+        else if (string.Equals(role, "Provider", StringComparison.OrdinalIgnoreCase))
+        {
+            if (providerProfile is not null)
+            {
+                query = query.Where(x => x.ProviderId == providerProfile.Id);
+            }
+            else
+            {
+                return Ok(Array.Empty<ConversationDto>());
+            }
+        }
+        else if (isStaff)
         {
             // Staff can see all conversations
         }
@@ -356,6 +373,25 @@ public sealed class ChatController(
         await EnsureCanAccessConversation(conversation, user.Id, roles, cancellationToken);
 
         conversation.IsClosed = true;
+        await db.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
+    [HttpDelete("conversations/{id:guid}")]
+    public async Task<IActionResult> DeleteConversation(Guid id, CancellationToken cancellationToken)
+    {
+        var user = await userManager.GetUserAsync(User)
+            ?? throw new ApiException("Phiên đăng nhập không hợp lệ.", StatusCodes.Status401Unauthorized);
+        var roles = await userManager.GetRolesAsync(user);
+
+        var conversation = await db.ChatConversations
+            .SingleOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new ApiException("Không tìm thấy cuộc trò chuyện.", StatusCodes.Status404NotFound);
+
+        await EnsureCanAccessConversation(conversation, user.Id, roles, cancellationToken);
+
+        db.ChatConversations.Remove(conversation);
         await db.SaveChangesAsync(cancellationToken);
 
         return NoContent();

@@ -345,6 +345,8 @@ export type SupportTicket = {
   category: string
   senderEmail: string
   content: string
+  attachmentFileName?: string | null
+  attachmentData?: string | null
   status: number
   resolutionNote?: string | null
   resolvedByName?: string | null

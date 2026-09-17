@@ -181,6 +181,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(x => x.Category).HasMaxLength(120).IsRequired();
             entity.Property(x => x.SenderEmail).HasMaxLength(160).IsRequired();
             entity.Property(x => x.Content).HasMaxLength(4000).IsRequired();
+            entity.Property(x => x.AttachmentFileName).HasMaxLength(260);
+            entity.Property(x => x.AttachmentData);
             entity.Property(x => x.ResolutionNote).HasMaxLength(4000);
             entity.Property(x => x.ResolvedByName).HasMaxLength(120);
             entity.HasIndex(x => x.Status);
