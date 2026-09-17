@@ -130,9 +130,9 @@ export function HelpCenterPage() {
       a: 'Bạn chỉ cần đăng nhập tài khoản khách hàng và nhấp vào mục "Lịch của tôi" trên thanh điều hướng đầu trang. Toàn bộ các slot sắp diễn ra, mã QR, mã PIN và lịch sử các đơn đã hoàn thành hoặc đã hủy đều được hiển thị đầy đủ.'
     },
     {
-      q: 'Cách thức nhắn tin trao đổi trực tiếp với cửa hàng (Shopee Web Chat)?',
+      q: 'Cách thức nhắn tin trao đổi trực tiếp với cửa hàng (OpenSlot Web Chat)?',
       category: 'customer',
-      a: 'Tại trang chi tiết slot bất kỳ, bạn nhấp vào nút "Chat với cửa hàng" hoặc bấm vào biểu tượng Chat nổi góc dưới bên phải màn hình. Khung chat 2 cột Shopee Web Chat sẽ mở ra cho phép bạn hỏi thông tin dịch vụ trước khi quyết định đặt chỗ.'
+      a: 'Tại trang chi tiết slot bất kỳ, bạn nhấp vào nút "Chat với cửa hàng" hoặc bấm vào biểu tượng Chat nổi góc dưới bên phải màn hình. Khung chat 2 cột OpenSlot Web Chat sẽ mở ra cho phép bạn hỏi thông tin dịch vụ trước khi quyết định đặt chỗ.'
     },
 
     // Account & Security

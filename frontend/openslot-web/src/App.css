@@ -47,13 +47,13 @@ footer{border-top:1px solid #edece8;padding:27px max(5vw,32px);color:#7a8492;fon
 @media(max-width:650px){.application-page{padding-top:32px;padding-bottom:48px}.application-intro,.provider-application-form{padding:24px}.provider-approval-banner{align-items:flex-start;flex-wrap:wrap}.manager-catalog .provider-form{grid-template-columns:1fr}.manager-catalog .provider-form .btn{justify-self:start}}
 .payment-page{min-height:calc(100vh - 150px);padding-top:42px;padding-bottom:76px}.payment-layout{width:min(100%,920px);display:grid;grid-template-columns:minmax(0,1.1fr) minmax(290px,.9fr);gap:22px;margin:20px auto 0}.payment-card,.payment-summary{border:1px solid var(--line);border-radius:18px;background:#fff}.payment-card{padding:30px}.payment-card h1{margin:5px 0 8px;color:var(--navy);font-size:30px;font-weight:800;letter-spacing:-1px}.payment-copy{margin:0;color:#657287;line-height:1.6}.payment-qr{display:flex;justify-content:center;align-items:center;margin:23px 0 20px;padding:12px;border:1px solid #e1e6ec;border-radius:14px;background:#f8fafc}.payment-qr img{display:block;max-width:100%;height:auto;border-radius:8px}.bank-details{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:15px}.bank-details div{display:grid;gap:4px;padding:11px;border:1px solid var(--line);border-radius:10px;background:#fcfcfb}.bank-details span{color:#7d8998;font-size:11px}.bank-details b{color:var(--navy);font-size:13px}.payment-demo-note{display:flex;gap:9px;align-items:flex-start;margin:0 0 15px;padding:12px;border:1px solid #f3d7a2;border-radius:10px;background:#fff8e8;color:#775919;font-size:12px;line-height:1.5}.payment-demo-note i{font-size:16px}.payment-summary{align-self:start;padding:25px;background:#fffaf7}.payment-summary h2{margin:4px 0 18px;color:var(--navy);font-size:20px;font-weight:800}.payment-summary>p:not(.eyebrow){margin:0 0 11px;color:#627187;font-size:13px}.payment-summary>p i{width:19px;color:var(--coral)}.payment-summary hr{margin:20px 0;border:0;border-top:1px solid var(--line)}.payment-summary>div{display:flex;justify-content:space-between;align-items:center;margin-top:10px;color:#718096;font-size:13px}.payment-summary del{color:#8994a2}.payment-summary .payment-total{padding-top:10px;border-top:1px dashed #d6dde5;color:var(--navy);font-weight:700}.payment-summary .payment-total strong{color:#d95e42;font-size:20px}@media(max-width:750px){.payment-layout{grid-template-columns:1fr}.bank-details{grid-template-columns:1fr}.payment-card{padding:22px}.payment-page{padding-top:30px}}
 
-/* Shopee-style Customer Service Chat Widget */
-.shopee-chat-trigger{position:fixed;bottom:24px;right:24px;z-index:1050;display:flex;align-items:center;gap:9px;padding:10px 18px;border-radius:999px;background:linear-gradient(135deg,#ff5722,#f43f5e);color:#fff;border:0;font-weight:700;font-size:14px;box-shadow:0 8px 24px rgba(244,63,94,0.38);cursor:pointer;transition:transform .18s,box-shadow .18s}
-.shopee-chat-trigger:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(244,63,94,0.48)}
-.shopee-chat-trigger i{font-size:17px}
+/* OpenSlot Customer Service & Direct P2P Chat Widget */
+.openslot-chat-trigger,.shopee-chat-trigger{position:fixed;bottom:24px;right:24px;z-index:1050;display:flex;align-items:center;gap:9px;padding:10px 18px;border-radius:999px;background:linear-gradient(135deg,#ff5722,#f43f5e);color:#fff;border:0;font-weight:700;font-size:14px;box-shadow:0 8px 24px rgba(244,63,94,0.38);cursor:pointer;transition:transform .18s,box-shadow .18s}
+.openslot-chat-trigger:hover,.shopee-chat-trigger:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(244,63,94,0.48)}
+.openslot-chat-trigger i,.shopee-chat-trigger i{font-size:17px}
 .chat-unread-badge{display:grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:#fff;color:#ef4444;font-size:11px;font-weight:800;line-height:1}
 
-.shopee-chat-window{position:fixed;bottom:80px;right:24px;width:390px;height:530px;max-width:calc(100vw - 32px);max-height:calc(100vh - 100px);border-radius:18px;background:#fff;border:1px solid var(--line);box-shadow:0 18px 45px rgba(20,35,55,0.22);display:flex;flex-direction:column;overflow:hidden;z-index:1050;animation:chatSlideUp .2s cubic-bezier(0.16,1,0.3,1)}
+.openslot-chat-window,.shopee-chat-window{position:fixed;bottom:80px;right:24px;width:390px;height:530px;max-width:calc(100vw - 32px);max-height:calc(100vh - 100px);border-radius:18px;background:#fff;border:1px solid var(--line);box-shadow:0 18px 45px rgba(20,35,55,0.22);display:flex;flex-direction:column;overflow:hidden;z-index:1050;animation:chatSlideUp .2s cubic-bezier(0.16,1,0.3,1)}
 @keyframes chatSlideUp{from{opacity:0;transform:translateY(18px) scale(0.96)}to{opacity:1;transform:translateY(0) scale(1)}}
 
 .chat-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--navy);color:#fff}
@@ -157,41 +157,74 @@ footer{border-top:1px solid #edece8;padding:27px max(5vw,32px);color:#7a8492;fon
 .ticket-form-card textarea{min-height:100px;resize:vertical}
 .ticket-form-disclaimer{font-size:11.5px;color:#64748b;line-height:1.5;margin:8px 0 20px}
 
-/* Shopee 2-column Split-pane Web Chat */
-.shopee-webchat-container{position:fixed;bottom:24px;right:24px;width:860px;height:580px;max-width:calc(100vw - 32px);max-height:calc(100vh - 48px);background:#fff;border-radius:16px;box-shadow:0 20px 50px rgba(15,23,42,0.22);border:1px solid var(--line);display:grid;grid-template-columns:290px 1fr;overflow:hidden;z-index:1060;animation:chatSlideUp .22s cubic-bezier(0.16,1,0.3,1)}
-.shopee-webchat-sidebar{border-right:1px solid #e2e8f0;display:flex;flex-direction:column;background:#fff;overflow:hidden}
-.shopee-webchat-sidebar-header{padding:14px 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f1f5f9}
-.shopee-webchat-sidebar-header h3{font-size:16px;font-weight:800;color:var(--navy);margin:0}
-.shopee-webchat-search{padding:8px 14px;border-bottom:1px solid #f1f5f9}
-.shopee-webchat-search input{width:100%;height:34px;padding:6px 12px;border-radius:999px;background:#f1f5f9;border:0;font-size:12px;outline:0}
-.shopee-webchat-filter-tabs{display:flex;padding:6px 14px;gap:12px;border-bottom:1px solid #f1f5f9;font-size:12px;font-weight:700}
-.shopee-webchat-filter-tabs button{background:transparent;border:0;color:#64748b;cursor:pointer;padding:4px 0}
-.shopee-webchat-filter-tabs button.active{color:var(--coral);border-bottom:2px solid var(--coral)}
-.shopee-webchat-thread-list{flex:1;overflow-y:auto}
-.shopee-webchat-thread{padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;border-bottom:1px solid #f8fafc;transition:background .15s}
-.shopee-webchat-thread:hover,.shopee-webchat-thread.active{background:#fff6f3}
+/* OpenSlot 2-column Split-pane Web Chat */
+.openslot-webchat-container,.shopee-webchat-container{position:fixed;bottom:24px;right:24px;width:860px;height:580px;max-width:calc(100vw - 32px);max-height:calc(100vh - 48px);background:#fff;border-radius:16px;box-shadow:0 20px 50px rgba(15,23,42,0.22);border:1px solid var(--line);display:grid;grid-template-columns:290px 1fr;overflow:hidden;z-index:1060;animation:chatSlideUp .22s cubic-bezier(0.16,1,0.3,1)}
+.openslot-webchat-sidebar,.shopee-webchat-sidebar{border-right:1px solid #e2e8f0;display:flex;flex-direction:column;background:#fff;overflow:hidden}
+.openslot-webchat-sidebar-header,.shopee-webchat-sidebar-header{padding:14px 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f1f5f9}
+.openslot-webchat-sidebar-header h3,.shopee-webchat-sidebar-header h3{font-size:16px;font-weight:800;color:var(--navy);margin:0}
+.openslot-webchat-search,.shopee-webchat-search{padding:8px 14px;border-bottom:1px solid #f1f5f9}
+.openslot-webchat-search input,.shopee-webchat-search input{width:100%;height:34px;padding:6px 12px;border-radius:999px;background:#f1f5f9;border:0;font-size:12px;outline:0}
+.openslot-webchat-filter-tabs,.shopee-webchat-filter-tabs{display:flex;padding:6px 14px;gap:12px;border-bottom:1px solid #f1f5f9;font-size:12px;font-weight:700}
+.openslot-webchat-filter-tabs button,.shopee-webchat-filter-tabs button{background:transparent;border:0;color:#64748b;cursor:pointer;padding:4px 0}
+.openslot-webchat-filter-tabs button.active,.shopee-webchat-filter-tabs button.active{color:var(--coral);border-bottom:2px solid var(--coral)}
+.openslot-webchat-thread-list,.shopee-webchat-thread-list{flex:1;overflow-y:auto}
+.openslot-webchat-thread,.shopee-webchat-thread{padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;border-bottom:1px solid #f8fafc;transition:background .15s;position:relative}
+.openslot-webchat-thread:hover,.openslot-webchat-thread.active,.shopee-webchat-thread:hover,.shopee-webchat-thread.active{background:#fff6f3}
+
+/* Thread action menu & delete button */
+.chat-thread-actions{position:relative;display:flex;align-items:center;margin-left:auto}
+.chat-thread-menu-btn{background:transparent;border:0;color:#94a3b8;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.chat-thread-menu-btn:hover{color:var(--navy);background:#f1f5f9}
+.chat-thread-dropdown-menu{position:absolute;top:calc(100% + 4px);right:0;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,0.16);z-index:40;min-width:175px;padding:4px 0;animation:chatSlideUp .15s ease-out}
+.chat-thread-dropdown-item{display:flex;align-items:center;width:100%;padding:8px 12px;border:0;background:transparent;font-size:12.5px;font-weight:600;text-align:left;cursor:pointer;transition:background .12s}
+.chat-thread-dropdown-item:hover{background:#fff1f2}
+
 .chat-thread-delete-btn{opacity:0;transition:opacity .15s;background:transparent;border:0;color:#94a3b8;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.shopee-webchat-thread:hover .chat-thread-delete-btn{opacity:1}
+.openslot-webchat-thread:hover .chat-thread-delete-btn,.shopee-webchat-thread:hover .chat-thread-delete-btn{opacity:1}
 .chat-thread-delete-btn:hover{color:#ef4444;background:#fee2e2}
 
-.shopee-webchat-main{display:flex;flex-direction:column;background:#f8fafc;position:relative;min-width:0}
-.shopee-webchat-main-header{padding:12px 18px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between}
-.shopee-webchat-main-header b{font-size:14.5px;color:var(--navy)}
-.shopee-webchat-main-header small{color:#10b981;font-size:11px;display:block;font-weight:600}
-.shopee-webchat-controls{display:flex;align-items:center;gap:8px}
-.shopee-webchat-controls button{background:transparent;border:0;color:#64748b;font-size:16px;cursor:pointer;padding:2px 6px;border-radius:4px}
-.shopee-webchat-controls button:hover{background:#f1f5f9;color:var(--navy)}
+.openslot-webchat-main,.shopee-webchat-main{display:flex;flex-direction:column;background:#f8fafc;position:relative;min-width:0}
+.openslot-webchat-main-header,.shopee-webchat-main-header{padding:12px 18px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between}
+.openslot-webchat-main-header b,.shopee-webchat-main-header b{font-size:14.5px;color:var(--navy)}
+.openslot-webchat-main-header small,.shopee-webchat-main-header small{color:#10b981;font-size:11px;display:block;font-weight:600}
+.openslot-webchat-controls,.shopee-webchat-controls{display:flex;align-items:center;gap:8px}
+.openslot-webchat-controls button,.shopee-webchat-controls button{background:transparent;border:0;color:#64748b;font-size:16px;cursor:pointer;padding:2px 6px;border-radius:4px}
+.openslot-webchat-controls button:hover,.shopee-webchat-controls button:hover{background:#f1f5f9;color:var(--navy)}
 
-.shopee-webchat-pinned-slot{background:#fff;border-bottom:1px solid #e2e8f0;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.shopee-webchat-pinned-slot-info{display:flex;align-items:center;gap:10px;min-width:0}
-.shopee-webchat-pinned-slot-info b{font-size:13px;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.shopee-webchat-pinned-slot-info span{font-size:11.5px;color:#64748b}
-.shopee-webchat-pinned-slot-price{color:var(--coral);font-weight:800;font-size:14px;white-space:nowrap}
+.chat-header-dropdown-menu{position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,0.16);z-index:40;min-width:180px;padding:4px 0;animation:chatSlideUp .15s ease-out}
+.chat-header-dropdown-item{display:flex;align-items:center;width:100%;padding:9px 14px;border:0;background:transparent;font-size:13px;font-weight:600;text-align:left;cursor:pointer;transition:background .12s}
+.chat-header-dropdown-item:hover{background:#fff1f2}
 
-.shopee-webchat-welcome{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;color:#64748b}
-.shopee-webchat-welcome i{font-size:64px;color:var(--coral);opacity:.85;margin-bottom:16px}
-.shopee-webchat-welcome h4{font-size:18px;font-weight:800;color:var(--navy);margin-bottom:6px}
-.shopee-webchat-welcome p{font-size:13px;max-width:320px}
+.openslot-webchat-pinned-slot,.shopee-webchat-pinned-slot{background:#fff;border-bottom:1px solid #e2e8f0;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.openslot-webchat-pinned-slot-info,.shopee-webchat-pinned-slot-info{display:flex;align-items:center;gap:10px;min-width:0}
+.openslot-webchat-pinned-slot-info b,.shopee-webchat-pinned-slot-info b{font-size:13px;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.openslot-webchat-pinned-slot-info span,.shopee-webchat-pinned-slot-info span{font-size:11.5px;color:#64748b}
+.openslot-webchat-pinned-slot-price,.shopee-webchat-pinned-slot-price{color:var(--coral);font-weight:800;font-size:14px;white-space:nowrap}
+
+/* OpenSlot Welcome Screen */
+.openslot-webchat-welcome,.shopee-webchat-welcome{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:36px 28px;color:#64748b}
+.openslot-webchat-welcome-illustration{position:relative;width:86px;height:86px;margin-bottom:18px}
+.openslot-welcome-bubble-main{width:76px;height:76px;border-radius:22px;background:linear-gradient(135deg,#ff5722 0%,#ee4d2d 45%,#f43f5e 100%);color:#fff;display:grid;place-items:center;font-size:36px;box-shadow:0 12px 28px rgba(238,77,45,0.32);animation:floatBubble 3s ease-in-out infinite}
+.openslot-welcome-bubble-secondary{position:absolute;bottom:0;right:0;width:32px;height:32px;border-radius:50%;background:#fff;color:var(--coral);border:2px solid #fff;display:grid;place-items:center;font-size:15px;box-shadow:0 4px 12px rgba(15,23,42,0.12)}
+@keyframes floatBubble{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.openslot-webchat-welcome h4,.shopee-webchat-welcome h4{font-size:19px;font-weight:800;color:var(--navy);margin-bottom:8px}
+.openslot-webchat-welcome-subtitle{font-size:13.5px;color:#475569;max-width:360px;margin-bottom:12px;line-height:1.5}
+.openslot-webchat-welcome-role-badge{display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;background:#f1f5f9;color:var(--navy);font-size:12px;font-weight:700;margin-bottom:14px}
+.openslot-webchat-welcome-hint{font-size:12px;color:#94a3b8;max-width:320px;line-height:1.5}
+
+/* Admin Category Management Enhancements */
+.category-recommend-container{margin:14px 0 20px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px}
+.category-recommend-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.category-recommend-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.category-recommend-btn{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;font-size:12px;font-weight:600;color:#334155;cursor:pointer;text-align:left;transition:all .15s}
+.category-recommend-btn:hover{background:#fff6f3;border-color:var(--coral);color:var(--coral);transform:translateY(-1px)}
+.category-recommend-btn.active{background:#fff1ee;border-color:var(--coral);color:var(--coral);box-shadow:0 2px 6px rgba(238,113,88,0.18)}
+.category-recommend-symbol{font-size:18px;line-height:1;flex-shrink:0}
+.category-recommend-info{display:flex;flex-direction:column;min-width:0}
+.category-recommend-name{font-weight:700;font-size:12px;color:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.category-recommend-note{font-size:10.5px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.icon-select-preview{display:flex;align-items:center;gap:10px}
+.icon-preview-box{width:42px;height:42px;border-radius:8px;background:#fff1ee;color:var(--coral);display:grid;place-items:center;font-size:20px;border:1px solid #fca592;flex-shrink:0}
 
 /* CSKH Dashboard */
 .cskh-status-badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800}

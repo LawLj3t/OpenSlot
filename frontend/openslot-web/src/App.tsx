@@ -10,7 +10,7 @@ import type { AdminCategory, AdminDashboard, AdminProviderDetail, AdminService, 
 import { HelpCenterPage } from './HelpCenterPage'
 import { SupportRequestPage } from './SupportRequestPage'
 import { CskhPage } from './CskhPage'
-import { ShopeeWebChat } from './ShopeeWebChat'
+import { OpenSlotWebChat } from './OpenSlotWebChat'
 import './App.css'
 import './AuthExperience.css'
 import './EmailVerification.css'
@@ -111,7 +111,7 @@ function App() {
       <Route path="*" element={<NotFoundPage />} />
     </Routes></main>
     <footer><div><b>OpenSlot</b><span>Săn thời điểm trống. Tận hưởng giá hợp lý.</span></div><small>Demo đồ án cá nhân · ASP.NET Core + React</small></footer>
-    <ShopeeWebChat session={session} activeRole={activeRole} />
+    <OpenSlotWebChat session={session} activeRole={activeRole} />
   </>
 }
 
@@ -596,6 +596,26 @@ function getResourceTypesForCategory(slugOrName?: string): string[] {
   return DEFAULT_RESOURCE_TYPES
 }
 
+function getResourceTypeSymbol(type: string): string {
+  const lower = type.toLowerCase()
+  if (lower.includes('sân') || lower.includes('bóng') || lower.includes('vợt')) return '🏸'
+  if (lower.includes('tập') || lower.includes('gym')) return '🏋️'
+  if (lower.includes('bida') || lower.includes('bi-a')) return '🎱'
+  if (lower.includes('massage') || lower.includes('spa')) return '💆'
+  if (lower.includes('gội') || lower.includes('tóc')) return '💇'
+  if (lower.includes('móng') || lower.includes('nail')) return '💅'
+  if (lower.includes('làm việc') || lower.includes('ghế')) return '💻'
+  if (lower.includes('họp') || lower.includes('phòng riêng')) return '🚪'
+  if (lower.includes('bàn') || lower.includes('ngồi') || lower.includes('ăn')) return '🍽️'
+  if (lower.includes('karaoke') || lower.includes('hát')) return '🎤'
+  if (lower.includes('game') || lower.includes('chơi')) return '🎮'
+  if (lower.includes('studio') || lower.includes('ảnh') || lower.includes('phim')) return '📸'
+  if (lower.includes('podcast') || lower.includes('thu âm')) return '🎙️'
+  if (lower.includes('thời gian') || lower.includes('slot')) return '⏱️'
+  if (lower.includes('thiết bị') || lower.includes('máy')) return '🛠️'
+  return '🏷️'
+}
+
 function ResourceForm({ token, venues, services, categories, onDone, onError }: { token: string; venues: ProviderVenue[]; services: ProviderService[]; categories: Category[]; onDone: () => void; onError: (message: string) => void }) {
   const [venueId, setVenueId] = useState(''); const [serviceId, setServiceId] = useState(''); const [categorySlug, setCategorySlug] = useState(''); const [name, setName] = useState(''); const [resourceType, setResourceType] = useState(''); const [code, setCode] = useState(''); const [floorOrZone, setFloorOrZone] = useState(''); const [positionDescription, setPositionDescription] = useState(''); const [maxCapacity, setMaxCapacity] = useState('1'); const [saving, setSaving] = useState(false)
   const availableServices = services.filter((s) => !venueId || s.venueId === venueId)
@@ -620,7 +640,10 @@ function ResourceForm({ token, venues, services, categories, onDone, onError }: 
       <div className="resource-suggestions-row">
         <small className="form-hint me-1">Gợi ý:</small>
         {recommendedTypes.map((type) => (
-          <button type="button" key={type} className={`resource-tag-pill ${resourceType === type ? 'active' : ''}`} onClick={() => setResourceType(type)}>{type}</button>
+          <button type="button" key={type} className={`resource-tag-pill ${resourceType === type ? 'active' : ''}`} onClick={() => setResourceType(type)}>
+            <span className="me-1">{getResourceTypeSymbol(type)}</span>
+            {type}
+          </button>
         ))}
       </div>
     </label>
@@ -706,12 +729,63 @@ function ProviderDetailPanel({ detail, onClose }: { detail: AdminProviderDetail;
   return <section className="provider-detail-panel" aria-live="polite"><div className="provider-detail-heading"><div><p className="eyebrow">Chi tiết đối tác</p><h2>{detail.businessName}</h2><p>{detail.ownerName} · {detail.ownerEmail} · {detail.contactPhone}</p></div><button className="btn btn-outline-secondary btn-sm" onClick={onClose}><i className="bi bi-x-lg" /> Đóng</button></div>{detail.description && <p className="provider-detail-description">{detail.description}</p>}<div className="detail-stat-grid"><article><small>Địa điểm</small><b>{detail.summary.venueCount}</b></article><article><small>Đơn vị đặt chỗ</small><b>{detail.summary.resourceCount}</b></article><article><small>Dịch vụ</small><b>{detail.summary.serviceCount}</b></article><article><small>Slot đang mở</small><b>{detail.summary.publishedSlotCount}</b></article><article><small>Lượt đã đặt</small><b>{detail.summary.bookingCount}</b></article></div><div className="detail-section"><h3>Địa điểm và đơn vị nhận đặt chỗ</h3>{detail.venues.length ? <div className="detail-venue-grid">{detail.venues.map((venue) => <article key={venue.id}><b><i className="bi bi-geo-alt" /> {venue.name}</b><span>{venue.addressLine}, {venue.district}, {venue.city}</span>{venue.resources.length ? <ul>{venue.resources.map((resource) => <li key={resource.id}><strong>{resource.name}</strong>{resource.code && ` · ${resource.code}`}{resource.floorOrZone && ` · ${resource.floorOrZone}`}<small>{resource.resourceType}{resource.positionDescription ? ` · ${resource.positionDescription}` : ''} · tối đa {resource.maxCapacity} chỗ</small></li>)}</ul> : <em>Chưa khai báo đơn vị đặt chỗ.</em>}</article>)}</div> : <p className="section-note">Đối tác chưa có địa điểm.</p>}</div><div className="detail-section"><h3>Dịch vụ đang khai báo</h3>{detail.services.length ? <div className="detail-list">{detail.services.map((service) => <article key={service.id}><div><b>{service.name}</b><span>{service.categoryName} · {service.venueName}</span></div><strong>{formatMoney(service.basePriceVnd)}</strong><span className={`status-pill ${service.isActive ? '' : 'provider-status status-2'}`}>{service.isActive ? 'Đang hoạt động' : 'Đang ẩn'}</span></article>)}</div> : <p className="section-note">Chưa có dịch vụ.</p>}</div><div className="detail-section"><h3>30 slot gần nhất</h3>{detail.slots.length ? <div className="detail-list">{detail.slots.map((slot) => <article key={slot.id}><div><b>{slot.serviceName}</b><span>{slot.venueName}{slot.resourceName ? ` · ${slot.resourceName}${slot.resourceCode ? ` (${slot.resourceCode})` : ''}` : ''} · {formatSlotWindow(slot.startAtUtc, slot.endAtUtc)}</span></div><strong>{formatMoney(slot.dealPriceVnd)}</strong><span className="status-pill">{slotStatus(slot.status)} · {slot.confirmedBookingCount}/{slot.capacity}</span></article>)}</div> : <p className="section-note">Chưa có slot nào.</p>}</div></section>
 }
 
+const RECOMMENDED_CATEGORY_TAGS = [
+  { name: 'Thể thao & Sân bãi', iconName: 'trophy', symbol: '🏸', serviceTypes: 'Sân cầu lông, Pickleball, Bóng đá, Tennis' },
+  { name: 'Làm đẹp & Spa', iconName: 'sparkles', symbol: '💅', serviceTypes: 'Nail, Nối mi, Gội đầu dưỡng sinh, Spa massage' },
+  { name: 'Không gian làm việc', iconName: 'laptop', symbol: '💻', serviceTypes: 'Coworking, Phòng họp, Bàn làm việc' },
+  { name: 'Studio & Nghệ thuật', iconName: 'camera', symbol: '📸', serviceTypes: 'Chụp ảnh cưới/concept, Quay phim, Podcast' },
+  { name: 'Giải trí & Trò chơi', iconName: 'joystick', symbol: '🎮', serviceTypes: 'Bàn bida, Gaming zone, Boardgame' },
+  { name: 'Ăn uống & Cà phê', iconName: 'cup-hot', symbol: '☕', serviceTypes: 'Quán cafe, Đặt bàn ẩm thực, Trà chiều' },
+  { name: 'Sức khỏe & Thể hình', iconName: 'heart-pulse', symbol: '💪', serviceTypes: 'Phòng gym, Yoga, Pilates, Trị liệu' },
+  { name: 'Âm nhạc & Karaoke', iconName: 'mic', symbol: '🎤', serviceTypes: 'Phòng karaoke mini, Phòng luyện thanh' },
+  { name: 'Giáo dục & Kỹ năng', iconName: 'book', symbol: '📚', serviceTypes: 'Phòng học nhóm, Workshop, Lớp học ngắn hạn' },
+  { name: 'Dịch vụ kỹ thuật', iconName: 'tools', symbol: '🚗', serviceTypes: 'Rửa xe, Giặt ủi công nghiệp, Sửa chữa' }
+]
+
+const CATEGORY_ICON_DEFINITIONS = [
+  { value: 'tag', symbol: '🏷️', label: 'Danh mục chung', note: 'Dịch vụ đa năng, tổng hợp' },
+  { value: 'trophy', symbol: '🏸', label: 'Thể thao & Sân bãi', note: 'Sân cầu lông, Pickleball, Bóng đá' },
+  { value: 'sparkles', symbol: '💅', label: 'Làm đẹp & Spa', note: 'Nail, Mi, Gội đầu, Massage' },
+  { value: 'laptop', symbol: '💻', label: 'Không gian làm việc', note: 'Coworking, Phòng họp, Bàn việc' },
+  { value: 'camera', symbol: '📸', label: 'Studio & Nhiếp ảnh', note: 'Chụp ảnh, Quay podcast, Phim' },
+  { value: 'joystick', symbol: '🎮', label: 'Giải trí & Trò chơi', note: 'Bida, Game PS5, Board game' },
+  { value: 'cup-hot', symbol: '☕', label: 'Ăn uống & Cà phê', note: 'Quán cafe, Nhà hàng, Đặt bàn' },
+  { value: 'heart-pulse', symbol: '💓', label: 'Sức khỏe & Thể thao', note: 'Gym, Yoga, Pilates' },
+  { value: 'mic', symbol: '🎤', label: 'Âm nhạc & Karaoke', note: 'Phòng hát, Nhạc cụ, Thu âm' },
+  { value: 'book', symbol: '📚', label: 'Học tập & Giáo dục', note: 'Phòng học nhóm, Workshop' },
+  { value: 'tools', symbol: '🛠️', label: 'Kỹ thuật & Tiện ích', note: 'Rửa xe, Giặt sấy, Sửa chữa' }
+]
+
 function CategoryManagementPanel({ token, isAdmin }: { token: string; isAdmin?: boolean }) {
-  const [categories, setCategories] = useState<AdminCategory[]>([]); const [name, setName] = useState(''); const [iconName, setIconName] = useState('tag'); const [error, setError] = useState(''); const [message, setMessage] = useState('')
+  const [categories, setCategories] = useState<AdminCategory[]>([])
+  const [name, setName] = useState('')
+  const [iconName, setIconName] = useState('tag')
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const refresh = () => { api.adminCategories(token).then(setCategories).catch((e: Error) => setError(e.message)) }
   useEffect(refresh, [token])
-  const create = async (event: React.FormEvent) => { event.preventDefault(); setError(''); try { await api.createAdminCategory({ name, iconName }, token); setName(''); setIconName('tag'); setMessage('Đã tạo danh mục để Provider lựa chọn khi đăng dịch vụ.'); refresh() } catch (e) { setError(e instanceof Error ? e.message : 'Không thể tạo danh mục.') } }
-  const toggle = async (category: AdminCategory) => { try { await api.setAdminCategoryActive(category.id, !category.isActive, token); setMessage(`Đã ${category.isActive ? 'tạm ngưng' : 'mở lại'} danh mục ${category.name}.`); refresh() } catch (e) { setError(e instanceof Error ? e.message : 'Không thể cập nhật danh mục.') } }
+  const create = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setError('')
+    try {
+      await api.createAdminCategory({ name, iconName }, token)
+      setName('')
+      setIconName('tag')
+      setMessage('Đã tạo danh mục để Provider lựa chọn khi đăng dịch vụ.')
+      refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể tạo danh mục.')
+    }
+  }
+  const toggle = async (category: AdminCategory) => {
+    try {
+      await api.setAdminCategoryActive(category.id, !category.isActive, token)
+      setMessage(`Đã ${category.isActive ? 'tạm ngưng' : 'mở lại'} danh mục ${category.name}.`)
+      refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể cập nhật danh mục.')
+    }
+  }
   const remove = async (category: AdminCategory) => {
     if (!window.confirm(`Xóa danh mục "${category.name}"? Danh mục chỉ có thể xóa khi chưa có dịch vụ nào liên kết.`)) return
     try {
@@ -722,8 +796,111 @@ function CategoryManagementPanel({ token, isAdmin }: { token: string; isAdmin?: 
       setError(e instanceof Error ? e.message : 'Không thể xóa danh mục.')
     }
   }
-  const icons = ['tag', 'trophy', 'sparkles', 'laptop', 'camera', 'joystick', 'tools', 'cup-hot', 'heart-pulse']
-  return <section className="catalog-panel manager-catalog"><div className="admin-section-title"><div><p className="eyebrow">Danh mục toàn nền tảng</p><h2>Nhóm dịch vụ do Manager quản lý</h2></div><span className="section-note">Provider tự tạo dịch vụ cụ thể và chọn một danh mục phù hợp.</span></div><form onSubmit={create} className="provider-form catalog-form"><h3>Tạo danh mục mới</h3><label>Tên danh mục<input required minLength={2} maxLength={80} value={name} onChange={(e) => setName(e.target.value)} placeholder="Ví dụ: Ăn uống" /></label><label>Biểu tượng<select value={iconName} onChange={(e) => setIconName(e.target.value)}>{icons.map((icon) => <option value={icon} key={icon}>{icon}</option>)}</select></label><button className="btn btn-primary rounded-pill">Thêm danh mục</button></form>{error && <div className="alert alert-danger mt-3">{error}</div>}{message && <div className="alert alert-success mt-3">{message}</div>}<div className="resource-list">{categories.map((category) => <article className={!category.isActive ? 'inactive' : ''} key={category.id}><div><b><i className={`bi bi-${category.iconName}`} /> {category.name}</b><span>{category.slug} · {category.serviceCount} dịch vụ đang phân loại</span></div><div className="category-actions"><button onClick={() => toggle(category)} className={`btn btn-sm ${category.isActive ? 'btn-outline-danger' : 'btn-outline-success'}`}>{category.isActive ? 'Tạm ngưng' : 'Mở lại'}</button>{isAdmin && <button onClick={() => remove(category)} disabled={category.serviceCount > 0} title={category.serviceCount > 0 ? 'Không thể xóa danh mục đang có dịch vụ liên kết' : 'Xóa danh mục'} className="btn btn-sm btn-outline-danger">Xóa</button>}</div></article>)}</div></section>
+
+  return (
+    <section className="catalog-panel manager-catalog">
+      <div className="admin-section-title">
+        <div>
+          <p className="eyebrow">Danh mục toàn nền tảng</p>
+          <h2>Nhóm dịch vụ do Manager quản lý</h2>
+        </div>
+        <span className="section-note">Provider tự tạo dịch vụ cụ thể và chọn một danh mục phù hợp.</span>
+      </div>
+
+      <form onSubmit={create} className="provider-form catalog-form">
+        <h3>Tạo danh mục mới</h3>
+        <label>
+          Tên danh mục
+          <input
+            required
+            minLength={2}
+            maxLength={80}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ví dụ: Ăn uống, Thể thao & Sân bãi..."
+          />
+        </label>
+        <label>
+          <span>Biểu tượng hiển thị</span>
+          <div className="icon-select-preview">
+            <span className="icon-preview-box" title={`Biểu tượng Bootstrap: bi-${iconName}`}>
+              <i className={`bi bi-${iconName}`} />
+            </span>
+            <select value={iconName} onChange={(e) => setIconName(e.target.value)}>
+              {CATEGORY_ICON_DEFINITIONS.map((icon) => (
+                <option value={icon.value} key={icon.value}>
+                  {icon.symbol} {icon.value} — {icon.label} ({icon.note})
+                </option>
+              ))}
+            </select>
+          </div>
+        </label>
+        <button className="btn btn-primary rounded-pill">Thêm danh mục</button>
+      </form>
+
+      {/* Recommended Tag Presets with Service Symbols */}
+      <div className="category-recommend-container">
+        <div className="category-recommend-title">
+          <i className="bi bi-tags-fill text-danger" />
+          <span>Gợi ý danh mục phổ biến (nhấp để chọn nhanh tên và biểu tượng phù hợp):</span>
+        </div>
+        <div className="category-recommend-grid">
+          {RECOMMENDED_CATEGORY_TAGS.map((tag) => (
+            <button
+              type="button"
+              key={tag.name}
+              className={`category-recommend-btn ${name === tag.name ? 'active' : ''}`}
+              onClick={() => {
+                setName(tag.name)
+                setIconName(tag.iconName)
+              }}
+              title={`Áp dụng cho: ${tag.serviceTypes}`}
+            >
+              <span className="category-recommend-symbol">{tag.symbol}</span>
+              <div className="category-recommend-info">
+                <span className="category-recommend-name">{tag.name}</span>
+                <span className="category-recommend-note">{tag.serviceTypes}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {error && <div className="alert alert-danger mt-3">{error}</div>}
+      {message && <div className="alert alert-success mt-3">{message}</div>}
+
+      <div className="resource-list">
+        {categories.map((category) => (
+          <article className={!category.isActive ? 'inactive' : ''} key={category.id}>
+            <div>
+              <b>
+                <i className={`bi bi-${category.iconName}`} /> {category.name}
+              </b>
+              <span>{category.slug} · {category.serviceCount} dịch vụ đang phân loại</span>
+            </div>
+            <div className="category-actions">
+              <button
+                onClick={() => toggle(category)}
+                className={`btn btn-sm ${category.isActive ? 'btn-outline-danger' : 'btn-outline-success'}`}
+              >
+                {category.isActive ? 'Tạm ngưng' : 'Mở lại'}
+              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => remove(category)}
+                  disabled={category.serviceCount > 0}
+                  title={category.serviceCount > 0 ? 'Không thể xóa danh mục đang có dịch vụ liên kết' : 'Xóa danh mục'}
+                  className="btn btn-sm btn-outline-danger"
+                >
+                  Xóa
+                </button>
+              )}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
 }
 
 function NotificationsPage({ session }: { session: Session }) {
