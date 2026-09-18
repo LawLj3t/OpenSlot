@@ -8,6 +8,7 @@ using OpenSlot.Api.Domain;
 using OpenSlot.Api.Domain.Entities;
 using OpenSlot.Api.Domain.Enums;
 using OpenSlot.Api.Infrastructure;
+using OpenSlot.Api.Realtime;
 using OpenSlot.Api.Services;
 
 namespace OpenSlot.Api.Controllers;
@@ -15,7 +16,7 @@ namespace OpenSlot.Api.Controllers;
 [Authorize(Roles = RoleNames.Provider)]
 [ApiController]
 [Route("api/provider/slots")]
-public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
+public sealed class ProviderSlotsController(AppDbContext db, ISlotAvailabilityNotifier? availabilityNotifier = null) : ControllerBase
 {
     [HttpGet("services")]
     public async Task<IActionResult> GetMyServices(CancellationToken cancellationToken)
@@ -48,6 +49,7 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
         var slots = await db.DealSlots
             .AsNoTracking()
             .Include(x => x.ServiceOffering).ThenInclude(x => x.Venue).ThenInclude(x => x.ProviderProfile)
+            .Include(x => x.ServiceOffering).ThenInclude(x => x.Category)
             .Include(x => x.BookableResource)
             .Where(x => x.ServiceOffering.Venue.ProviderProfile.UserId == UserId)
             .OrderByDescending(x => x.StartAtUtc)
@@ -55,9 +57,14 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
             {
                 x.Id,
                 serviceName = x.ServiceOffering.Name,
+                categoryName = x.ServiceOffering.Category.Name,
                 venueName = x.ServiceOffering.Venue.Name,
+                venueAddress = x.ServiceOffering.Venue.AddressLine + ", " + x.ServiceOffering.Venue.District + ", " + x.ServiceOffering.Venue.City,
                 resourceName = x.BookableResource != null ? x.BookableResource.Name : "Chưa xác định",
                 resourceCode = x.BookableResource != null ? x.BookableResource.Code : null,
+                resourceType = x.BookableResource != null ? x.BookableResource.ResourceType : null,
+                floorOrZone = x.BookableResource != null ? x.BookableResource.FloorOrZone : null,
+                positionDescription = x.BookableResource != null ? x.BookableResource.PositionDescription : null,
                 x.StartAtUtc,
                 x.EndAtUtc,
                 x.BookingOpensAtUtc,
@@ -67,7 +74,9 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
                 x.Capacity,
                 x.ConfirmedBookingCount,
                 activeHoldCount = db.SlotHolds.Count(hold => hold.DealSlotId == x.Id && hold.Status == SlotHoldStatus.Active && hold.ExpiresAtUtc > now),
-                x.Status
+                x.Status,
+                x.CreatedAtUtc,
+                x.PublishedAtUtc
             })
             .ToListAsync(cancellationToken);
         return Ok(slots);
@@ -149,6 +158,17 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
         slot.ConcurrencyToken = Guid.NewGuid();
         db.AuditLogs.Add(CreateAudit("slot.published", nameof(DealSlot), slot.Id.ToString()));
         await db.SaveChangesAsync(cancellationToken);
+        if (availabilityNotifier != null)
+        {
+            await availabilityNotifier.PublishAsync(
+                new SlotAvailabilityUpdate(
+                    slot.Id,
+                    SlotAvailabilityPolicy.RemainingCapacity(slot.Capacity, slot.ConfirmedBookingCount, 0),
+                    slot.Capacity,
+                    slot.Status,
+                    "slot-published"),
+                cancellationToken);
+        }
         return Ok(new { slot.Id, slot.Status, slot.PublishedAtUtc });
     }
 
@@ -181,7 +201,14 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
 
         if (slot.BookingClosesAtUtc <= now)
         {
-            throw new ApiException("Slot đã quá thời gian mở bán.");
+            slot.BookingClosesAtUtc = slot.StartAtUtc > now.AddMinutes(15)
+                ? slot.StartAtUtc.AddMinutes(-15)
+                : slot.StartAtUtc;
+        }
+
+        if (slot.BookingOpensAtUtc > now)
+        {
+            slot.BookingOpensAtUtc = now;
         }
 
         if (slot.BookableResourceId.HasValue)
@@ -205,6 +232,17 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
         slot.ConcurrencyToken = Guid.NewGuid();
         db.AuditLogs.Add(CreateAudit("slot.republished", nameof(DealSlot), slot.Id.ToString()));
         await db.SaveChangesAsync(cancellationToken);
+        if (availabilityNotifier != null)
+        {
+            await availabilityNotifier.PublishAsync(
+                new SlotAvailabilityUpdate(
+                    slot.Id,
+                    SlotAvailabilityPolicy.RemainingCapacity(slot.Capacity, slot.ConfirmedBookingCount, 0),
+                    slot.Capacity,
+                    slot.Status,
+                    "slot-republished"),
+                cancellationToken);
+        }
         return Ok(new { slot.Id, slot.Status, slot.PublishedAtUtc });
     }
 
@@ -263,6 +301,17 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
         slot.ConcurrencyToken = Guid.NewGuid();
         db.AuditLogs.Add(CreateAudit("slot.cancelled", nameof(DealSlot), slot.Id.ToString()));
         await db.SaveChangesAsync(cancellationToken);
+        if (availabilityNotifier != null)
+        {
+            await availabilityNotifier.PublishAsync(
+                new SlotAvailabilityUpdate(
+                    slot.Id,
+                    0,
+                    slot.Capacity,
+                    slot.Status,
+                    "slot-cancelled"),
+                cancellationToken);
+        }
         return NoContent();
     }
 

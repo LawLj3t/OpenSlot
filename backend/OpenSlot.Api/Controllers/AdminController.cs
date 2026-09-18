@@ -9,6 +9,7 @@ using OpenSlot.Api.Domain;
 using OpenSlot.Api.Domain.Enums;
 using OpenSlot.Api.Domain.Entities;
 using OpenSlot.Api.Infrastructure;
+using OpenSlot.Api.Realtime;
 using OpenSlot.Api.Services;
 
 namespace OpenSlot.Api.Controllers;
@@ -16,7 +17,7 @@ namespace OpenSlot.Api.Controllers;
 [Authorize(Roles = RoleNames.ManagerOrAdmin)]
 [ApiController]
 [Route("api/admin")]
-public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser> userManager) : ControllerBase
+public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser> userManager, ISlotAvailabilityNotifier? availabilityNotifier = null) : ControllerBase
 {
     [HttpGet("users")]
     public async Task<IActionResult> Users(CancellationToken cancellationToken)
@@ -293,6 +294,17 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
         db.AuditLogs.Add(new() { ActorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier), Action = "slot.admin-cancelled", EntityType = nameof(DealSlot), EntityId = slot.Id.ToString() });
         db.Notifications.Add(new Notification { UserId = slot.ServiceOffering.Venue.ProviderProfile.UserId, Title = "Slot bị quản trị viên hủy", Message = $"Slot {slot.ServiceOffering.Name} đã bị hủy sau kiểm duyệt.", Link = "/provider" });
         await db.SaveChangesAsync(cancellationToken);
+        if (availabilityNotifier != null)
+        {
+            await availabilityNotifier.PublishAsync(
+                new SlotAvailabilityUpdate(
+                    slot.Id,
+                    0,
+                    slot.Capacity,
+                    slot.Status,
+                    "slot-cancelled"),
+                cancellationToken);
+        }
         return NoContent();
     }
 
@@ -301,6 +313,7 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
     {
         var cancelledCount = 0;
         var skipped = new List<string>();
+        var cancelledSlots = new List<DealSlot>();
         foreach (var id in request.Ids.Distinct())
         {
             var slot = await db.DealSlots
@@ -331,9 +344,24 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
                 Message = $"Slot {slot.ServiceOffering.Name} đã bị hủy sau kiểm duyệt.",
                 Link = "/provider"
             });
+            cancelledSlots.Add(slot);
             cancelledCount++;
         }
         await db.SaveChangesAsync(cancellationToken);
+        if (availabilityNotifier != null)
+        {
+            foreach (var s in cancelledSlots)
+            {
+                await availabilityNotifier.PublishAsync(
+                    new SlotAvailabilityUpdate(
+                        s.Id,
+                        0,
+                        s.Capacity,
+                        s.Status,
+                        "slot-cancelled"),
+                    cancellationToken);
+            }
+        }
         return Ok(new { cancelledCount, skippedCount = skipped.Count, skipped });
     }
 
@@ -343,6 +371,21 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
         var (success, error) = await TryReopenSlotInternalAsync(slotId, cancellationToken);
         if (!success) throw new ApiException(error ?? "Không thể mở lại slot.", StatusCodes.Status400BadRequest);
         await db.SaveChangesAsync(cancellationToken);
+        if (availabilityNotifier != null)
+        {
+            var slot = await db.DealSlots.AsNoTracking().FirstOrDefaultAsync(x => x.Id == slotId, cancellationToken);
+            if (slot != null)
+            {
+                await availabilityNotifier.PublishAsync(
+                    new SlotAvailabilityUpdate(
+                        slot.Id,
+                        SlotAvailabilityPolicy.RemainingCapacity(slot.Capacity, slot.ConfirmedBookingCount, 0),
+                        slot.Capacity,
+                        slot.Status,
+                        "slot-reopened"),
+                    cancellationToken);
+            }
+        }
         return NoContent();
     }
 
@@ -351,13 +394,33 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
     {
         var reopenedCount = 0;
         var skipped = new List<string>();
+        var reopenedIds = new List<Guid>();
         foreach (var id in request.Ids.Distinct())
         {
             var (success, error) = await TryReopenSlotInternalAsync(id, cancellationToken);
-            if (success) reopenedCount++;
+            if (success)
+            {
+                reopenedCount++;
+                reopenedIds.Add(id);
+            }
             else if (!string.IsNullOrWhiteSpace(error)) skipped.Add(error);
         }
         await db.SaveChangesAsync(cancellationToken);
+        if (availabilityNotifier != null && reopenedIds.Count > 0)
+        {
+            var reopenedSlots = await db.DealSlots.AsNoTracking().Where(x => reopenedIds.Contains(x.Id)).ToListAsync(cancellationToken);
+            foreach (var slot in reopenedSlots)
+            {
+                await availabilityNotifier.PublishAsync(
+                    new SlotAvailabilityUpdate(
+                        slot.Id,
+                        SlotAvailabilityPolicy.RemainingCapacity(slot.Capacity, slot.ConfirmedBookingCount, 0),
+                        slot.Capacity,
+                        slot.Status,
+                        "slot-reopened"),
+                    cancellationToken);
+            }
+        }
         return Ok(new { reopenedCount, skippedCount = skipped.Count, skipped });
     }
 
@@ -996,7 +1059,14 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
 
         if (slot.BookingClosesAtUtc <= now)
         {
-            return (false, "Slot đã quá thời gian đóng đăng ký.");
+            slot.BookingClosesAtUtc = slot.StartAtUtc > now.AddMinutes(15)
+                ? slot.StartAtUtc.AddMinutes(-15)
+                : slot.StartAtUtc;
+        }
+
+        if (slot.BookingOpensAtUtc > now)
+        {
+            slot.BookingOpensAtUtc = now;
         }
 
         if (!slot.ServiceOffering.IsActive)

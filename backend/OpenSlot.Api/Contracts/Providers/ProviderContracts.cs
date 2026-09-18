@@ -39,4 +39,5 @@ public sealed class UpsertBookableResourceRequest
     [MaxLength(100)] public string? FloorOrZone { get; init; }
     [MaxLength(255)] public string? PositionDescription { get; init; }
     [Range(1, 100)] public int MaxCapacity { get; init; }
+    public bool? IsActive { get; init; }
 }

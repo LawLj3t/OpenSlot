@@ -105,11 +105,49 @@ public sealed class ProviderProfileController(AppDbContext db) : ControllerBase
         if (code is not null && await db.BookableResources.AnyAsync(x => x.VenueId == venue.Id && x.Code == code, cancellationToken))
             throw new ApiException("Mã đơn vị này đã tồn tại tại địa điểm.", StatusCodes.Status409Conflict);
 
-        var resource = new BookableResource { VenueId = venue.Id };
+        var resource = new BookableResource { VenueId = venue.Id, IsActive = request.IsActive ?? true };
         MapResource(resource, request, code);
         db.BookableResources.Add(resource);
         await db.SaveChangesAsync(cancellationToken);
         return Created(string.Empty, new { resource.Id });
+    }
+
+    [HttpPut("resources/{id:guid}")]
+    public async Task<IActionResult> UpdateResource(Guid id, UpsertBookableResourceRequest request, CancellationToken cancellationToken)
+    {
+        await EnsureCanConfigure(cancellationToken);
+        var resource = await db.BookableResources.Include(x => x.Venue).ThenInclude(x => x.ProviderProfile).SingleOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new ApiException("Không tìm thấy đơn vị đặt chỗ.", StatusCodes.Status404NotFound);
+        EnsureOwner(resource.Venue.ProviderProfile.UserId);
+
+        var venue = await db.Venues.Include(x => x.ProviderProfile).SingleOrDefaultAsync(x => x.Id == request.VenueId, cancellationToken)
+            ?? throw new ApiException("Không tìm thấy địa điểm.", StatusCodes.Status404NotFound);
+        EnsureOwner(venue.ProviderProfile.UserId);
+
+        var code = string.IsNullOrWhiteSpace(request.Code) ? null : request.Code.Trim().ToUpperInvariant();
+        if (code is not null && await db.BookableResources.AnyAsync(x => x.VenueId == venue.Id && x.Code == code && x.Id != id, cancellationToken))
+            throw new ApiException("Mã đơn vị này đã tồn tại tại địa điểm.", StatusCodes.Status409Conflict);
+
+        resource.VenueId = venue.Id;
+        MapResource(resource, request, code);
+        if (request.IsActive.HasValue)
+        {
+            resource.IsActive = request.IsActive.Value;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("resources/{id:guid}/activate")]
+    public async Task<IActionResult> ActivateResource(Guid id, CancellationToken cancellationToken)
+    {
+        await EnsureCanConfigure(cancellationToken);
+        var resource = await db.BookableResources.Include(x => x.Venue).ThenInclude(x => x.ProviderProfile).SingleOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new ApiException("Không tìm thấy đơn vị đặt chỗ.", StatusCodes.Status404NotFound);
+        EnsureOwner(resource.Venue.ProviderProfile.UserId);
+        resource.IsActive = true;
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
     }
 
     [HttpPost("resources/{id:guid}/deactivate")]
@@ -231,6 +269,6 @@ public sealed class ProviderProfileController(AppDbContext db) : ControllerBase
     private void EnsureOwner(string ownerId) { if (ownerId != UserId) throw new ApiException("Bạn không có quyền quản lý dữ liệu này.", StatusCodes.Status403Forbidden); }
     private static void MapVenue(Venue venue, UpsertVenueRequest request) { venue.Name = request.Name.Trim(); venue.AddressLine = request.AddressLine.Trim(); venue.District = request.District.Trim(); venue.City = request.City.Trim(); venue.Latitude = request.Latitude; venue.Longitude = request.Longitude; }
     private static void MapService(ServiceOffering service, UpsertServiceRequest request) { service.VenueId = request.VenueId; service.CategoryId = request.CategoryId; service.Name = request.Name.Trim(); service.Description = request.Description?.Trim(); service.BasePriceVnd = request.BasePriceVnd; service.ImageUrl = request.ImageUrl?.Trim(); }
-    private static void MapResource(BookableResource resource, UpsertBookableResourceRequest request, string? code) { resource.Name = request.Name.Trim(); resource.ResourceType = request.ResourceType.Trim(); resource.Code = code; resource.FloorOrZone = string.IsNullOrWhiteSpace(request.FloorOrZone) ? null : request.FloorOrZone.Trim(); resource.PositionDescription = string.IsNullOrWhiteSpace(request.PositionDescription) ? null : request.PositionDescription.Trim(); resource.MaxCapacity = request.MaxCapacity; resource.IsActive = true; }
+    private static void MapResource(BookableResource resource, UpsertBookableResourceRequest request, string? code) { resource.Name = request.Name.Trim(); resource.ResourceType = request.ResourceType.Trim(); resource.Code = code; resource.FloorOrZone = string.IsNullOrWhiteSpace(request.FloorOrZone) ? null : request.FloorOrZone.Trim(); resource.PositionDescription = string.IsNullOrWhiteSpace(request.PositionDescription) ? null : request.PositionDescription.Trim(); resource.MaxCapacity = request.MaxCapacity; }
     private string UserId => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new ApiException("Phiên đăng nhập không hợp lệ.", StatusCodes.Status401Unauthorized);
 }

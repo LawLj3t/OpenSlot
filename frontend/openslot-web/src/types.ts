@@ -147,9 +147,14 @@ export type MyProviderProfile = {
 export type ProviderSlot = {
   id: string
   serviceName: string
+  categoryName?: string
   venueName: string
+  venueAddress?: string
   resourceName: string
   resourceCode: string | null
+  resourceType?: string | null
+  floorOrZone?: string | null
+  positionDescription?: string | null
   startAtUtc: string
   endAtUtc: string
   bookingOpensAtUtc: string
@@ -160,6 +165,8 @@ export type ProviderSlot = {
   confirmedBookingCount: number
   activeHoldCount: number
   status: number
+  createdAtUtc?: string
+  publishedAtUtc?: string | null
 }
 
 export type ProviderProfile = {
