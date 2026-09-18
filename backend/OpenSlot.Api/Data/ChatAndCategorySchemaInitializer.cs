@@ -64,6 +64,8 @@ public static class ChatAndCategorySchemaInitializer
                 "LastMessageAtUtc" TEXT NOT NULL,
                 "CreatedAtUtc" TEXT NOT NULL,
                 "IsClosed" INTEGER NOT NULL DEFAULT 0,
+                "IsDeletedByCustomer" INTEGER NOT NULL DEFAULT 0,
+                "IsDeletedByProvider" INTEGER NOT NULL DEFAULT 0,
                 CONSTRAINT "FK_ChatConversations_AspNetUsers_CustomerId" FOREIGN KEY ("CustomerId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE,
                 CONSTRAINT "FK_ChatConversations_ProviderProfiles_ProviderId" FOREIGN KEY ("ProviderId") REFERENCES "ProviderProfiles" ("Id") ON DELETE SET NULL
             );
@@ -112,6 +114,8 @@ public static class ChatAndCategorySchemaInitializer
 
         try { await db.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""SupportTickets"" ADD COLUMN ""AttachmentFileName"" TEXT NULL;", cancellationToken); } catch { }
         try { await db.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""SupportTickets"" ADD COLUMN ""AttachmentData"" TEXT NULL;", cancellationToken); } catch { }
+        try { await db.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""ChatConversations"" ADD COLUMN ""IsDeletedByCustomer"" INTEGER NOT NULL DEFAULT 0;", cancellationToken); } catch { }
+        try { await db.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""ChatConversations"" ADD COLUMN ""IsDeletedByProvider"" INTEGER NOT NULL DEFAULT 0;", cancellationToken); } catch { }
     }
 
     private static async Task EnsurePostgreSqlAsync(AppDbContext db, CancellationToken cancellationToken)
@@ -131,6 +135,8 @@ public static class ChatAndCategorySchemaInitializer
                 "LastMessageAtUtc" timestamp with time zone NOT NULL,
                 "CreatedAtUtc" timestamp with time zone NOT NULL,
                 "IsClosed" boolean NOT NULL DEFAULT FALSE,
+                "IsDeletedByCustomer" boolean NOT NULL DEFAULT FALSE,
+                "IsDeletedByProvider" boolean NOT NULL DEFAULT FALSE,
                 CONSTRAINT "PK_ChatConversations" PRIMARY KEY ("Id"),
                 CONSTRAINT "FK_ChatConversations_AspNetUsers_CustomerId"
                     FOREIGN KEY ("CustomerId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE,
@@ -182,6 +188,8 @@ public static class ChatAndCategorySchemaInitializer
             );
             ALTER TABLE "SupportTickets" ADD COLUMN IF NOT EXISTS "AttachmentFileName" character varying(260) NULL;
             ALTER TABLE "SupportTickets" ADD COLUMN IF NOT EXISTS "AttachmentData" text NULL;
+            ALTER TABLE "ChatConversations" ADD COLUMN IF NOT EXISTS "IsDeletedByCustomer" boolean NOT NULL DEFAULT FALSE;
+            ALTER TABLE "ChatConversations" ADD COLUMN IF NOT EXISTS "IsDeletedByProvider" boolean NOT NULL DEFAULT FALSE;
             CREATE INDEX IF NOT EXISTS "IX_SupportTickets_Status" ON "SupportTickets" ("Status");
             CREATE INDEX IF NOT EXISTS "IX_SupportTickets_CreatedAtUtc" ON "SupportTickets" ("CreatedAtUtc");
             CREATE INDEX IF NOT EXISTS "IX_SupportTickets_SenderEmail" ON "SupportTickets" ("SenderEmail");

@@ -70,6 +70,44 @@ public sealed class SupportTicketsController(
         return Created($"/api/support-tickets/{ticket.Id}", ToDto(ticket));
     }
 
+    [Authorize]
+    [HttpGet("mine")]
+    public async Task<ActionResult<IReadOnlyCollection<SupportTicketDto>>> GetMine(CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+
+        var tickets = await db.SupportTickets
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Select(x => ToDto(x))
+            .ToListAsync(cancellationToken);
+
+        return Ok(tickets);
+    }
+
+    [Authorize]
+    [HttpGet("mine/{id:guid}")]
+    public async Task<ActionResult<SupportTicketDto>> GetMineById(Guid id, CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+
+        var ticket = await db.SupportTickets
+            .AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Id == id && x.UserId == userId, cancellationToken)
+            ?? throw new ApiException("Không tìm thấy yêu cầu hỗ trợ.", StatusCodes.Status404NotFound);
+
+        return Ok(ToDto(ticket));
+    }
+
     [Authorize(Roles = RoleNames.CskhOrManagerOrAdmin)]
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<SupportTicketDto>>> GetAll(
@@ -158,18 +196,19 @@ public sealed class SupportTicketsController(
         {
             var notifTitle = "CSKH đã phản hồi yêu cầu hỗ trợ";
             var notifMessage = $"Yêu cầu '{ticket.Category}' của bạn đã được {resolverName} phản hồi: \"{resolutionNote}\"";
+            var notifLink = $"/help?ticketId={ticket.Id}";
             db.Notifications.Add(new Notification
             {
                 UserId = ticket.UserId,
                 Title = notifTitle,
                 Message = notifMessage,
-                Link = "/help"
+                Link = notifLink
             });
             await availabilityNotifier.PublishNotificationAsync(
                 ticket.UserId,
                 notifTitle,
                 notifMessage,
-                "/help",
+                notifLink,
                 CancellationToken.None);
         }
 

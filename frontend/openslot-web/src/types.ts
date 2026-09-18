@@ -294,6 +294,8 @@ export type AdminSlot = {
   venueName: string
   providerName: string
   startAtUtc: string
+  endAtUtc?: string
+  bookingClosesAtUtc?: string
   capacity: number
   confirmedBookingCount: number
   status: number

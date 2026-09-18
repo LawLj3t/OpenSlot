@@ -39,13 +39,13 @@ public sealed class ChatController(
 
         if (string.Equals(role, "Customer", StringComparison.OrdinalIgnoreCase))
         {
-            query = query.Where(x => x.CustomerId == user.Id);
+            query = query.Where(x => x.CustomerId == user.Id && !x.IsDeletedByCustomer);
         }
         else if (string.Equals(role, "Provider", StringComparison.OrdinalIgnoreCase))
         {
             if (providerProfile is not null)
             {
-                query = query.Where(x => x.ProviderId == providerProfile.Id);
+                query = query.Where(x => x.ProviderId == providerProfile.Id && !x.IsDeletedByProvider);
             }
             else
             {
@@ -59,12 +59,12 @@ public sealed class ChatController(
         else if (providerProfile is not null)
         {
             // Provider sees conversations for their shop OR where they are customer
-            query = query.Where(x => x.ProviderId == providerProfile.Id || x.CustomerId == user.Id);
+            query = query.Where(x => (x.ProviderId == providerProfile.Id && !x.IsDeletedByProvider) || (x.CustomerId == user.Id && !x.IsDeletedByCustomer));
         }
         else
         {
             // Customer only sees their conversations
-            query = query.Where(x => x.CustomerId == user.Id);
+            query = query.Where(x => x.CustomerId == user.Id && !x.IsDeletedByCustomer);
         }
 
         var conversations = await query
@@ -158,6 +158,8 @@ public sealed class ChatController(
         {
             conversation.LastMessageText = request.InitialMessage.Trim();
             conversation.LastMessageAtUtc = DateTime.UtcNow;
+            conversation.IsDeletedByCustomer = false;
+            conversation.IsDeletedByProvider = false;
         }
 
         var senderRole = DetermineSenderRole(user, roles, providerId);
@@ -229,6 +231,25 @@ public sealed class ChatController(
             ?? throw new ApiException("Không tìm thấy cuộc trò chuyện.", StatusCodes.Status404NotFound);
 
         await EnsureCanAccessConversation(conversation, user.Id, roles, cancellationToken);
+
+        var isStaff = roles.Contains(RoleNames.Admin) || roles.Contains(RoleNames.Manager);
+        if (!isStaff)
+        {
+            if (conversation.CustomerId == user.Id && conversation.IsDeletedByCustomer)
+            {
+                throw new ApiException("Không tìm thấy cuộc trò chuyện.", StatusCodes.Status404NotFound);
+            }
+            if (conversation.ProviderId.HasValue && conversation.IsDeletedByProvider)
+            {
+                var isProviderOwner = await db.ProviderProfiles.AnyAsync(
+                    x => x.Id == conversation.ProviderId.Value && x.UserId == user.Id,
+                    cancellationToken);
+                if (isProviderOwner)
+                {
+                    throw new ApiException("Không tìm thấy cuộc trò chuyện.", StatusCodes.Status404NotFound);
+                }
+            }
+        }
 
         var messages = await db.ChatMessages
             .AsNoTracking()
@@ -302,6 +323,8 @@ public sealed class ChatController(
 
         conversation.LastMessageText = message.Content;
         conversation.LastMessageAtUtc = message.SentAtUtc;
+        conversation.IsDeletedByCustomer = false;
+        conversation.IsDeletedByProvider = false;
 
         db.ChatMessages.Add(message);
         await db.SaveChangesAsync(cancellationToken);
@@ -391,7 +414,37 @@ public sealed class ChatController(
 
         await EnsureCanAccessConversation(conversation, user.Id, roles, cancellationToken);
 
-        db.ChatConversations.Remove(conversation);
+        var isStaff = roles.Contains(RoleNames.Admin) || roles.Contains(RoleNames.Manager);
+        var isCustomer = conversation.CustomerId == user.Id;
+        var isProvider = false;
+        if (conversation.ProviderId.HasValue)
+        {
+            isProvider = await db.ProviderProfiles.AnyAsync(
+                x => x.Id == conversation.ProviderId.Value && x.UserId == user.Id,
+                cancellationToken);
+        }
+
+        if (isStaff)
+        {
+            db.ChatConversations.Remove(conversation);
+        }
+        else
+        {
+            if (isCustomer)
+            {
+                conversation.IsDeletedByCustomer = true;
+            }
+            if (isProvider)
+            {
+                conversation.IsDeletedByProvider = true;
+            }
+
+            if (conversation.IsDeletedByCustomer && (conversation.IsDeletedByProvider || conversation.ProviderId == null))
+            {
+                db.ChatConversations.Remove(conversation);
+            }
+        }
+
         await db.SaveChangesAsync(cancellationToken);
 
         return NoContent();

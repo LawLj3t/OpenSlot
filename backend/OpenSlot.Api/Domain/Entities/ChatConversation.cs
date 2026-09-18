@@ -12,6 +12,8 @@ public sealed class ChatConversation
     public DateTime LastMessageAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public bool IsClosed { get; set; }
+    public bool IsDeletedByCustomer { get; set; }
+    public bool IsDeletedByProvider { get; set; }
 
     public ApplicationUser Customer { get; set; } = null!;
     public ProviderProfile? Provider { get; set; }

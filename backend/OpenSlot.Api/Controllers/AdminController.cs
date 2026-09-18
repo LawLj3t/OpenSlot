@@ -57,6 +57,32 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
     [HttpPost("users/{userId}/revoke-manager")]
     public Task<IActionResult> RevokeManager(string userId, CancellationToken cancellationToken) => SetManagerRole(userId, false, cancellationToken);
 
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpDelete("users/{userId}")]
+    public async Task<IActionResult> DeleteUser(string userId, CancellationToken cancellationToken)
+    {
+        var (success, error) = await TryDeleteUserInternalAsync(userId, cancellationToken);
+        if (!success) throw new ApiException(error ?? "Không thể xóa tài khoản.", StatusCodes.Status400BadRequest);
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpPost("users/bulk-delete")]
+    public async Task<IActionResult> BulkDeleteUsers(BulkIdsRequest<string> request, CancellationToken cancellationToken)
+    {
+        var deletedCount = 0;
+        var skipped = new List<string>();
+        foreach (var id in request.Ids.Distinct())
+        {
+            var (success, error) = await TryDeleteUserInternalAsync(id, cancellationToken);
+            if (success) deletedCount++;
+            else if (!string.IsNullOrWhiteSpace(error)) skipped.Add(error);
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new { deletedCount, skippedCount = skipped.Count, skipped });
+    }
+
     [HttpGet("dashboard")]
     public async Task<IActionResult> Dashboard(CancellationToken cancellationToken)
     {
@@ -221,11 +247,37 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
         return Ok(new { updatedCount });
     }
 
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpDelete("services/{serviceId:guid}")]
+    public async Task<IActionResult> DeleteService(Guid serviceId, CancellationToken cancellationToken)
+    {
+        var (success, error) = await TryDeleteServiceInternalAsync(serviceId, cancellationToken);
+        if (!success) throw new ApiException(error ?? "Không thể xóa dịch vụ.", StatusCodes.Status400BadRequest);
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpPost("services/bulk-delete")]
+    public async Task<IActionResult> BulkDeleteServices(BulkIdsRequest<Guid> request, CancellationToken cancellationToken)
+    {
+        var deletedCount = 0;
+        var skipped = new List<string>();
+        foreach (var id in request.Ids.Distinct())
+        {
+            var (success, error) = await TryDeleteServiceInternalAsync(id, cancellationToken);
+            if (success) deletedCount++;
+            else if (!string.IsNullOrWhiteSpace(error)) skipped.Add(error);
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new { deletedCount, skippedCount = skipped.Count, skipped });
+    }
+
     [HttpGet("slots")]
     public async Task<IActionResult> Slots(CancellationToken cancellationToken) => Ok(await db.DealSlots.AsNoTracking()
         .Include(x => x.ServiceOffering).ThenInclude(x => x.Venue).ThenInclude(x => x.ProviderProfile)
         .OrderByDescending(x => x.StartAtUtc).Take(200)
-        .Select(x => new { x.Id, serviceName = x.ServiceOffering.Name, venueName = x.ServiceOffering.Venue.Name, providerName = x.ServiceOffering.Venue.ProviderProfile.BusinessName, x.StartAtUtc, x.Capacity, x.ConfirmedBookingCount, x.Status })
+        .Select(x => new { x.Id, serviceName = x.ServiceOffering.Name, venueName = x.ServiceOffering.Venue.Name, providerName = x.ServiceOffering.Venue.ProviderProfile.BusinessName, x.StartAtUtc, x.EndAtUtc, x.BookingClosesAtUtc, x.Capacity, x.ConfirmedBookingCount, x.Status })
         .ToListAsync(cancellationToken));
 
     [HttpPost("slots/{slotId:guid}/cancel")]
@@ -283,6 +335,30 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
         }
         await db.SaveChangesAsync(cancellationToken);
         return Ok(new { cancelledCount, skippedCount = skipped.Count, skipped });
+    }
+
+    [HttpPost("slots/{slotId:guid}/reopen")]
+    public async Task<IActionResult> ReopenSlot(Guid slotId, CancellationToken cancellationToken)
+    {
+        var (success, error) = await TryReopenSlotInternalAsync(slotId, cancellationToken);
+        if (!success) throw new ApiException(error ?? "Không thể mở lại slot.", StatusCodes.Status400BadRequest);
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("slots/bulk-reopen")]
+    public async Task<IActionResult> BulkReopenSlots(BulkIdsRequest<Guid> request, CancellationToken cancellationToken)
+    {
+        var reopenedCount = 0;
+        var skipped = new List<string>();
+        foreach (var id in request.Ids.Distinct())
+        {
+            var (success, error) = await TryReopenSlotInternalAsync(id, cancellationToken);
+            if (success) reopenedCount++;
+            else if (!string.IsNullOrWhiteSpace(error)) skipped.Add(error);
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new { reopenedCount, skippedCount = skipped.Count, skipped });
     }
 
     [HttpPost("providers/{providerId:guid}/approve")]
@@ -721,5 +797,258 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
         db.Notifications.Add(new Notification { UserId = service.Venue.ProviderProfile.UserId, Title = active ? "Dịch vụ đã được mở lại" : "Dịch vụ bị tạm ẩn", Message = $"Dịch vụ {service.Name} đã được quản trị viên cập nhật trạng thái.", Link = "/provider" });
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+
+    private async Task<(bool Success, string? Error)> TryDeleteUserInternalAsync(string userId, CancellationToken cancellationToken)
+    {
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId == currentUserId)
+        {
+            return (false, "Admin không thể tự xóa tài khoản của chính mình.");
+        }
+
+        var user = await db.Users
+            .Include(u => u.ProviderProfile)
+            .SingleOrDefaultAsync(x => x.Id == userId, cancellationToken);
+
+        if (user == null)
+        {
+            return (false, "Không tìm thấy người dùng.");
+        }
+
+        var targetRoles = await userManager.GetRolesAsync(user);
+        if (targetRoles.Contains(RoleNames.Admin))
+        {
+            return (false, "Không thể xóa tài khoản Admin.");
+        }
+
+        var activeCustomerBookings = await db.Bookings.CountAsync(b =>
+            b.CustomerUserId == userId &&
+            (b.Status == BookingStatus.Confirmed || b.Status == BookingStatus.CheckedIn),
+            cancellationToken);
+
+        if (activeCustomerBookings > 0)
+        {
+            return (false, $"Tài khoản “{user.DisplayName}” còn {activeCustomerBookings} booking đang hoạt động.");
+        }
+
+        var now = DateTime.UtcNow;
+        var activeCustomerHolds = await db.SlotHolds.CountAsync(h =>
+            h.CustomerUserId == userId &&
+            h.Status == SlotHoldStatus.Active &&
+            h.ExpiresAtUtc > now,
+            cancellationToken);
+
+        if (activeCustomerHolds > 0)
+        {
+            return (false, $"Tài khoản “{user.DisplayName}” đang có phiên giữ chỗ thanh toán.");
+        }
+
+        if (user.ProviderProfile != null)
+        {
+            var providerId = user.ProviderProfile.Id;
+            var providerActiveBookings = await db.Bookings.CountAsync(b =>
+                b.DealSlot.ServiceOffering.Venue.ProviderProfileId == providerId &&
+                (b.Status == BookingStatus.Confirmed || b.Status == BookingStatus.CheckedIn),
+                cancellationToken);
+
+            if (providerActiveBookings > 0)
+            {
+                return (false, $"Tài khoản đối tác “{user.DisplayName}” còn {providerActiveBookings} booking của khách hàng đang hoạt động.");
+            }
+
+            var providerActiveHolds = await db.SlotHolds.CountAsync(h =>
+                h.DealSlot.ServiceOffering.Venue.ProviderProfileId == providerId &&
+                h.Status == SlotHoldStatus.Active &&
+                h.ExpiresAtUtc > now,
+                cancellationToken);
+
+            if (providerActiveHolds > 0)
+            {
+                return (false, $"Tài khoản đối tác “{user.DisplayName}” đang có khách hàng giữ chỗ thanh toán.");
+            }
+
+            user.ProviderProfile.Status = ProviderStatus.Deleted;
+            var slotsToCancel = await db.DealSlots
+                .Where(s => s.ServiceOffering.Venue.ProviderProfileId == providerId &&
+                            (s.Status == DealSlotStatus.Published || s.Status == DealSlotStatus.Draft))
+                .ToListAsync(cancellationToken);
+            foreach (var s in slotsToCancel)
+            {
+                s.Status = DealSlotStatus.Cancelled;
+                s.ConcurrencyToken = Guid.NewGuid();
+            }
+        }
+
+        var result = await userManager.DeleteAsync(user);
+        if (!result.Succeeded)
+        {
+            return (false, "Không thể xóa người dùng: " + string.Join("; ", result.Errors.Select(e => e.Description)));
+        }
+
+        db.AuditLogs.Add(new AuditLog
+        {
+            ActorUserId = currentUserId,
+            Action = "user.deleted",
+            EntityType = "ApplicationUser",
+            EntityId = userId,
+            Metadata = user.Email
+        });
+
+        return (true, null);
+    }
+
+    private async Task<(bool Success, string? Error)> TryDeleteServiceInternalAsync(Guid serviceId, CancellationToken cancellationToken)
+    {
+        var service = await db.ServiceOfferings
+            .Include(x => x.Venue).ThenInclude(v => v.ProviderProfile)
+            .Include(x => x.DealSlots)
+            .SingleOrDefaultAsync(x => x.Id == serviceId, cancellationToken);
+
+        if (service == null) return (false, "Không tìm thấy dịch vụ.");
+
+        var activeBookingsCount = await db.Bookings.CountAsync(b =>
+            b.DealSlot.ServiceOfferingId == serviceId &&
+            (b.Status == BookingStatus.Confirmed || b.Status == BookingStatus.CheckedIn),
+            cancellationToken);
+
+        if (activeBookingsCount > 0)
+        {
+            return (false, $"Dịch vụ “{service.Name}” còn {activeBookingsCount} booking đang hoạt động.");
+        }
+
+        var now = DateTime.UtcNow;
+        var activeHoldsCount = await db.SlotHolds.CountAsync(h =>
+            h.DealSlot.ServiceOfferingId == serviceId &&
+            h.Status == SlotHoldStatus.Active &&
+            h.ExpiresAtUtc > now,
+            cancellationToken);
+
+        if (activeHoldsCount > 0)
+        {
+            return (false, $"Dịch vụ “{service.Name}” đang có khách hàng giữ chỗ thanh toán.");
+        }
+
+        var futureSlots = service.DealSlots
+            .Where(s => s.Status is DealSlotStatus.Published or DealSlotStatus.Draft)
+            .ToList();
+        foreach (var s in futureSlots)
+        {
+            s.Status = DealSlotStatus.Cancelled;
+            s.ConcurrencyToken = Guid.NewGuid();
+        }
+
+        var hasHistoricalBookings = await db.Bookings.AnyAsync(b => b.DealSlot.ServiceOfferingId == serviceId, cancellationToken);
+        if (hasHistoricalBookings)
+        {
+            service.IsActive = false;
+        }
+        else
+        {
+            db.DealSlots.RemoveRange(service.DealSlots);
+            db.ServiceOfferings.Remove(service);
+        }
+
+        db.AuditLogs.Add(new AuditLog
+        {
+            ActorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
+            Action = "service.deleted",
+            EntityType = nameof(ServiceOffering),
+            EntityId = service.Id.ToString(),
+            Metadata = service.Name
+        });
+
+        if (service.Venue?.ProviderProfile?.UserId != null)
+        {
+            db.Notifications.Add(new Notification
+            {
+                UserId = service.Venue.ProviderProfile.UserId,
+                Title = "Dịch vụ đã bị xóa",
+                Message = $"Dịch vụ “{service.Name}” đã bị xóa bởi quản trị viên hệ thống.",
+                Link = "/provider"
+            });
+        }
+
+        return (true, null);
+    }
+
+    private async Task<(bool Success, string? Error)> TryReopenSlotInternalAsync(Guid slotId, CancellationToken cancellationToken)
+    {
+        var slot = await db.DealSlots
+            .Include(x => x.ServiceOffering)
+                .ThenInclude(s => s.Venue)
+                    .ThenInclude(v => v.ProviderProfile)
+            .Include(x => x.BookableResource)
+            .SingleOrDefaultAsync(x => x.Id == slotId, cancellationToken);
+
+        if (slot == null) return (false, "Không tìm thấy slot.");
+
+        if (slot.Status != DealSlotStatus.Cancelled)
+        {
+            return (false, $"Chỉ có thể mở lại slot đã bị hủy (trạng thái hiện tại: {slot.Status}).");
+        }
+
+        var now = DateTime.UtcNow;
+        if (slot.StartAtUtc <= now)
+        {
+            return (false, "Không thể mở lại slot trong quá khứ.");
+        }
+
+        if (slot.BookingClosesAtUtc <= now)
+        {
+            return (false, "Slot đã quá thời gian đóng đăng ký.");
+        }
+
+        if (!slot.ServiceOffering.IsActive)
+        {
+            return (false, "Dịch vụ liên kết đang bị ẩn.");
+        }
+
+        if (slot.ServiceOffering.Venue.ProviderProfile.Status != ProviderStatus.Approved)
+        {
+            return (false, "Hồ sơ đối tác chưa được duyệt hoặc đang bị khóa.");
+        }
+
+        if (slot.BookableResource != null && !slot.BookableResource.IsActive)
+        {
+            return (false, "Đơn vị đặt chỗ (sân/bàn/phòng) của slot đang bị vô hiệu hóa.");
+        }
+
+        if (slot.BookableResourceId.HasValue)
+        {
+            var conflict = await db.DealSlots.AnyAsync(x =>
+                x.Id != slotId &&
+                x.BookableResourceId == slot.BookableResourceId &&
+                x.Status != DealSlotStatus.Cancelled &&
+                x.Status != DealSlotStatus.Expired &&
+                x.StartAtUtc < slot.EndAtUtc &&
+                x.EndAtUtc > slot.StartAtUtc,
+                cancellationToken);
+            if (conflict)
+            {
+                return (false, "Đã có slot khác trùng khung giờ trên đơn vị đặt chỗ này.");
+            }
+        }
+
+        slot.Status = DealSlotStatus.Published;
+        slot.ConcurrencyToken = Guid.NewGuid();
+
+        db.AuditLogs.Add(new AuditLog
+        {
+            ActorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
+            Action = "slot.admin-reopened",
+            EntityType = nameof(DealSlot),
+            EntityId = slot.Id.ToString()
+        });
+
+        db.Notifications.Add(new Notification
+        {
+            UserId = slot.ServiceOffering.Venue.ProviderProfile.UserId,
+            Title = "Slot đã được mở lại",
+            Message = $"Slot “{slot.ServiceOffering.Name}” lúc {slot.StartAtUtc:dd/MM/yyyy HH:mm} đã được mở lại bởi ban quản trị.",
+            Link = "/provider"
+        });
+
+        return (true, null);
     }
 }

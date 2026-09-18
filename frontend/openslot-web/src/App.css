@@ -284,6 +284,13 @@ footer{border-top:1px solid #edece8;padding:27px max(5vw,32px);color:#7a8492;fon
 .cskh-modal-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.6);display:grid;place-items:center;padding:20px;z-index:1100}
 .cskh-modal-body{width:100%;max-width:580px;background:#fff;border-radius:16px;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,0.3);position:relative}
 
+.confirm-modal-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.6);display:grid;place-items:center;padding:20px;z-index:1200}
+.confirm-modal-body{width:100%;max-width:480px;background:#fff;border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3);position:relative;animation:confirmModalIn .15s ease-out}
+.confirm-modal-header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:12px}
+.confirm-modal-icon-title{display:flex;align-items:center}
+.confirm-modal-footer{border-top:1px solid var(--line);padding-top:16px}
+@keyframes confirmModalIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+
 @media(max-width:768px){
   .shopee-webchat-container{grid-template-columns:1fr}
   .help-categories-grid{grid-template-columns:repeat(2,1fr)}

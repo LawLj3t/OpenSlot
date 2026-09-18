@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from './api'
+import { ConfirmModal } from './ConfirmModal'
 import { useChatRealtime } from './realtime'
 import type { ChatMessage, Conversation, ConversationDetail, PortalRole, Session } from './types'
 
@@ -28,6 +29,8 @@ export function OpenSlotWebChat({ session, activeRole }: { session: Session | nu
   const [pinnedSlot, setPinnedSlot] = useState<PinnedSlotSnippet | null>(null)
   const [threadMenuId, setThreadMenuId] = useState<string | null>(null)
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
   const isEligible = Boolean(session && (session.user.roles.includes('Customer') || session.user.roles.includes('Provider')))
@@ -68,22 +71,30 @@ export function OpenSlotWebChat({ session, activeRole }: { session: Session | nu
     }
   }, [session])
 
-  const handleDeleteConversation = useCallback(async (id: string, name: string) => {
+  const handleDeleteConversation = useCallback((id: string, name: string) => {
     if (!session) return
     setThreadMenuId(null)
     setHeaderMenuOpen(false)
-    if (!window.confirm(`Bạn có chắc muốn xóa cuộc trò chuyện với "${name}"? Toàn bộ lịch sử tin nhắn sẽ bị xóa vĩnh viễn.`)) return
+    setDeleteTarget({ id, name })
+  }, [session])
+
+  const confirmDeleteConversation = async () => {
+    if (!session || !deleteTarget) return
+    setDeleteLoading(true)
     try {
-      await api.deleteConversation(id, session.accessToken)
-      setConversations((prev) => prev.filter((c) => c.id !== id))
-      if (activeConversationId === id) {
+      await api.deleteConversation(deleteTarget.id, session.accessToken)
+      setConversations((prev) => prev.filter((c) => c.id !== deleteTarget.id))
+      if (activeConversationId === deleteTarget.id) {
         setActiveConversationId(null)
         setActiveDetail(null)
       }
+      setDeleteTarget(null)
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Không thể xóa cuộc trò chuyện.')
+    } finally {
+      setDeleteLoading(false)
     }
-  }, [activeConversationId, session])
+  }
 
   const handleMessageReceived = useCallback((msg: ChatMessage) => {
     setActiveDetail((current) => {
@@ -577,6 +588,18 @@ export function OpenSlotWebChat({ session, activeRole }: { session: Session | nu
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        title="Xóa cuộc trò chuyện"
+        message={`Bạn có chắc muốn xóa cuộc trò chuyện với "${deleteTarget?.name}"? Cuộc trò chuyện này sẽ được ẩn khỏi danh sách của bạn và chỉ xuất hiện lại khi có tin nhắn mới.`}
+        confirmText="Xóa cuộc trò chuyện"
+        cancelText="Hủy bỏ"
+        variant="danger"
+        loading={deleteLoading}
+        onConfirm={confirmDeleteConversation}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </>
   )
 }

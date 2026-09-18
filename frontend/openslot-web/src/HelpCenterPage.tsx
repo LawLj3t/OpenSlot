@@ -1,5 +1,7 @@
-import { useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { useState, useEffect, useCallback } from 'react'
+import { NavLink, useSearchParams } from 'react-router-dom'
+import { api } from './api'
+import type { Session, SupportTicket } from './types'
 
 function normalizeVi(str: string): string {
   return str
@@ -11,10 +13,69 @@ function normalizeVi(str: string): string {
     .trim()
 }
 
-export function HelpCenterPage() {
+export function HelpCenterPage({ session }: { session?: Session | null }) {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [expandedFaqIndex, setExpandedFaqIndex] = useState<number | null>(null)
+
+  const [viewingTicket, setViewingTicket] = useState<SupportTicket | null>(null)
+  const [loadingTicket, setLoadingTicket] = useState(false)
+  const [ticketError, setTicketError] = useState('')
+
+  const [myTickets, setMyTickets] = useState<SupportTicket[]>([])
+  const [showMyTickets, setShowMyTickets] = useState(false)
+  const [loadingMyTickets, setLoadingMyTickets] = useState(false)
+
+  const ticketIdParam = searchParams.get('ticketId')
+
+  const fetchTicket = useCallback(async (id: string) => {
+    if (!session?.accessToken) return
+    setLoadingTicket(true)
+    setTicketError('')
+    try {
+      const ticket = await api.mySupportTicket(id, session.accessToken)
+      setViewingTicket(ticket)
+    } catch {
+      try {
+        const ticket = await api.supportTicket(id, session.accessToken)
+        setViewingTicket(ticket)
+      } catch (err) {
+        setTicketError(err instanceof Error ? err.message : 'Không thể tải chi tiết phản hồi CSKH.')
+      }
+    } finally {
+      setLoadingTicket(false)
+    }
+  }, [session])
+
+  useEffect(() => {
+    if (ticketIdParam) {
+      // oxlint-disable-next-line react/set-state-in-effect -- fetching ticket detail when query param is present
+      void fetchTicket(ticketIdParam)
+    }
+  }, [ticketIdParam, fetchTicket])
+
+  const loadMyTickets = useCallback(async () => {
+    if (!session?.accessToken) return
+    setLoadingMyTickets(true)
+    try {
+      const list = await api.mySupportTickets(session.accessToken)
+      setMyTickets(list)
+    } catch {
+      // ignore
+    } finally {
+      setLoadingMyTickets(false)
+    }
+  }, [session])
+
+  const closeTicketModal = () => {
+    setViewingTicket(null)
+    setTicketError('')
+    if (searchParams.has('ticketId')) {
+      searchParams.delete('ticketId')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }
 
   const categories = [
     { id: 'booking', name: 'Đặt chỗ & Giữ chỗ', icon: 'bi-calendar2-check', desc: 'Quy định 10 phút, đặt lịch, xác nhận' },
@@ -240,6 +301,60 @@ export function HelpCenterPage() {
       </section>
 
       <div className="help-container">
+        {session && (
+          <div className="d-flex justify-content-between align-items-center mb-4 p-3 bg-white rounded-3 border shadow-sm flex-wrap gap-2">
+            <div>
+              <h5 className="m-0 fw-bold"><i className="bi bi-person-check text-primary me-2" />Yêu cầu hỗ trợ của bạn</h5>
+              <small className="text-muted">Theo dõi tiến độ xử lý và xem câu trả lời từ đội ngũ CSKH OpenSlot</small>
+            </div>
+            <button
+              type="button"
+              className={`btn btn-sm ${showMyTickets ? 'btn-primary' : 'btn-outline-primary'} rounded-pill px-3`}
+              onClick={() => {
+                const next = !showMyTickets
+                setShowMyTickets(next)
+                if (next) void loadMyTickets()
+              }}
+            >
+              <i className="bi bi-inbox me-1" />
+              {showMyTickets ? 'Đóng danh sách' : 'Xem yêu cầu đã gửi'}
+            </button>
+          </div>
+        )}
+
+        {showMyTickets && (
+          <div className="mb-4 p-3 bg-white rounded-3 border shadow-sm">
+            <h6 className="fw-bold mb-3"><i className="bi bi-clock-history me-2 text-primary" />Lịch sử yêu cầu đã gửi</h6>
+            {loadingMyTickets ? (
+              <div className="text-center py-3"><div className="spinner-border spinner-border-sm text-primary" /> Đang tải...</div>
+            ) : myTickets.length ? (
+              <div className="d-flex flex-column gap-2">
+                {myTickets.map((t) => (
+                  <div key={t.id} className="p-3 border rounded-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                      <span className="badge bg-secondary-subtle text-dark me-2">{t.category}</span>
+                      <span className={`badge ${t.status === 2 ? 'bg-success' : t.status === 0 ? 'bg-warning text-dark' : 'bg-secondary'}`}>
+                        {t.status === 2 ? 'Đã phản hồi' : t.status === 0 ? 'Đang chờ xử lý' : 'Đã đóng'}
+                      </span>
+                      <p className="m-0 mt-1 text-secondary small text-truncate" style={{ maxWidth: 500 }}>{t.content}</p>
+                      <small className="text-muted">{new Date(t.createdAtUtc).toLocaleString('vi-VN')}</small>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-primary rounded-pill px-3"
+                      onClick={() => setViewingTicket(t)}
+                    >
+                      {t.status === 2 ? 'Xem phản hồi CSKH' : 'Xem chi tiết'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted text-center m-0 py-2">Bạn chưa gửi yêu cầu hỗ trợ nào.</p>
+            )}
+          </div>
+        )}
+
         <h2 className="help-section-title">Danh mục trợ giúp</h2>
         <div className="help-categories-grid">
           {categories.map((cat) => (
@@ -346,6 +461,82 @@ export function HelpCenterPage() {
           </NavLink>
         </div>
       </div>
+
+      {loadingTicket && (
+        <div className="cskh-modal-backdrop">
+          <div className="cskh-modal-body text-center py-5">
+            <div className="spinner-border text-primary mb-2" />
+            <p className="m-0 text-secondary">Đang tải phản hồi từ CSKH...</p>
+          </div>
+        </div>
+      )}
+
+      {ticketError && (
+        <div className="cskh-modal-backdrop" onClick={closeTicketModal}>
+          <div className="cskh-modal-body" onClick={(e) => e.stopPropagation()}>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 className="m-0 text-danger fw-bold"><i className="bi bi-exclamation-triangle me-2" />Không thể xem yêu cầu</h5>
+              <button type="button" className="btn-close" onClick={closeTicketModal} />
+            </div>
+            <p className="text-secondary mb-4">{ticketError}</p>
+            <div className="text-end">
+              <button type="button" className="btn btn-secondary rounded-pill px-4" onClick={closeTicketModal}>
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewingTicket && (
+        <div className="cskh-modal-backdrop" onClick={closeTicketModal}>
+          <div className="cskh-modal-body" onClick={(e) => e.stopPropagation()}>
+            <div className="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+              <div>
+                <span className="badge bg-primary-subtle text-primary me-2">{viewingTicket.category}</span>
+                <span className={`badge ${viewingTicket.status === 2 ? 'bg-success' : viewingTicket.status === 0 ? 'bg-warning text-dark' : 'bg-secondary'}`}>
+                  {viewingTicket.status === 2 ? 'Đã phản hồi' : viewingTicket.status === 0 ? 'Đang chờ xử lý' : 'Đã đóng'}
+                </span>
+              </div>
+              <button type="button" className="btn-close" onClick={closeTicketModal} aria-label="Close" />
+            </div>
+
+            <div className="mb-3">
+              <label className="text-muted small fw-bold">Nội dung yêu cầu bạn đã gửi:</label>
+              <div className="p-3 bg-light rounded-3 text-secondary" style={{ whiteSpace: 'pre-wrap', maxHeight: 150, overflowY: 'auto' }}>
+                {viewingTicket.content}
+              </div>
+              <small className="text-muted">Gửi lúc {new Date(viewingTicket.createdAtUtc).toLocaleString('vi-VN')}</small>
+            </div>
+
+            {viewingTicket.status === 2 && viewingTicket.resolutionNote ? (
+              <div className="p-3 rounded-3" style={{ background: '#ecfdf5', border: '1px solid #a7f3d0' }}>
+                <div className="d-flex align-items-center mb-2">
+                  <i className="bi bi-patch-check-fill text-success fs-4 me-2" />
+                  <div>
+                    <b className="text-success d-block">Phản hồi từ CSKH OpenSlot</b>
+                    <small className="text-muted">Xử lý bởi {viewingTicket.resolvedByName || 'CSKH OpenSlot'} {viewingTicket.resolvedAtUtc ? `vào lúc ${new Date(viewingTicket.resolvedAtUtc).toLocaleString('vi-VN')}` : ''}</small>
+                  </div>
+                </div>
+                <div className="text-dark p-2" style={{ whiteSpace: 'pre-wrap', fontSize: '15px', lineHeight: 1.6 }}>
+                  {viewingTicket.resolutionNote}
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 bg-light rounded-3 text-center text-muted">
+                <i className="bi bi-hourglass-split fs-4 d-block mb-1 text-warning" />
+                Yêu cầu của bạn đang được chuyên viên CSKH tiếp nhận và xử lý. Bạn sẽ nhận được thông báo ngay khi có phản hồi.
+              </div>
+            )}
+
+            <div className="mt-3 text-end">
+              <button type="button" className="btn btn-primary rounded-pill px-4" onClick={closeTicketModal}>
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

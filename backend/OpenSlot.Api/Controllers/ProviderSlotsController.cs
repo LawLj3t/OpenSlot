@@ -152,6 +152,62 @@ public sealed class ProviderSlotsController(AppDbContext db) : ControllerBase
         return Ok(new { slot.Id, slot.Status, slot.PublishedAtUtc });
     }
 
+    [HttpPost("{slotId:guid}/republish")]
+    public async Task<IActionResult> Republish(Guid slotId, CancellationToken cancellationToken)
+    {
+        await EnsureCanPublish(cancellationToken);
+        var slot = await db.DealSlots
+            .Include(x => x.ServiceOffering).ThenInclude(x => x.Venue).ThenInclude(x => x.ProviderProfile)
+            .Include(x => x.BookableResource)
+            .SingleOrDefaultAsync(x => x.Id == slotId, cancellationToken)
+            ?? throw new ApiException("Không tìm thấy slot.", StatusCodes.Status404NotFound);
+        EnsureProviderOwnsService(slot.ServiceOffering, UserId);
+
+        if (slot.BookableResource is null || !slot.BookableResource.IsActive)
+        {
+            throw new ApiException("Slot phải gắn với một đơn vị đặt chỗ đang hoạt động.");
+        }
+
+        if (slot.Status is not (DealSlotStatus.Cancelled or DealSlotStatus.Draft))
+        {
+            throw new ApiException("Chỉ slot ở trạng thái Đã hủy hoặc Nháp mới có thể đăng lại.");
+        }
+
+        var now = DateTime.UtcNow;
+        if (slot.StartAtUtc <= now)
+        {
+            throw new ApiException("Không thể đăng lại slot trong quá khứ.");
+        }
+
+        if (slot.BookingClosesAtUtc <= now)
+        {
+            throw new ApiException("Slot đã quá thời gian mở bán.");
+        }
+
+        if (slot.BookableResourceId.HasValue)
+        {
+            var conflict = await db.DealSlots.AnyAsync(x =>
+                x.Id != slotId &&
+                x.BookableResourceId == slot.BookableResourceId &&
+                x.Status != DealSlotStatus.Cancelled &&
+                x.Status != DealSlotStatus.Expired &&
+                x.StartAtUtc < slot.EndAtUtc &&
+                x.EndAtUtc > slot.StartAtUtc,
+                cancellationToken);
+            if (conflict)
+            {
+                throw new ApiException("Đơn vị này đã có slot khác trong cùng khung giờ.", StatusCodes.Status409Conflict);
+            }
+        }
+
+        slot.Status = DealSlotStatus.Published;
+        slot.PublishedAtUtc = DateTime.UtcNow;
+        slot.ConcurrencyToken = Guid.NewGuid();
+        db.AuditLogs.Add(CreateAudit("slot.republished", nameof(DealSlot), slot.Id.ToString()));
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new { slot.Id, slot.Status, slot.PublishedAtUtc });
+    }
+
     [HttpPut("{slotId:guid}")]
     public async Task<IActionResult> Update(Guid slotId, CreateDealSlotRequest request, CancellationToken cancellationToken)
     {

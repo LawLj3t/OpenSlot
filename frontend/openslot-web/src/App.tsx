@@ -11,6 +11,7 @@ import { HelpCenterPage } from './HelpCenterPage'
 import { SupportRequestPage } from './SupportRequestPage'
 import { CskhPage } from './CskhPage'
 import { OpenSlotWebChat } from './OpenSlotWebChat'
+import { ConfirmModal } from './ConfirmModal'
 import './App.css'
 import './AuthExperience.css'
 import './EmailVerification.css'
@@ -135,7 +136,7 @@ function App() {
       <Route path="/provider" element={hasRole(session, 'Provider') && activeRole === 'Provider' ? <ProviderPage session={session!} /> : <Navigate to={session ? homeFor(session) : '/login'} replace />} />
       <Route path="/manager" element={hasRole(session, 'Manager') && activeRole === 'Manager' ? <AdminPage session={session!} mode="manager" /> : <Navigate to={session ? homeFor(session) : '/login'} replace />} />
       <Route path="/admin" element={hasRole(session, 'Admin') && activeRole === 'Admin' ? <AdminPage session={session!} mode="admin" /> : <Navigate to={session ? homeFor(session) : '/login'} replace />} />
-      <Route path="/help" element={<HelpCenterPage />} />
+      <Route path="/help" element={<HelpCenterPage session={session} />} />
       <Route path="/help/request" element={<SupportRequestPage session={session} />} />
       <Route path="/cskh" element={(hasRole(session, 'CSKH') || hasRole(session, 'Manager') || hasRole(session, 'Admin')) ? <CskhPage session={session!} /> : <Navigate to={session ? homeFor(session) : '/login'} replace />} />
       <Route path="/notifications" element={session ? <NotificationsPage session={session} onRead={checkUnread} /> : <Navigate to="/login" replace />} />
@@ -511,16 +512,38 @@ function ProviderApplicationPage({ session, onAuthenticated }: { session: Sessio
 
 function BookingsPage({ session }: { session: Session }) {
   const [bookings, setBookings] = useState<Booking[]>([]); const [error, setError] = useState(''); const [loading, setLoading] = useState(true)
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; confirmText?: string; variant?: 'danger' | 'warning' | 'primary'; onConfirm: () => Promise<void> } | null>(null)
+  const [confirmLoading, setConfirmLoading] = useState(false)
   // oxlint-disable-next-line react/set-state-in-effect -- loading belongs to the request lifecycle
   const refresh = () => { setLoading(true); api.myBookings(session.accessToken).then(setBookings).catch((e: Error) => setError(e.message)).finally(() => setLoading(false)) }
   useEffect(refresh, [session.accessToken])
-  // oxlint-disable-next-line react/purity -- Date.now is only called during user interaction, not render
-  const cancel = async (booking: Booking) => { const now = Date.now(); const hoursUntilStart = (new Date(booking.startAtUtc).getTime() - now) / 3600000; const message = hoursUntilStart < 2 ? `⚠️ CẢNH BÁO: Chỉ còn ${Math.round(hoursUntilStart * 60)} phút nữa là bắt đầu!\n\nHủy booking ${booking.publicCode}?\n\nĐối tác đã giữ chỗ cho bạn, hủy quá gần giờ có thể ảnh hưởng uy tín tài khoản.` : `Hủy booking ${booking.publicCode}?`; if (!window.confirm(message)) return; try { await api.cancelBooking(booking.id, 'Người dùng hủy từ giao diện', session.accessToken); refresh() } catch (e) { setError(e instanceof Error ? e.message : 'Không thể hủy booking.') } }
-  return <div className="container dashboard"><p className="eyebrow">Tài khoản của bạn</p><h1>Lịch trải nghiệm</h1><p className="dashboard-copy">Mã QR/check-in PIN được mở khi bạn giữ chỗ. Hãy đến đúng giờ để giữ lịch sử tốt.</p>{error && <div className="alert alert-danger">{error}</div>}{loading ? <div className="empty-state"><div className="spinner-border text-primary" /></div> : bookings.length ? <div className="booking-list">{bookings.map((booking) => <article className="booking-item" key={booking.id}><div className="booking-date"><b>{new Intl.DateTimeFormat('vi-VN', { day: '2-digit' }).format(new Date(booking.startAtUtc))}</b><span>thg {new Intl.DateTimeFormat('vi-VN', { month: '2-digit' }).format(new Date(booking.startAtUtc))}</span></div><div className="booking-info"><span className="status-pill">{booking.status === 0 ? 'Đã xác nhận' : booking.status === 3 ? 'Đã hủy' : 'Đã cập nhật'}</span><h3>{booking.serviceName}</h3><p><i className="bi bi-building" /> {booking.venueName}{booking.resourceName ? ` · ${booking.resourceName}${booking.resourceCode ? ` (${booking.resourceCode})` : ''}` : ''} · <i className="bi bi-clock" /> {formatTime(booking.startAtUtc)}</p><b>{formatMoney(booking.dealPriceVnd)}</b></div><div className="booking-actions"><code>{booking.publicCode}</code>{booking.status === 0 && <button onClick={() => cancel(booking)} className="btn btn-outline-danger btn-sm rounded-pill">Hủy chỗ</button>}</div></article>)}</div> : <div className="empty-state"><i className="bi bi-calendar-heart" /><h3>Chưa có lịch nào</h3><NavLink className="btn btn-primary rounded-pill" to="/">Khám phá slot ngay</NavLink></div>}</div>
+  const cancel = (booking: Booking) => {
+    // oxlint-disable-next-line react/purity -- Date.now is only called during user interaction, not render
+    const now = Date.now()
+    const hoursUntilStart = (new Date(booking.startAtUtc).getTime() - now) / 3600000
+    const message = hoursUntilStart < 2
+      ? `CẢNH BÁO: Chỉ còn ${Math.round(hoursUntilStart * 60)} phút nữa là bắt đầu!\n\nHủy booking ${booking.publicCode}?\n\nĐối tác đã giữ chỗ cho bạn, hủy quá gần giờ có thể ảnh hưởng uy tín tài khoản.`
+      : `Bạn có chắc muốn hủy đặt chỗ ${booking.publicCode} (${booking.serviceName})?`
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hủy đặt chỗ',
+      message,
+      confirmText: 'Hủy đặt chỗ',
+      variant: 'danger',
+      onConfirm: async () => {
+        await api.cancelBooking(booking.id, 'Người dùng hủy từ giao diện', session.accessToken)
+        refresh()
+      }
+    })
+  }
+  return <div className="container dashboard"><p className="eyebrow">Tài khoản của bạn</p><h1>Lịch trải nghiệm</h1><p className="dashboard-copy">Mã QR/check-in PIN được mở khi bạn giữ chỗ. Hãy đến đúng giờ để giữ lịch sử tốt.</p>{error && <div className="alert alert-danger">{error}</div>}{loading ? <div className="empty-state"><div className="spinner-border text-primary" /></div> : bookings.length ? <div className="booking-list">{bookings.map((booking) => <article className="booking-item" key={booking.id}><div className="booking-date"><b>{new Intl.DateTimeFormat('vi-VN', { day: '2-digit' }).format(new Date(booking.startAtUtc))}</b><span>thg {new Intl.DateTimeFormat('vi-VN', { month: '2-digit' }).format(new Date(booking.startAtUtc))}</span></div><div className="booking-info"><span className="status-pill">{booking.status === 0 ? 'Đã xác nhận' : booking.status === 3 ? 'Đã hủy' : 'Đã cập nhật'}</span><h3>{booking.serviceName}</h3><p><i className="bi bi-building" /> {booking.venueName}{booking.resourceName ? ` · ${booking.resourceName}${booking.resourceCode ? ` (${booking.resourceCode})` : ''}` : ''} · <i className="bi bi-clock" /> {formatTime(booking.startAtUtc)}</p><b>{formatMoney(booking.dealPriceVnd)}</b></div><div className="booking-actions"><code>{booking.publicCode}</code>{booking.status === 0 && <button onClick={() => cancel(booking)} className="btn btn-outline-danger btn-sm rounded-pill">Hủy chỗ</button>}</div></article>)}</div> : <div className="empty-state"><i className="bi bi-calendar-heart" /><h3>Chưa có lịch nào</h3><NavLink className="btn btn-primary rounded-pill" to="/">Khám phá slot ngay</NavLink></div>}{confirmModal && <ConfirmModal isOpen={confirmModal.isOpen} title={confirmModal.title} message={confirmModal.message} confirmText={confirmModal.confirmText} variant={confirmModal.variant} loading={confirmLoading} onConfirm={async () => { try { setConfirmLoading(true); await confirmModal.onConfirm(); setConfirmModal(null) } catch (e) { setError(e instanceof Error ? e.message : 'Thao tác không thành công.'); setConfirmModal(null) } finally { setConfirmLoading(false) } }} onCancel={() => { if (!confirmLoading) setConfirmModal(null) }} />}</div>
 }
 
 function ProviderPage({ session }: { session: Session }) {
   const [slots, setSlots] = useState<ProviderSlot[]>([]); const [services, setServices] = useState<ProviderService[]>([]); const [resources, setResources] = useState<ProviderResource[]>([]); const [profile, setProfile] = useState<MyProviderProfile | null>(null); const [error, setError] = useState(''); const [notice, setNotice] = useState(''); const [loading, setLoading] = useState(true); const [showForm, setShowForm] = useState(false)
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; confirmText?: string; variant?: 'danger' | 'warning' | 'primary'; onConfirm: () => Promise<void> } | null>(null)
+  const [confirmLoading, setConfirmLoading] = useState(false)
+
   // oxlint-disable-next-line react/set-state-in-effect -- loading belongs to the request lifecycle
   const refresh = useCallback(() => { setLoading(true); return Promise.all([api.providerSlots(session.accessToken), api.providerServices(session.accessToken), api.providerResources(session.accessToken), api.providerProfile(session.accessToken)]).then(([slotData, serviceData, resourceData, profileData]) => { setSlots(slotData); setServices(serviceData); setResources(resourceData); setProfile(profileData) }).catch((e: Error) => setError(e.message)).finally(() => setLoading(false)) }, [session.accessToken])
   // oxlint-disable-next-line react/set-state-in-effect -- provider data is loaded from an external request lifecycle.
@@ -528,9 +551,45 @@ function ProviderPage({ session }: { session: Session }) {
   useSlotAvailability(useCallback(() => { void refresh() }, [refresh]))
   const publish = async (id: string) => { if (profile?.status !== 1) { setError('Hồ sơ cửa hàng đang chờ Manager duyệt nên chưa thể phát hành slot.'); return }; try { await api.publishProviderSlot(id, session.accessToken); setNotice('Slot đã được phát hành.'); refresh() } catch (e) { setError(e instanceof Error ? e.message : 'Không thể phát hành slot.') } }
   const resubmit = async () => { try { await api.resubmitProviderProfile(session.accessToken); setNotice('Đã gửi lại hồ sơ để Manager xét duyệt.'); refresh() } catch (e) { setError(e instanceof Error ? e.message : 'Không thể gửi lại hồ sơ.') } }
+
+  const handleCancelSlot = (slot: ProviderSlot) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Dừng / Hủy slot',
+      message: `Bạn có chắc muốn dừng / hủy slot "${slot.serviceName}" (${formatSlotWindow(slot.startAtUtc, slot.endAtUtc)})? Khách hàng sẽ không thể đặt chỗ cho slot này nữa.`,
+      confirmText: 'Dừng / Hủy slot',
+      variant: 'danger',
+      onConfirm: async () => {
+        await api.cancelProviderSlot(slot.id, session.accessToken)
+        setNotice(`Đã dừng / hủy slot ${slot.serviceName}.`)
+        refresh()
+      }
+    })
+  }
+
+  const handleRepublishSlot = (slot: ProviderSlot) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Đăng lại slot',
+      message: `Mở lại và tiếp tục đăng bán slot "${slot.serviceName}" (${formatSlotWindow(slot.startAtUtc, slot.endAtUtc)})? Slot sẽ được mở công khai để khách hàng đặt chỗ.`,
+      confirmText: 'Đăng lại ngay',
+      variant: 'primary',
+      onConfirm: async () => {
+        await api.republishProviderSlot(slot.id, session.accessToken)
+        setNotice(`Đã đăng lại slot ${slot.serviceName}.`)
+        refresh()
+      }
+    })
+  }
+
   const status = profile?.status
   const statusMessage = status === 2 ? 'Hồ sơ đối tác đang bị tạm khóa. Liên hệ quản trị viên để biết lý do và cách khôi phục tài khoản.' : ''
-  return <div className="container dashboard"><p className="eyebrow">Khu vực đối tác</p><div className="provider-heading"><div><h1>Quản lý cửa hàng và slot trống</h1><p className="dashboard-copy">Mỗi slot phải gắn với một sân, bàn, ghế hoặc phòng cụ thể để không bị trùng lịch.</p></div><button disabled={status === 2} onClick={() => setShowForm(!showForm)} className="btn btn-primary rounded-pill"><i className="bi bi-plus-lg" /> {showForm ? 'Đóng form' : 'Tạo slot'}</button></div>{status === 0 && <div className="provider-approval-banner pending"><i className="bi bi-hourglass-split" /><div><b>Hồ sơ cửa hàng đang chờ Manager duyệt</b><span>Bạn có thể hoàn thiện địa điểm, dịch vụ và slot nháp. Chỉ slot của hồ sơ đã duyệt mới được công khai.</span></div></div>}{status === 3 && <div className="provider-approval-banner rejected"><i className="bi bi-exclamation-diamond" /><div><b>Hồ sơ cần bổ sung trước khi hoạt động</b><span>Hãy rà soát thông tin cửa hàng, sau đó gửi lại để Manager xét duyệt.</span></div><button onClick={resubmit} className="btn btn-sm btn-outline-danger">Gửi lại xét duyệt</button></div>}{status === 2 && <div className="provider-approval-banner suspended"><i className="bi bi-lock" /><div><b>Hồ sơ đối tác đang bị tạm khóa</b><span>{statusMessage}</span></div></div>}{showForm && <ProviderSlotForm services={services} resources={resources} token={session.accessToken} onDone={() => { setShowForm(false); setNotice('Đã tạo slot nháp. Hãy phát hành khi hồ sơ được duyệt.'); refresh() }} onError={setError} />}{error && <div className="alert alert-danger">{error}</div>}{notice && <div className="alert alert-success">{notice}</div>}{loading ? <div className="empty-state"><div className="spinner-border text-primary" /></div> : <><div className="provider-table"><div className="table-head"><span>Dịch vụ / đơn vị</span><span>Thời gian</span><span>Giá deal</span><span>Chỗ còn</span></div>{slots.map((slot) => <div className="table-row" key={slot.id}><span><b>{slot.serviceName}</b><small>{slot.venueName} · {slot.resourceName}{slot.resourceCode ? ` (${slot.resourceCode})` : ''}</small></span><span>{formatSlotWindow(slot.startAtUtc, slot.endAtUtc)}</span><span><b>{formatMoney(slot.dealPriceVnd)}</b></span><span>{Math.max(0, slot.capacity - slot.confirmedBookingCount - slot.activeHoldCount)}/{slot.capacity}{slot.activeHoldCount > 0 && <small className="slot-awaiting-approval"> · {slot.activeHoldCount} đang thanh toán</small>} {slot.status === 0 && (status === 1 ? <button onClick={() => publish(slot.id)} className="btn btn-sm btn-outline-primary ms-2">Phát hành</button> : <small className="slot-awaiting-approval">Chờ Manager duyệt</small>)}</span></div>)}</div><CheckInPanel token={session.accessToken} /><ProviderCatalogPanel token={session.accessToken} onServicesChanged={refresh} /></>}</div>
+  return <div className="container dashboard"><p className="eyebrow">Khu vực đối tác</p><div className="provider-heading"><div><h1>Quản lý cửa hàng và slot trống</h1><p className="dashboard-copy">Mỗi slot phải gắn với một sân, bàn, ghế hoặc phòng cụ thể để không bị trùng lịch.</p></div><button disabled={status === 2} onClick={() => setShowForm(!showForm)} className="btn btn-primary rounded-pill"><i className="bi bi-plus-lg" /> {showForm ? 'Đóng form' : 'Tạo slot'}</button></div>{status === 0 && <div className="provider-approval-banner pending"><i className="bi bi-hourglass-split" /><div><b>Hồ sơ cửa hàng đang chờ Manager duyệt</b><span>Bạn có thể hoàn thiện địa điểm, dịch vụ và slot nháp. Chỉ slot của hồ sơ đã duyệt mới được công khai.</span></div></div>}{status === 3 && <div className="provider-approval-banner rejected"><i className="bi bi-exclamation-diamond" /><div><b>Hồ sơ cần bổ sung trước khi hoạt động</b><span>Hãy rà soát thông tin cửa hàng, sau đó gửi lại để Manager xét duyệt.</span></div><button onClick={resubmit} className="btn btn-sm btn-outline-danger">Gửi lại xét duyệt</button></div>}{status === 2 && <div className="provider-approval-banner suspended"><i className="bi bi-lock" /><div><b>Hồ sơ đối tác đang bị tạm khóa</b><span>{statusMessage}</span></div></div>}{showForm && <ProviderSlotForm services={services} resources={resources} token={session.accessToken} onDone={() => { setShowForm(false); setNotice('Đã tạo slot nháp. Hãy phát hành khi hồ sơ được duyệt.'); refresh() }} onError={setError} />}{error && <div className="alert alert-danger">{error}</div>}{notice && <div className="alert alert-success">{notice}</div>}{loading ? <div className="empty-state"><div className="spinner-border text-primary" /></div> : <><div className="provider-table"><div className="table-head"><span>Dịch vụ / đơn vị</span><span>Thời gian</span><span>Giá deal</span><span>Trạng thái</span><span>Chỗ còn</span><span>Thao tác</span></div>{slots.map((slot) => {
+    const isFuture = new Date(slot.bookingClosesAtUtc).getTime() > Date.now()
+    const canCancel = slot.status === 1 && slot.confirmedBookingCount === 0
+    const canRepublish = (slot.status === 2 || slot.status === 0) && isFuture && status === 1
+    return <div className="table-row" key={slot.id}><span><b>{slot.serviceName}</b><small>{slot.venueName} · {slot.resourceName}{slot.resourceCode ? ` (${slot.resourceCode})` : ''}</small></span><span>{formatSlotWindow(slot.startAtUtc, slot.endAtUtc)}</span><span><b>{formatMoney(slot.dealPriceVnd)}</b></span><span>{slot.status === 0 && <span className="badge bg-secondary">Nháp</span>}{slot.status === 1 && <span className="badge bg-success">Đang mở</span>}{slot.status === 2 && <span className="badge bg-danger">Đã dừng / hủy</span>}{slot.status === 3 && <span className="badge bg-dark">Hết hạn</span>}{slot.status === 4 && <span className="badge bg-warning text-dark">Kín chỗ</span>}</span><span>{Math.max(0, slot.capacity - slot.confirmedBookingCount - slot.activeHoldCount)}/{slot.capacity}{slot.activeHoldCount > 0 && <small className="slot-awaiting-approval"> · {slot.activeHoldCount} đang thanh toán</small>}</span><span className="d-flex gap-1 align-items-center">{slot.status === 0 && (status === 1 ? <button onClick={() => publish(slot.id)} className="btn btn-sm btn-outline-primary">Phát hành</button> : <small className="slot-awaiting-approval">Chờ duyệt</small>)}{canCancel && <button onClick={() => handleCancelSlot(slot)} className="btn btn-sm btn-outline-danger">Dừng / Hủy</button>}{slot.status === 1 && slot.confirmedBookingCount > 0 && <small className="text-muted">Đã có khách đặt</small>}{slot.status === 2 && canRepublish && <button onClick={() => handleRepublishSlot(slot)} className="btn btn-sm btn-outline-success">Đăng lại</button>}</span></div>
+  })}</div><CheckInPanel token={session.accessToken} /><ProviderCatalogPanel token={session.accessToken} onServicesChanged={refresh} /></>}{confirmModal && <ConfirmModal isOpen={confirmModal.isOpen} title={confirmModal.title} message={confirmModal.message} confirmText={confirmModal.confirmText} variant={confirmModal.variant} loading={confirmLoading} onConfirm={async () => { try { setConfirmLoading(true); await confirmModal.onConfirm(); setConfirmModal(null) } catch (e) { setError(e instanceof Error ? e.message : 'Thao tác không thành công.'); setConfirmModal(null) } finally { setConfirmLoading(false) } }} onCancel={() => { if (!confirmLoading) setConfirmModal(null) }} />}</div>
 }
 
 function ProviderSlotForm({ services, resources, token, onDone, onError }: { services: ProviderService[]; resources: ProviderResource[]; token: string; onDone: () => void; onError: (message: string) => void }) {
@@ -543,13 +602,27 @@ function ProviderSlotForm({ services, resources, token, onDone, onError }: { ser
 
 function ProviderCatalogPanel({ token, onServicesChanged }: { token: string; onServicesChanged: () => void }) {
   const [profile, setProfile] = useState<MyProviderProfile | null>(null); const [venues, setVenues] = useState<ProviderVenue[]>([]); const [resources, setResources] = useState<ProviderResource[]>([]); const [categories, setCategories] = useState<Category[]>([]); const [services, setServices] = useState<ProviderService[]>([]); const [mode, setMode] = useState<'none' | 'profile' | 'venue' | 'resource' | 'service'>('none'); const [message, setMessage] = useState(''); const [error, setError] = useState('')
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; confirmText?: string; variant?: 'danger' | 'warning' | 'primary'; onConfirm: () => Promise<void> } | null>(null)
+  const [confirmLoading, setConfirmLoading] = useState(false)
   const load = useCallback(() => Promise.all([api.providerProfile(token), api.providerVenues(token), api.providerResources(token), api.categories(), api.providerServices(token)]).then(([profileData, venueData, resourceData, categoryData, serviceData]) => { setProfile(profileData); setVenues(venueData); setResources(resourceData); setCategories(categoryData); setServices(serviceData) }).catch((e: Error) => setError(e.message)), [token])
   useEffect(() => { load() }, [load])
   const success = (text: string) => { setMode('none'); setError(''); setMessage(text); load(); onServicesChanged() }
-  const deactivate = async (resource: ProviderResource) => { if (!window.confirm(`Ngưng sử dụng chỗ đặt ${resource.name}?`)) return; try { await api.deactivateProviderResource(resource.id, token); success(`Đã ngưng sử dụng chỗ đặt ${resource.name}.`) } catch (e) { setError(e instanceof Error ? e.message : 'Không thể ngưng chỗ đặt.') } }
+  const deactivate = (resource: ProviderResource) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Ngưng sử dụng chỗ đặt',
+      message: `Ngưng sử dụng chỗ đặt "${resource.name}"? Các slot đã phát hành của chỗ đặt này vẫn giữ nguyên, nhưng sẽ không thể tạo thêm slot mới.`,
+      confirmText: 'Ngưng sử dụng',
+      variant: 'danger',
+      onConfirm: async () => {
+        await api.deactivateProviderResource(resource.id, token)
+        success(`Đã ngưng sử dụng chỗ đặt ${resource.name}.`)
+      }
+    })
+  }
   const isSuspended = profile?.status === 2
   const providerStatusText = profile?.status === 0 ? 'Chờ duyệt' : profile?.status === 1 ? 'Đã duyệt' : profile?.status === 2 ? 'Tạm khóa' : profile?.status === 3 ? 'Cần bổ sung' : 'Đang tải'
-  return <section className="catalog-panel"><div className="admin-section-title"><div><p className="eyebrow">Thiết lập gian hàng</p><h2>Hồ sơ, địa điểm và chỗ đặt</h2></div><div className="catalog-actions"><button disabled={isSuspended} onClick={() => setMode('profile')} className="btn btn-sm btn-outline-secondary">Sửa hồ sơ</button><button disabled={isSuspended} onClick={() => setMode('venue')} className="btn btn-sm btn-outline-secondary">Thêm địa điểm</button><button disabled={isSuspended} onClick={() => setMode('resource')} className="btn btn-sm btn-outline-secondary">Thêm chỗ đặt</button><button disabled={isSuspended} onClick={() => setMode('service')} className="btn btn-sm btn-outline-primary">Thêm dịch vụ</button></div></div>{error && <div className="alert alert-danger mt-3">{error}</div>}{message && <div className="alert alert-success mt-3">{message}</div>}<div className="catalog-summary"><article><small>Đối tác</small><b>{profile?.businessName ?? 'Đang tải...'}</b><span>{profile?.contactPhone}</span></article><article><small>Lĩnh vực kinh doanh</small><b>{profile?.categoryName ?? 'Chưa phân loại'}</b><span className="category-locked-badge"><i className="bi bi-shield-lock" /> Dịch vụ tự động khóa</span></article><article><small>Trạng thái hồ sơ</small><b>{providerStatusText}</b><span>{isSuspended ? 'Tạm dừng thao tác' : 'Manager quản lý xét duyệt'}</span></article><article><small>Địa điểm</small><b>{venues.length}</b><span>{venues.map((x) => x.name).join(', ') || 'Chưa có địa điểm'}</span></article><article><small>Chỗ có thể đặt (Sân/Bàn/Phòng)</small><b>{resources.filter((x) => x.isActive).length}</b><span>{resources.filter((x) => x.isActive).map((x) => x.name).join(', ') || 'Chưa có chỗ đặt'}</span></article></div>{resources.length > 0 && <div className="resource-list">{resources.map((resource) => <article key={resource.id} className={!resource.isActive ? 'inactive' : ''}><div><b>{resource.name}{resource.code ? ` · ${resource.code}` : ''}</b><span>{resource.venueName} · {resource.resourceType} · {resource.maxCapacity} chỗ{resource.floorOrZone ? ` · ${resource.floorOrZone}` : ''}{resource.positionDescription ? ` · ${resource.positionDescription}` : ''}</span></div>{resource.isActive ? <button disabled={isSuspended} onClick={() => deactivate(resource)} className="btn btn-sm btn-outline-secondary">Ngưng sử dụng</button> : <small>Đã ngưng</small>}</article>)}</div>}{mode === 'profile' && profile && <ProviderProfileForm profile={profile} token={token} categories={categories} onDone={() => success('Đã cập nhật hồ sơ đối tác.')} onError={setError} />}{mode === 'venue' && <VenueForm token={token} onDone={() => success('Đã thêm địa điểm.')} onError={setError} />}{mode === 'resource' && <ResourceForm token={token} venues={venues} services={services} categories={categories} onDone={() => success('Đã thêm chỗ đặt.')} onError={setError} />}{mode === 'service' && <ServiceForm token={token} venues={venues} categories={categories} profile={profile} onDone={() => success('Đã thêm dịch vụ.')} onError={setError} />}</section>
+  return <section className="catalog-panel"><div className="admin-section-title"><div><p className="eyebrow">Thiết lập gian hàng</p><h2>Hồ sơ, địa điểm và chỗ đặt</h2></div><div className="catalog-actions"><button disabled={isSuspended} onClick={() => setMode('profile')} className="btn btn-sm btn-outline-secondary">Sửa hồ sơ</button><button disabled={isSuspended} onClick={() => setMode('venue')} className="btn btn-sm btn-outline-secondary">Thêm địa điểm</button><button disabled={isSuspended} onClick={() => setMode('resource')} className="btn btn-sm btn-outline-secondary">Thêm chỗ đặt</button><button disabled={isSuspended} onClick={() => setMode('service')} className="btn btn-sm btn-outline-primary">Thêm dịch vụ</button></div></div>{error && <div className="alert alert-danger mt-3">{error}</div>}{message && <div className="alert alert-success mt-3">{message}</div>}<div className="catalog-summary"><article><small>Đối tác</small><b>{profile?.businessName ?? 'Đang tải...'}</b><span>{profile?.contactPhone}</span></article><article><small>Lĩnh vực kinh doanh</small><b>{profile?.categoryName ?? 'Chưa phân loại'}</b><span className="category-locked-badge"><i className="bi bi-shield-lock" /> Dịch vụ tự động khóa</span></article><article><small>Trạng thái hồ sơ</small><b>{providerStatusText}</b><span>{isSuspended ? 'Tạm dừng thao tác' : 'Manager quản lý xét duyệt'}</span></article><article><small>Địa điểm</small><b>{venues.length}</b><span>{venues.map((x) => x.name).join(', ') || 'Chưa có địa điểm'}</span></article><article><small>Chỗ có thể đặt (Sân/Bàn/Phòng)</small><b>{resources.filter((x) => x.isActive).length}</b><span>{resources.filter((x) => x.isActive).map((x) => x.name).join(', ') || 'Chưa có chỗ đặt'}</span></article></div>{resources.length > 0 && <div className="resource-list">{resources.map((resource) => <article key={resource.id} className={!resource.isActive ? 'inactive' : ''}><div><b>{resource.name}{resource.code ? ` · ${resource.code}` : ''}</b><span>{resource.venueName} · {resource.resourceType} · {resource.maxCapacity} chỗ{resource.floorOrZone ? ` · ${resource.floorOrZone}` : ''}{resource.positionDescription ? ` · ${resource.positionDescription}` : ''}</span></div>{resource.isActive ? <button disabled={isSuspended} onClick={() => deactivate(resource)} className="btn btn-sm btn-outline-secondary">Ngưng sử dụng</button> : <small>Đã ngưng</small>}</article>)}</div>}{mode === 'profile' && profile && <ProviderProfileForm profile={profile} token={token} categories={categories} onDone={() => success('Đã cập nhật hồ sơ đối tác.')} onError={setError} />}{mode === 'venue' && <VenueForm token={token} onDone={() => success('Đã thêm địa điểm.')} onError={setError} />}{mode === 'resource' && <ResourceForm token={token} venues={venues} services={services} categories={categories} onDone={() => success('Đã thêm chỗ đặt.')} onError={setError} />}{mode === 'service' && <ServiceForm token={token} venues={venues} categories={categories} profile={profile} onDone={() => success('Đã thêm dịch vụ.')} onError={setError} />}{confirmModal && <ConfirmModal isOpen={confirmModal.isOpen} title={confirmModal.title} message={confirmModal.message} confirmText={confirmModal.confirmText} variant={confirmModal.variant} loading={confirmLoading} onConfirm={async () => { try { setConfirmLoading(true); await confirmModal.onConfirm(); setConfirmModal(null) } catch (e) { setError(e instanceof Error ? e.message : 'Thao tác không thành công.'); setConfirmModal(null) } finally { setConfirmLoading(false) } }} onCancel={() => { if (!confirmLoading) setConfirmModal(null) }} />}</section>
 }
 
 function ProviderProfileForm({ profile, token, categories, onDone, onError }: { profile: MyProviderProfile; token: string; categories?: Category[]; onDone: () => void; onError: (message: string) => void }) {
@@ -750,6 +823,15 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
   const [stats, setStats] = useState<AdminDashboard | null>(null)
   const [filter, setFilter] = useState<number | undefined>()
   const [error, setError] = useState(''); const [message, setMessage] = useState(''); const [loading, setLoading] = useState(true); const isAdmin = mode === 'admin'
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    confirmText?: string
+    variant?: 'danger' | 'warning' | 'primary'
+    onConfirm: () => Promise<void>
+  } | null>(null)
+  const [confirmLoading, setConfirmLoading] = useState(false)
 
   const [providerSearch, setProviderSearch] = useState('')
   const [userSearch, setUserSearch] = useState('')
@@ -827,116 +909,290 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
   const toggleUser = async (user: AdminUser) => { try { if (user.isSuspended) await api.restoreUser(user.id, session.accessToken); else await api.suspendUser(user.id, session.accessToken); setMessage(`Đã ${user.isSuspended ? 'mở khóa' : 'tạm khóa'} tài khoản ${user.email}.`); refresh() } catch (e) { setError(e instanceof Error ? e.message : 'Không thể cập nhật tài khoản.') } }
   const toggleManager = async (user: AdminUser) => { try { const targetIsManager = user.roles.includes('Manager'); if (targetIsManager) await api.revokeManager(user.id, session.accessToken); else await api.grantManager(user.id, session.accessToken); setMessage(`Đã ${targetIsManager ? 'thu hồi' : 'cấp'} quyền Manager cho ${user.email}.`); refresh() } catch (e) { setError(e instanceof Error ? e.message : 'Không thể cập nhật quyền Manager.') } }
   const toggleService = async (service: AdminService) => { try { await api.setServiceActive(service.id, !service.isActive, session.accessToken); setMessage(`Đã ${service.isActive ? 'ẩn' : 'mở lại'} dịch vụ ${service.name}.`); refresh() } catch (e) { setError(e instanceof Error ? e.message : 'Không thể cập nhật dịch vụ.') } }
-  const cancelSlot = async (slot: AdminSlot) => { if (!window.confirm(`Hủy slot ${slot.serviceName}?`)) return; try { await api.adminCancelSlot(slot.id, session.accessToken); setMessage('Slot đã được hủy.'); refresh() } catch (e) { setError(e instanceof Error ? e.message : 'Không thể hủy slot.') } }
-  const deleteProvider = async (provider: ProviderProfile) => {
-    if (!window.confirm(`Xóa đối tác "${provider.businessName}"? Trạng thái sẽ chuyển thành Đã xóa, slot đang mở/nháp sẽ bị hủy và chỉ thực hiện được nếu không có lịch đặt chỗ đang hoạt động.`)) return
-    try {
-      await api.adminDeleteProvider(provider.id, session.accessToken)
-      setMessage(`Đã xóa đối tác ${provider.businessName}.`)
-      refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không thể xóa đối tác.')
-    }
+
+  const deleteUser = (user: AdminUser) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Xóa tài khoản người dùng',
+      message: `Bạn có chắc muốn xóa vĩnh viễn tài khoản "${user.displayName}" (${user.email})? Thao tác này chỉ thành công khi tài khoản không còn lịch đặt chỗ hoặc giữ chỗ nào đang hoạt động.`,
+      confirmText: 'Xóa tài khoản',
+      variant: 'danger',
+      onConfirm: async () => {
+        await api.adminDeleteUser(user.id, session.accessToken)
+        setMessage(`Đã xóa tài khoản ${user.email}.`)
+        refresh()
+      }
+    })
   }
+
+  const bulkDeleteUsers = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Xóa hàng loạt tài khoản',
+      message: `Xác nhận xóa ${selectedUsers.length} tài khoản đã chọn? Hệ thống sẽ bỏ qua tài khoản là Admin, chính bạn, hoặc đang có lịch đặt chỗ/giữ chỗ hoạt động.`,
+      confirmText: 'Xóa các tài khoản đã chọn',
+      variant: 'danger',
+      onConfirm: async () => {
+        const res = await api.bulkDeleteUsers(selectedUsers, session.accessToken)
+        let msg = `Đã xóa ${res.deletedCount} tài khoản.`
+        if (res.skippedCount > 0) msg += ` Bỏ qua ${res.skippedCount} tài khoản không đủ điều kiện xóa.`
+        setMessage(msg)
+        setSelectedUsers([])
+        refresh()
+      }
+    })
+  }
+
+  const deleteService = (service: AdminService) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Xóa dịch vụ',
+      message: `Bạn có chắc muốn xóa dịch vụ "${service.name}" (${service.providerName})? Dịch vụ sẽ bị xóa hoàn toàn nếu chưa có booking nào, hoặc chuyển sang trạng thái ngưng hoạt động nếu đã có lịch sử booking.`,
+      confirmText: 'Xóa dịch vụ',
+      variant: 'danger',
+      onConfirm: async () => {
+        await api.adminDeleteService(service.id, session.accessToken)
+        setMessage(`Đã xóa dịch vụ ${service.name}.`)
+        refresh()
+      }
+    })
+  }
+
+  const bulkDeleteServices = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Xóa hàng loạt dịch vụ',
+      message: `Xác nhận xóa ${selectedServices.length} dịch vụ đã chọn? Hệ thống sẽ bỏ qua nếu dịch vụ đang có lịch đặt chỗ/giữ chỗ hoạt động.`,
+      confirmText: 'Xóa các dịch vụ đã chọn',
+      variant: 'danger',
+      onConfirm: async () => {
+        const res = await api.bulkDeleteServices(selectedServices, session.accessToken)
+        let msg = `Đã xóa hoặc ngưng hoạt động ${res.deletedCount} dịch vụ.`
+        if (res.skippedCount > 0) msg += ` Bỏ qua ${res.skippedCount} dịch vụ do còn booking đang hoạt động.`
+        setMessage(msg)
+        setSelectedServices([])
+        refresh()
+      }
+    })
+  }
+
+  const cancelSlot = (slot: AdminSlot) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hủy slot',
+      message: `Hủy slot "${slot.serviceName}" (${slot.venueName})? Slot này chỉ có thể hủy khi chưa có khách đặt chỗ.`,
+      confirmText: 'Hủy slot',
+      variant: 'danger',
+      onConfirm: async () => {
+        await api.adminCancelSlot(slot.id, session.accessToken)
+        setMessage('Slot đã được hủy.')
+        refresh()
+      }
+    })
+  }
+
+  const reopenSlot = (slot: AdminSlot) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Mở lại slot đã hủy',
+      message: `Mở lại slot "${slot.serviceName}" (${slot.venueName})? Slot sẽ được mở lại cho khách hàng đặt chỗ nếu dịch vụ và đối tác đang hoạt động bình thường.`,
+      confirmText: 'Mở lại ngay',
+      variant: 'primary',
+      onConfirm: async () => {
+        await api.adminReopenSlot(slot.id, session.accessToken)
+        setMessage(`Đã mở lại slot ${slot.serviceName}.`)
+        refresh()
+      }
+    })
+  }
+
+  const deleteProvider = (provider: ProviderProfile) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Xóa đối tác',
+      message: `Xóa đối tác "${provider.businessName}"? Trạng thái sẽ chuyển thành Đã xóa, slot đang mở/nháp sẽ bị hủy và chỉ thực hiện được nếu không có lịch đặt chỗ đang hoạt động.`,
+      confirmText: 'Xác nhận xóa',
+      variant: 'danger',
+      onConfirm: async () => {
+        await api.adminDeleteProvider(provider.id, session.accessToken)
+        setMessage(`Đã xóa đối tác ${provider.businessName}.`)
+        refresh()
+      }
+    })
+  }
+
   const viewProvider = async (provider: ProviderProfile) => { setError(''); setProviderDetail(null); setDetailLoading(true); try { setProviderDetail(await api.adminProviderDetail(provider.id, session.accessToken)) } catch (e) { setError(e instanceof Error ? e.message : 'Không thể tải chi tiết đối tác.') } finally { setDetailLoading(false) } }
 
-  const bulkDeleteProviders = async () => {
-    if (!window.confirm(`Xác nhận xóa ${selectedProviders.length} đối tác đã chọn? Chỉ đối tác không còn booking hoặc hold đang hoạt động mới có thể xóa.`)) return
-    try {
-      const res = await api.bulkDeleteProviders(selectedProviders, session.accessToken)
-      let msg = `Đã xóa ${res.deletedCount} đối tác.`
-      if (res.skippedCount > 0) msg += ` Bỏ qua ${res.skippedCount} đối tác do còn booking hoặc hold hoạt động.`
-      setMessage(msg)
-      setSelectedProviders([])
-      refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không thể xóa hàng loạt đối tác.')
-    }
+  const bulkDeleteProviders = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Xóa hàng loạt đối tác',
+      message: `Xác nhận xóa ${selectedProviders.length} đối tác đã chọn? Chỉ đối tác không còn booking hoặc hold đang hoạt động mới có thể xóa.`,
+      confirmText: 'Xóa đối tác đã chọn',
+      variant: 'danger',
+      onConfirm: async () => {
+        const res = await api.bulkDeleteProviders(selectedProviders, session.accessToken)
+        let msg = `Đã xóa ${res.deletedCount} đối tác.`
+        if (res.skippedCount > 0) msg += ` Bỏ qua ${res.skippedCount} đối tác do còn booking hoặc hold hoạt động.`
+        setMessage(msg)
+        setSelectedProviders([])
+        refresh()
+      }
+    })
   }
 
-  const bulkSetProviderStatus = async (status: number, label: string) => {
-    if (!window.confirm(`Xác nhận ${label} ${selectedProviders.length} đối tác đã chọn?`)) return
-    try {
-      const res = await api.bulkSetProviderStatus(selectedProviders, status, session.accessToken)
-      setMessage(`Đã cập nhật trạng thái cho ${res.updatedCount} đối tác.`)
-      setSelectedProviders([])
-      refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không thể cập nhật đối tác.')
-    }
+  const bulkSetProviderStatus = (status: number, label: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: `Xác nhận ${label} đối tác`,
+      message: `Xác nhận ${label} ${selectedProviders.length} đối tác đã chọn?`,
+      confirmText: `Xác nhận ${label}`,
+      variant: status === 2 ? 'danger' : status === 3 ? 'warning' : 'primary',
+      onConfirm: async () => {
+        const res = await api.bulkSetProviderStatus(selectedProviders, status, session.accessToken)
+        setMessage(`Đã cập nhật trạng thái cho ${res.updatedCount} đối tác.`)
+        setSelectedProviders([])
+        refresh()
+      }
+    })
   }
 
-  const bulkSuspendUsers = async (suspend: boolean) => {
+  const bulkSuspendUsers = (suspend: boolean) => {
     const label = suspend ? 'tạm khóa' : 'mở khóa'
-    if (!window.confirm(`Xác nhận ${label} ${selectedUsers.length} tài khoản đã chọn?`)) return
-    try {
-      const res = await api.bulkSetUsersSuspended(selectedUsers, suspend, session.accessToken)
-      setMessage(`Đã ${label} ${res.updatedCount} tài khoản.`)
-      setSelectedUsers([])
-      refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không thể cập nhật tài khoản.')
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: `Xác nhận ${label} tài khoản`,
+      message: `Xác nhận ${label} ${selectedUsers.length} tài khoản đã chọn?`,
+      confirmText: `Xác nhận ${label}`,
+      variant: suspend ? 'danger' : 'primary',
+      onConfirm: async () => {
+        const res = await api.bulkSetUsersSuspended(selectedUsers, suspend, session.accessToken)
+        setMessage(`Đã ${label} ${res.updatedCount} tài khoản.`)
+        setSelectedUsers([])
+        refresh()
+      }
+    })
   }
 
-  const bulkToggleServices = async (active: boolean) => {
+  const bulkToggleServices = (active: boolean) => {
     const label = active ? 'mở lại' : 'ẩn'
-    if (!window.confirm(`Xác nhận ${label} ${selectedServices.length} dịch vụ đã chọn?`)) return
-    try {
-      const res = await api.bulkSetServicesActive(selectedServices, active, session.accessToken)
-      setMessage(`Đã ${label} ${res.updatedCount} dịch vụ.`)
-      setSelectedServices([])
-      refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không thể cập nhật dịch vụ.')
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: `Xác nhận ${label} dịch vụ`,
+      message: `Xác nhận ${label} ${selectedServices.length} dịch vụ đã chọn?`,
+      confirmText: `Xác nhận ${label}`,
+      variant: active ? 'primary' : 'warning',
+      onConfirm: async () => {
+        const res = await api.bulkSetServicesActive(selectedServices, active, session.accessToken)
+        setMessage(`Đã ${label} ${res.updatedCount} dịch vụ.`)
+        setSelectedServices([])
+        refresh()
+      }
+    })
   }
 
-  const bulkCancelSlots = async () => {
-    if (!window.confirm(`Xác nhận hủy ${selectedSlots.length} slot đã chọn? Chỉ hủy các slot chưa có khách đặt chỗ.`)) return
-    try {
-      const res = await api.bulkCancelSlots(selectedSlots, session.accessToken)
-      let msg = `Đã hủy ${res.cancelledCount} slot.`
-      if (res.skippedCount > 0) msg += ` Bỏ qua ${res.skippedCount} slot do đã có khách đặt chỗ.`
-      setMessage(msg)
-      setSelectedSlots([])
-      refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không thể hủy slot.')
-    }
+  const bulkCancelSlots = () => {
+    const candidateIds = selectedSlots.filter(id => {
+      const slot = managedSlots.find(s => s.id === id)
+      return slot && slot.status < 3 && slot.confirmedBookingCount === 0
+    })
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hủy slot đã chọn',
+      message: `Xác nhận hủy ${candidateIds.length} slot đã chọn? Chỉ hủy các slot chưa có khách đặt chỗ.`,
+      confirmText: 'Hủy slot',
+      variant: 'danger',
+      onConfirm: async () => {
+        const res = await api.bulkCancelSlots(candidateIds, session.accessToken)
+        let msg = `Đã hủy ${res.cancelledCount} slot.`
+        if (res.skippedCount > 0) msg += ` Bỏ qua ${res.skippedCount} slot do đã có khách đặt chỗ.`
+        setMessage(msg)
+        setSelectedSlots([])
+        refresh()
+      }
+    })
   }
 
-  const bulkResolveReports = async () => {
-    if (!window.confirm(`Xác nhận đánh dấu đã xử lý ${selectedReports.length} báo cáo đã chọn?`)) return
-    try {
-      const res = await api.bulkResolveReports(selectedReports, session.accessToken)
-      setMessage(`Đã xử lý ${res.resolvedCount} báo cáo.`)
-      setSelectedReports([])
-      refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không thể xử lý báo cáo.')
-    }
+  const bulkReopenSlots = () => {
+    const candidateIds = selectedSlots.filter(id => {
+      const slot = managedSlots.find(s => s.id === id)
+      return slot && slot.status === 4 && new Date(slot.startAtUtc).getTime() > Date.now() && (!slot.bookingClosesAtUtc || new Date(slot.bookingClosesAtUtc).getTime() > Date.now())
+    })
+    setConfirmModal({
+      isOpen: true,
+      title: 'Mở lại slot đã chọn',
+      message: `Xác nhận mở lại ${candidateIds.length} slot đã chọn? Chỉ các slot đã hủy trong tương lai, dịch vụ đang mở và không trùng lịch mới có thể mở lại thành công.`,
+      confirmText: 'Mở lại slot',
+      variant: 'primary',
+      onConfirm: async () => {
+        const res = await api.bulkReopenSlots(candidateIds, session.accessToken)
+        let msg = `Đã mở lại ${res.reopenedCount} slot.`
+        if (res.skippedCount > 0) msg += ` Bỏ qua ${res.skippedCount} slot không đủ điều kiện.`
+        setMessage(msg)
+        setSelectedSlots([])
+        refresh()
+      }
+    })
   }
 
-  const bulkDeleteReports = async () => {
-    if (!window.confirm(`Xác nhận xóa ${selectedReports.length} báo cáo đã chọn?`)) return
-    try {
-      const res = await api.bulkDeleteReports(selectedReports, session.accessToken)
-      setMessage(`Đã xóa ${res.deletedCount} báo cáo.`)
-      setSelectedReports([])
-      refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không thể xóa báo cáo.')
-    }
+  const bulkResolveReports = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Đánh dấu đã xử lý',
+      message: `Xác nhận đánh dấu đã xử lý cho ${selectedReports.length} báo cáo đã chọn?`,
+      confirmText: 'Đánh dấu đã xử lý',
+      variant: 'primary',
+      onConfirm: async () => {
+        const res = await api.bulkResolveReports(selectedReports, session.accessToken)
+        setMessage(`Đã xử lý ${res.resolvedCount} báo cáo.`)
+        setSelectedReports([])
+        refresh()
+      }
+    })
+  }
+
+  const bulkDeleteReports = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Xóa báo cáo',
+      message: `Xác nhận xóa vĩnh viễn ${selectedReports.length} báo cáo đã chọn?`,
+      confirmText: 'Xóa báo cáo',
+      variant: 'danger',
+      onConfirm: async () => {
+        const res = await api.bulkDeleteReports(selectedReports, session.accessToken)
+        setMessage(`Đã xóa ${res.deletedCount} báo cáo.`)
+        setSelectedReports([])
+        refresh()
+      }
+    })
   }
 
   const selectableUsers = useMemo(() => {
     return filteredUsers.filter((u) => u.id !== session.user.id && !u.roles.includes('Admin') && (isAdmin || !u.roles.includes('Manager')))
   }, [filteredUsers, session.user.id, isAdmin])
 
-  const cancellableSlots = useMemo(() => {
-    return filteredSlots.filter((s) => s.status < 3 && s.confirmedBookingCount === 0)
+  const selectableSlots = useMemo(() => {
+    return filteredSlots.filter((s) => {
+      const canCancel = s.status < 3 && s.confirmedBookingCount === 0
+      const isFuture = new Date(s.startAtUtc).getTime() > Date.now() && (!s.bookingClosesAtUtc || new Date(s.bookingClosesAtUtc).getTime() > Date.now())
+      const canReopen = s.status === 4 && isFuture
+      return canCancel || canReopen
+    })
   }, [filteredSlots])
+
+  const cancellableSlotsSelected = useMemo(() => {
+    return selectedSlots.filter(id => {
+      const slot = managedSlots.find(s => s.id === id)
+      return slot && slot.status < 3 && slot.confirmedBookingCount === 0
+    })
+  }, [selectedSlots, managedSlots])
+
+  const reopenableSlotsSelected = useMemo(() => {
+    return selectedSlots.filter(id => {
+      const slot = managedSlots.find(s => s.id === id)
+      return slot && slot.status === 4 && new Date(slot.startAtUtc).getTime() > Date.now() && (!slot.bookingClosesAtUtc || new Date(slot.bookingClosesAtUtc).getTime() > Date.now())
+    })
+  }, [selectedSlots, managedSlots])
 
   return <div className="container dashboard">
     <p className="eyebrow">{isAdmin ? 'Quản trị hệ thống' : 'Vận hành nền tảng'}</p><h1>{isAdmin ? 'Tổng quan OpenSlot' : 'Trung tâm vận hành'}</h1><p className="dashboard-copy">{isAdmin ? 'Quản lý toàn hệ thống, phân quyền Manager và theo dõi mọi hoạt động.' : 'Theo dõi vận hành, duyệt đối tác và xử lý vi phạm trên OpenSlot.'}</p>
@@ -1071,6 +1327,11 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
               <button className="btn btn-sm btn-outline-success" onClick={() => bulkSuspendUsers(false)}>
                 <i className="bi bi-unlock" /> Mở khóa
               </button>
+              {isAdmin && (
+                <button className="btn btn-sm btn-danger" onClick={bulkDeleteUsers}>
+                  <i className="bi bi-trash" /> Xóa tài khoản
+                </button>
+              )}
               <button className="btn btn-sm btn-outline-secondary" onClick={() => setSelectedUsers([])}>
                 Bỏ chọn
               </button>
@@ -1142,7 +1403,12 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
                     {targetIsManager ? 'Thu hồi Manager' : 'Cấp Manager'}
                   </button>
                 )}
-                {!canModerate && !canChangeManager && (
+                {isAdmin && user.id !== session.user.id && !targetIsAdmin && (
+                  <button onClick={() => deleteUser(user)} className="btn btn-sm btn-outline-danger" title="Xóa tài khoản">
+                    <i className="bi bi-trash" /> Xóa
+                  </button>
+                )}
+                {!canModerate && !canChangeManager && (!isAdmin || user.id === session.user.id || targetIsAdmin) && (
                   <span className="section-note">{targetIsAdmin ? 'Tài khoản Admin' : user.id === session.user.id ? 'Tài khoản hiện tại' : 'Chỉ có thể theo dõi'}</span>
                 )}
               </span>
@@ -1182,6 +1448,11 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
               <button className="btn btn-sm btn-outline-success" onClick={() => bulkToggleServices(true)}>
                 <i className="bi bi-eye" /> Mở lại
               </button>
+              {isAdmin && (
+                <button className="btn btn-sm btn-danger" onClick={bulkDeleteServices}>
+                  <i className="bi bi-trash" /> Xóa dịch vụ
+                </button>
+              )}
               <button className="btn btn-sm btn-outline-secondary" onClick={() => setSelectedServices([])}>
                 Bỏ chọn
               </button>
@@ -1226,10 +1497,15 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
             </span>
             <span>{service.providerName}</span>
             <span>{formatMoney(service.basePriceVnd)}</span>
-            <span>
+            <span className="admin-actions">
               <button onClick={() => toggleService(service)} className={`btn btn-sm ${service.isActive ? 'btn-outline-danger' : 'btn-outline-success'}`}>
                 {service.isActive ? 'Ẩn' : 'Mở lại'}
               </button>
+              {isAdmin && (
+                <button onClick={() => deleteService(service)} className="btn btn-sm btn-outline-danger" title="Xóa dịch vụ">
+                  <i className="bi bi-trash" /> Xóa
+                </button>
+              )}
             </span>
           </div>
         )) : (
@@ -1259,9 +1535,16 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
           <div className="bulk-actions-bar">
             <span className="bulk-count">Đã chọn <b>{selectedSlots.length}</b></span>
             <div className="bulk-buttons">
-              <button className="btn btn-sm btn-outline-danger" onClick={bulkCancelSlots}>
-                <i className="bi bi-x-circle" /> Hủy slot đã chọn
-              </button>
+              {cancellableSlotsSelected.length > 0 && (
+                <button className="btn btn-sm btn-outline-danger" onClick={bulkCancelSlots}>
+                  <i className="bi bi-x-circle" /> Hủy ({cancellableSlotsSelected.length})
+                </button>
+              )}
+              {reopenableSlotsSelected.length > 0 && (
+                <button className="btn btn-sm btn-outline-success" onClick={bulkReopenSlots}>
+                  <i className="bi bi-arrow-clockwise" /> Mở lại ({reopenableSlotsSelected.length})
+                </button>
+              )}
               <button className="btn btn-sm btn-outline-secondary" onClick={() => setSelectedSlots([])}>
                 Bỏ chọn
               </button>
@@ -1275,57 +1558,80 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
             <input
               type="checkbox"
               className="table-checkbox"
-              checked={cancellableSlots.length > 0 && cancellableSlots.every((s) => selectedSlots.includes(s.id))}
+              checked={selectableSlots.length > 0 && selectableSlots.every((s) => selectedSlots.includes(s.id))}
               onChange={(e) => {
                 if (e.target.checked) {
-                  setSelectedSlots(Array.from(new Set([...selectedSlots, ...cancellableSlots.map((s) => s.id)])))
+                  setSelectedSlots(Array.from(new Set([...selectedSlots, ...selectableSlots.map((s) => s.id)])))
                 } else {
-                  const cancellableIds = new Set(cancellableSlots.map((s) => s.id))
-                  setSelectedSlots((prev) => prev.filter((id) => !cancellableIds.has(id)))
+                  const selectableIds = new Set(selectableSlots.map((s) => s.id))
+                  setSelectedSlots((prev) => prev.filter((id) => !selectableIds.has(id)))
                 }
               }}
-              aria-label="Chọn tất cả slot có thể hủy"
+              aria-label="Chọn tất cả slot có thể thao tác"
             />
           </span>
           <span>Slot</span>
           <span>Đối tác</span>
+          <span>Trạng thái</span>
           <span>Đã đặt</span>
           <span>Thao tác</span>
         </div>
-        {filteredSlots.length ? filteredSlots.map((slot) => (
-          <div className="table-row" key={slot.id}>
-            <span className="checkbox-cell">
-              {slot.status < 3 && slot.confirmedBookingCount === 0 ? (
-                <input
-                  type="checkbox"
-                  className="table-checkbox"
-                  checked={selectedSlots.includes(slot.id)}
-                  onChange={(e) => {
-                    setSelectedSlots((prev) =>
-                      e.target.checked ? [...prev, slot.id] : prev.filter((id) => id !== slot.id)
-                    )
-                  }}
-                  aria-label={`Chọn slot ${slot.serviceName}`}
-                />
-              ) : <span />}
-            </span>
-            <span>
-              <b>{slot.serviceName}</b>
-              <small>{slot.venueName} · {formatTime(slot.startAtUtc)}</small>
-            </span>
-            <span>{slot.providerName}</span>
-            <span>{slot.confirmedBookingCount}/{slot.capacity}</span>
-            <span>
-              {slot.status < 3 ? (
-                <button disabled={slot.confirmedBookingCount > 0} onClick={() => cancelSlot(slot)} className="btn btn-sm btn-outline-danger">
-                  Hủy
-                </button>
-              ) : (
-                <span className="status-pill">Đã đóng</span>
-              )}
-            </span>
-          </div>
-        )) : (
+        {filteredSlots.length ? filteredSlots.map((slot) => {
+          const isFuture = new Date(slot.startAtUtc).getTime() > Date.now() && (!slot.bookingClosesAtUtc || new Date(slot.bookingClosesAtUtc).getTime() > Date.now())
+          const canCancel = slot.status < 3 && slot.confirmedBookingCount === 0
+          const canReopen = slot.status === 4 && isFuture
+          const canSelect = canCancel || canReopen
+
+          return (
+            <div className="table-row" key={slot.id}>
+              <span className="checkbox-cell">
+                {canSelect ? (
+                  <input
+                    type="checkbox"
+                    className="table-checkbox"
+                    checked={selectedSlots.includes(slot.id)}
+                    onChange={(e) => {
+                      setSelectedSlots((prev) =>
+                        e.target.checked ? [...prev, slot.id] : prev.filter((id) => id !== slot.id)
+                      )
+                    }}
+                    aria-label={`Chọn slot ${slot.serviceName}`}
+                  />
+                ) : <span />}
+              </span>
+              <span>
+                <b>{slot.serviceName}</b>
+                <small>{slot.venueName} · {formatTime(slot.startAtUtc)}</small>
+              </span>
+              <span>{slot.providerName}</span>
+              <span>
+                {slot.status === 0 && <span className="badge bg-secondary">Nháp</span>}
+                {slot.status === 1 && <span className="badge bg-success">Đang mở</span>}
+                {slot.status === 2 && <span className="badge bg-warning text-dark">Kín chỗ</span>}
+                {slot.status === 3 && <span className="badge bg-dark">Hết hạn</span>}
+                {slot.status === 4 && <span className="badge bg-danger">Đã hủy</span>}
+              </span>
+              <span>{slot.confirmedBookingCount}/{slot.capacity}</span>
+              <span className="admin-actions">
+                {canCancel && (
+                  <button onClick={() => cancelSlot(slot)} className="btn btn-sm btn-outline-danger">
+                    Hủy
+                  </button>
+                )}
+                {canReopen && (
+                  <button onClick={() => reopenSlot(slot)} className="btn btn-sm btn-outline-success">
+                    Mở lại
+                  </button>
+                )}
+                {!canCancel && !canReopen && (
+                  <span className="section-note">
+                    {slot.status === 1 && slot.confirmedBookingCount > 0 ? 'Có booking' : slot.status === 4 ? 'Đã qua giờ' : 'Không khả dụng'}
+                  </span>
+                )}
+              </span>
+            </div>
+          )
+        }) : (
           <div className="empty-state"><p>Không tìm thấy slot phù hợp.</p></div>
         )}
       </div>
@@ -1409,6 +1715,31 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
           <div className="empty-state"><p>Không tìm thấy báo cáo nào phù hợp.</p></div>
         )}
       </div>
+      {confirmModal && (
+        <ConfirmModal
+          isOpen={confirmModal.isOpen}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          confirmText={confirmModal.confirmText}
+          variant={confirmModal.variant}
+          loading={confirmLoading}
+          onConfirm={async () => {
+            try {
+              setConfirmLoading(true)
+              await confirmModal.onConfirm()
+              setConfirmModal(null)
+            } catch (e) {
+              setError(e instanceof Error ? e.message : 'Thao tác không thành công.')
+              setConfirmModal(null)
+            } finally {
+              setConfirmLoading(false)
+            }
+          }}
+          onCancel={() => {
+            if (!confirmLoading) setConfirmModal(null)
+          }}
+        />
+      )}
     </>}
   </div>
 }
@@ -1453,6 +1784,15 @@ function CategoryManagementPanel({ token, isAdmin }: { token: string; isAdmin?: 
   const [message, setMessage] = useState('')
   const [categorySearch, setCategorySearch] = useState('')
   const [selectedCategories, setSelectedCategories] = useState<number[]>([])
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    confirmText?: string
+    variant?: 'danger' | 'warning' | 'primary'
+    onConfirm: () => Promise<void>
+  } | null>(null)
+  const [confirmLoading, setConfirmLoading] = useState(false)
 
   const refresh = () => { api.adminCategories(token).then(setCategories).catch((e: Error) => setError(e.message)) }
   useEffect(refresh, [token])
@@ -1488,44 +1828,56 @@ function CategoryManagementPanel({ token, isAdmin }: { token: string; isAdmin?: 
       setError(e instanceof Error ? e.message : 'Không thể cập nhật danh mục.')
     }
   }
-  const remove = async (category: AdminCategory) => {
-    if (!window.confirm(`Xóa danh mục "${category.name}"? Danh mục chỉ có thể xóa khi chưa có dịch vụ nào liên kết.`)) return
-    try {
-      await api.adminDeleteCategory(category.id, token)
-      setMessage(`Đã xóa danh mục ${category.name}.`)
-      refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không thể xóa danh mục.')
-    }
+  const remove = (category: AdminCategory) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Xóa danh mục',
+      message: `Xóa danh mục "${category.name}"? Danh mục chỉ có thể xóa khi chưa có dịch vụ nào liên kết.`,
+      confirmText: 'Xác nhận xóa',
+      variant: 'danger',
+      onConfirm: async () => {
+        await api.adminDeleteCategory(category.id, token)
+        setMessage(`Đã xóa danh mục ${category.name}.`)
+        refresh()
+      }
+    })
   }
 
-  const bulkToggleCategories = async (active: boolean) => {
+  const bulkToggleCategories = (active: boolean) => {
     const label = active ? 'mở lại' : 'tạm ngưng'
-    if (!window.confirm(`Xác nhận ${label} ${selectedCategories.length} danh mục đã chọn?`)) return
-    try {
-      const res = active
-        ? await api.bulkActivateCategories(selectedCategories, token)
-        : await api.bulkDeactivateCategories(selectedCategories, token)
-      setMessage(`Đã ${label} ${res.updatedCount} danh mục.`)
-      setSelectedCategories([])
-      refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không thể cập nhật danh mục.')
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: `Xác nhận ${label} danh mục`,
+      message: `Xác nhận ${label} ${selectedCategories.length} danh mục đã chọn?`,
+      confirmText: `Xác nhận ${label}`,
+      variant: active ? 'primary' : 'warning',
+      onConfirm: async () => {
+        const res = active
+          ? await api.bulkActivateCategories(selectedCategories, token)
+          : await api.bulkDeactivateCategories(selectedCategories, token)
+        setMessage(`Đã ${label} ${res.updatedCount} danh mục.`)
+        setSelectedCategories([])
+        refresh()
+      }
+    })
   }
 
-  const bulkDeleteCategories = async () => {
-    if (!window.confirm(`Xác nhận xóa ${selectedCategories.length} danh mục đã chọn? Chỉ danh mục chưa có dịch vụ liên kết mới có thể xóa.`)) return
-    try {
-      const res = await api.bulkDeleteCategories(selectedCategories, token)
-      let msg = `Đã xóa ${res.deletedCount} danh mục.`
-      if (res.skippedCount > 0) msg += ` Bỏ qua ${res.skippedCount} danh mục do đang có dịch vụ liên kết.`
-      setMessage(msg)
-      setSelectedCategories([])
-      refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không thể xóa danh mục.')
-    }
+  const bulkDeleteCategories = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Xóa hàng loạt danh mục',
+      message: `Xác nhận xóa ${selectedCategories.length} danh mục đã chọn? Chỉ danh mục chưa có dịch vụ liên kết mới có thể xóa.`,
+      confirmText: 'Xóa danh mục đã chọn',
+      variant: 'danger',
+      onConfirm: async () => {
+        const res = await api.bulkDeleteCategories(selectedCategories, token)
+        let msg = `Đã xóa ${res.deletedCount} danh mục.`
+        if (res.skippedCount > 0) msg += ` Bỏ qua ${res.skippedCount} danh mục do đang có dịch vụ liên kết.`
+        setMessage(msg)
+        setSelectedCategories([])
+        refresh()
+      }
+    })
   }
 
   return (
@@ -1695,6 +2047,31 @@ function CategoryManagementPanel({ token, isAdmin }: { token: string; isAdmin?: 
           <div className="empty-state"><p>Không tìm thấy danh mục phù hợp.</p></div>
         )}
       </div>
+      {confirmModal && (
+        <ConfirmModal
+          isOpen={confirmModal.isOpen}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          confirmText={confirmModal.confirmText}
+          variant={confirmModal.variant}
+          loading={confirmLoading}
+          onConfirm={async () => {
+            try {
+              setConfirmLoading(true)
+              await confirmModal.onConfirm()
+              setConfirmModal(null)
+            } catch (e) {
+              setError(e instanceof Error ? e.message : 'Thao tác không thành công.')
+              setConfirmModal(null)
+            } finally {
+              setConfirmLoading(false)
+            }
+          }}
+          onCancel={() => {
+            if (!confirmLoading) setConfirmModal(null)
+          }}
+        />
+      )}
     </section>
   )
 }
