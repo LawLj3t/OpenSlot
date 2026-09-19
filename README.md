@@ -7,7 +7,10 @@ Nền tảng săn các khung giờ dịch vụ còn trống với ưu đãi sát
 ## Chức năng chính
 
 - Khách hàng: đăng ký Gmail, xác minh bằng link email, đăng nhập, khám phá/lọc slot, giữ chỗ realtime trong lúc thanh toán QR VietinBank demo, QR/PIN check-in, xem và hủy lịch.
-- Đối tác: chủ cửa hàng tự nộp hồ sơ, cập nhật địa điểm, khai báo sân/bàn/ghế/phòng có thể đặt, tạo dịch vụ và phát hành slot đúng đơn vị; check-in rồi hoàn tất dịch vụ.
+- Đối tác: giao diện phân tách thành hai trang độc lập chuyên biệt:
+  - **Quản lý slot & Check-in** (`/provider`): quản lý danh sách slot, bộ lọc trạng thái, tạo slot nháp, phát hành / dừng nhận đặt / hủy slot, mở modal xem chi tiết slot (view-only), check-in bằng mã QR hoặc PIN và hoàn tất dịch vụ.
+  - **Thiết lập gian hàng** (`/provider/setup`): cấu hình thông tin hồ sơ doanh nghiệp, quản lý địa điểm (venue), quản lý chỗ đặt sân/bàn/ghế/phòng (Thêm, Sửa, Ngưng sử dụng, Mở lại sử dụng), danh mục dịch vụ và theo dõi trạng thái phê duyệt từ Manager.
+  - Hỗ trợ thanh điều hướng nhanh dạng tab (`ProviderNavTabs`) và menu riêng biệt trên thanh header.
 - Đối tác: một tài khoản vẫn giữ quyền Khách hàng để đặt dịch vụ; người dùng chọn cổng Khách hàng hoặc Đối tác khi đăng nhập và có thể chuyển lại trong thanh điều hướng.
 - Manager: dashboard vận hành, duyệt/yêu cầu bổ sung/tạm khóa đối tác, xem chi tiết cửa hàng/địa điểm/đơn vị đặt/dịch vụ/slot, quản lý danh mục chung, theo dõi tài khoản, kiểm duyệt dịch vụ/slot và xử lý báo cáo.
 - Quản trị viên: quản lý toàn hệ thống và cấp/thu hồi quyền Manager.
@@ -113,11 +116,11 @@ OpenSlot dùng OpenStreetMap qua Leaflet. Không cần Google Cloud, billing acc
 ```powershell
 dotnet test OpenSlot.slnx --no-restore
 cd frontend/openslot-web
-npm run lint
+npx oxlint
 npm run build
 ```
 
-Kết quả QA hiện tại: backend 31/31 unit test đạt, frontend build và lint sạch. Luồng tranh chỗ cuối và lượt giữ chỗ đã được kiểm thử đồng thời: đúng một request giữ được chỗ, request còn lại nhận `409`.
+Kết quả QA hiện tại: backend 46/46 unit test đạt (100% pass), frontend linter 0 lỗi và build Vite sạch sẽ. Luồng tranh chỗ cuối, giữ chỗ realtime, quy tắc mở lại slot (reopen), kích hoạt/sửa tài nguyên đặt chỗ và SignalR availability đã được kiểm thử toàn diện.
 
 ## Chạy bằng Docker
 

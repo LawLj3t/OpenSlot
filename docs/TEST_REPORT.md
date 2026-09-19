@@ -1,18 +1,21 @@
 # Báo cáo kiểm thử OpenSlot
 
-Ngày kiểm thử gần nhất: 14/09/2026.
+Ngày kiểm thử gần nhất: 18/09/2026.
 
 ## Kiểm thử tự động
 
 | Hạng mục | Kết quả |
 | --- | --- |
-| `dotnet test OpenSlot.slnx --no-restore` | 31 passed, 0 failed |
-| `npm run lint` | Thành công, 0 warning/error |
+| `dotnet test OpenSlot.slnx --no-restore` | 46 passed, 0 failed (100% pass) |
+| `npx oxlint` | Thành công, 0 error |
 | `npm run build` | Thành công, TypeScript và Vite production build |
 
-Unit test tập trung vào `SlotPolicy`, chuẩn hóa slug danh mục, validation số điện thoại và chỉ chấp nhận Gmail khi đăng ký: giá hợp lệ, giá deal thấp hơn giá gốc, thời gian bắt đầu/kết thúc, cửa sổ booking, capacity, điều kiện phát hành và tên danh mục tiếng Việt.
-
-Luồng bảo mật tài khoản kiểm thử token đặt lại mật khẩu: token Identity chỉ sử dụng được một lần, thay đổi mật khẩu đổi security stamp và token JWT cũ sẽ không còn hợp lệ.
+Unit test tập trung vào:
+- `SlotPolicy`: giá hợp lệ, giá deal thấp hơn giá gốc, thời gian bắt đầu/kết thúc, cửa sổ booking, capacity, điều kiện phát hành.
+- Chuẩn hóa slug danh mục, validation số điện thoại và chỉ chấp nhận Gmail khi đăng ký.
+- Quản lý vòng đời mở lại slot (`Admin` / `Provider` reopen/republish policy): kiểm tra mở lại slot đã dừng/hủy khi còn trước giờ bắt đầu, tự động điều chỉnh cửa sổ booking hợp lý.
+- Quản lý chỗ đặt (`BookableResource`): kích hoạt lại (activate) và chỉnh sửa (update) tài nguyên chỗ đặt, bảo đảm hợp đồng dữ liệu chuẩn xác.
+- Luồng bảo mật tài khoản kiểm thử token đặt lại mật khẩu: token Identity chỉ sử dụng được một lần, thay đổi mật khẩu đổi security stamp và token JWT cũ sẽ không còn hợp lệ.
 
 ## Smoke test API
 

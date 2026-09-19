@@ -101,9 +101,14 @@ Backend dùng mô hình modular monolith: một API deployable nhưng tách rõ 
 
 ### Giai đoạn 4 – Provider module
 
-- CRUD thông tin nhà cung cấp và dịch vụ.
+- Phân tách giao diện thành hai trang chuyên biệt, độc lập:
+  - `/provider` (Quản lý slot & Check-in): theo dõi danh sách slot, bộ lọc trạng thái, tạo slot nháp, phát hành / ngưng nhận đặt / hủy slot, modal chi tiết slot (view-only), panel check-in bằng QR và PIN.
+  - `/provider/setup` (Thiết lập gian hàng): quản lý thông tin hồ sơ đối tác, địa điểm (venue), quản lý chỗ đặt sân/bàn/ghế/phòng (Thêm / Sửa / Ngưng sử dụng / Mở lại sử dụng), danh mục dịch vụ, và banner trạng thái duyệt từ Manager.
+- Sub-navigation trực quan qua thanh tab `ProviderNavTabs` và liên kết trực tiếp trên header chính.
+- CRUD thông tin nhà cung cấp, địa điểm và dịch vụ.
+- Quản lý vòng đời chỗ đặt (BookableResource): thêm mới, sửa thông tin (tên, mã, tầng/khu vực, sức chứa), ngưng sử dụng và mở lại sử dụng với modal xác nhận.
 - Provider lưu latitude và longitude thật cho Venue, hiển thị marker trên OpenStreetMap.
-- Tạo, sửa, phát hành, tạm dừng slot.
+- Tạo, phát hành, tạm dừng, hủy và đăng lại (republish) slot khi còn trong thời hạn hợp lệ; cập nhật realtime qua SignalR.
 - Cấu hình giá, số lượng, thời gian mở bán và thời hạn check-in.
 - Dashboard quản lý slot và booking.
 - Chỉ cho sửa slot ở trạng thái Draft hoặc Published chưa có booking xác nhận.
@@ -153,8 +158,8 @@ Backend dùng mô hình modular monolith: một API deployable nhưng tách rõ 
 
 ### Giai đoạn 10 – Test, tài liệu và demo
 
-- Unit test các luật booking, thời hạn và chống đặt trùng.
-- Smoke test các luồng Customer/Provider/Admin.
+- Unit test các luật booking, thời hạn, chống đặt trùng, điều kiện mở lại slot (reopen) và quản lý vòng đời chỗ đặt (46/46 tests pass 100%).
+- Smoke test các luồng Customer/Provider/Admin/Manager/CSKH.
 - Kiểm tra concurrency khi hai tài khoản đặt cùng slot.
 - Viết API documentation và hướng dẫn chạy local.
 - Chuẩn bị tài khoản demo, dữ liệu demo và kịch bản trình bày.

@@ -37,10 +37,14 @@ SQLite + EF Core migrations
 1. Admin duyệt provider.
 2. Customer gửi hồ sơ để được bổ sung quyền Provider trên cùng email. Provider ở trạng thái Pending có thể chuẩn bị venue, đơn vị có thể đặt, service và slot nháp; khi cần, chủ cửa hàng chuyển về cổng Customer để đặt dịch vụ.
 3. Manager duyệt, yêu cầu bổ sung hoặc tạm khóa Provider. Chỉ Provider Approved phát hành slot; hệ thống kiểm tra giờ, giá, sức chứa và slot chồng lấn trên cùng đơn vị.
-4. Customer tìm theo từ khóa/khu vực/danh mục hoặc vị trí hiện tại. Khi vào thanh toán, API tạo `SlotHold` trong 10 phút và SignalR cập nhật sức chứa cho các trình duyệt đang mở.
-5. Customer xác nhận thanh toán demo để chuyển `SlotHold` thành `Booking`; hủy hoặc hết hạn sẽ trả chỗ. Transaction và concurrency token bảo đảm không bán vượt sức chứa.
-6. Hệ thống trả QR/PIN; provider check-in trong cửa sổ hợp lệ và đánh dấu hoàn tất.
-7. Worker tự hết hạn slot, đánh dấu no-show và áp dụng strike.
+4. Cổng đối tác (Provider Portal) được tách thành hai trang độc lập chuyên biệt:
+   - `Quản lý slot & Check-in` (`/provider`): theo dõi và tạo/hủy/phát hành slot, modal xem chi tiết slot, kiểm tra khách check-in và hoàn tất dịch vụ.
+   - `Thiết lập gian hàng` (`/provider/setup`): cập nhật hồ sơ doanh nghiệp, quản lý địa điểm, quản lý vòng đời chỗ đặt (thêm/sửa thông tin/ngưng sử dụng/mở lại sử dụng), danh mục dịch vụ và trạng thái phê duyệt từ Manager.
+   - Hỗ trợ chuyển đổi mượt mà qua thanh tab `ProviderNavTabs` và navigation bar trên header.
+5. Customer tìm theo từ khóa/khu vực/danh mục hoặc vị trí hiện tại. Khi vào thanh toán, API tạo `SlotHold` trong 10 phút và SignalR cập nhật sức chứa cho các trình duyệt đang mở.
+6. Customer xác nhận thanh toán demo để chuyển `SlotHold` thành `Booking`; hủy hoặc hết hạn sẽ trả chỗ. Transaction và concurrency token bảo đảm không bán vượt sức chứa.
+7. Hệ thống trả QR/PIN; provider check-in trong cửa sổ hợp lệ và đánh dấu hoàn tất.
+8. Worker tự hết hạn slot, đánh dấu no-show và áp dụng strike. Mở lại (reopen) hoặc đăng lại (republish) slot phát thông báo SignalR realtime tức thì.
 
 ## Bảo mật và tính toàn vẹn
 
