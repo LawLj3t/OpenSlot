@@ -27,16 +27,25 @@ Các tình huống "bất ổn" bắt buộc phải dừng và báo ngay:
 
 ---
 
-## 2. QUY TRÌNH QUẢN LÝ TASK & THỰC HIỆN CUỐN CHIẾU
+## 2. QUY TRÌNH TIẾP NHẬN YÊU CẦU & THỰC HIỆN CUỐN CHIẾU
 
-Khi nhận yêu cầu lớn hoặc gồm nhiều tính năng:
-1. **Lập Kế hoạch & Phân rã Task**:
-   - Tách biệt task độc lập và task phụ thuộc.
-   - Thống nhất thứ tự thực hiện tối ưu để tiết kiệm token và tránh sửa chéo.
-2. **Thực hiện Cuốn chiếu & Chắc chắn**:
-   - Triển khai tuần tự theo từng task.
-   - Mỗi task hoàn thành phải vượt qua toàn bộ các bước kiểm tra (linter, build, tests) trước khi sang task tiếp theo.
-   - Không ôm đồm sửa dàn trải cả chục file cùng lúc nếu chưa chốt chắc phần cốt lõi.
+### 📝 Nguyên Tắc Bắt Buộc: Viết Lại Prompt & Lên Plan Trước Khi Code (Planning First)
+**Khi người dùng trình bày một vấn đề, báo lỗi hoặc yêu cầu tính năng mới:**
+1. **TUYỆT ĐỐI KHÔNG nhảy vào sửa file hay viết code ngay lập tức.**
+2. **Viết lại Prompt & Làm rõ bài toán**: Droid tự động phân tích và chuẩn hóa lại vấn đề:
+   - **Hiện trạng & Vấn đề gốc rễ**: Hiện tượng lỗi là gì, code ở đâu đang xử lý chưa đúng.
+   - **Mục tiêu kỹ thuật**: Cần đạt được điều gì, phạm vi chạm vào những module nào.
+   - **Giải pháp đề xuất**: Nêu rõ hướng tiếp cận kỹ thuật.
+3. **Lập Kế hoạch Triển khai Chi tiết (Plan)**:
+   - Phân rã task rõ ràng (Task độc lập / Task phụ thuộc).
+   - Thống nhất trình tự thực hiện để tiết kiệm token và tránh sửa chéo.
+   - Trình bày kế hoạch cho người dùng duyệt (hoặc dùng Spec Mode / Todo List) trước khi đụng vào code.
+4. **Chỉ khi kế hoạch được chốt hoặc người dùng đồng ý mới bắt đầu thực thi.**
+
+### ⚙️ Thực Hiện Cuốn Chiếu & Chắc Chắn
+- Triển khai tuần tự theo từng task đã lập trong kế hoạch.
+- Mỗi task hoàn thành phải vượt qua toàn bộ các bước kiểm tra (linter, build, tests) trước khi sang task tiếp theo.
+- Không ôm đồm sửa dàn trải cả chục file cùng lúc nếu chưa chốt chắc phần cốt lõi.
 
 ---
 
