@@ -252,10 +252,17 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
     [HttpDelete("services/{serviceId:guid}")]
     public async Task<IActionResult> DeleteService(Guid serviceId, CancellationToken cancellationToken)
     {
-        var (success, error) = await TryDeleteServiceInternalAsync(serviceId, cancellationToken);
+        var (success, error, isSoftDeleted) = await TryDeleteServiceInternalAsync(serviceId, cancellationToken);
         if (!success) throw new ApiException(error ?? "Không thể xóa dịch vụ.", StatusCodes.Status400BadRequest);
         await db.SaveChangesAsync(cancellationToken);
-        return NoContent();
+        return Ok(new
+        {
+            success = true,
+            isSoftDeleted,
+            message = isSoftDeleted
+                ? "Dịch vụ đã được chuyển sang trạng thái ngưng hoạt động do có lịch sử đặt chỗ."
+                : "Dịch vụ đã được xóa hoàn toàn khỏi hệ thống."
+        });
     }
 
     [Authorize(Roles = RoleNames.Admin)]
@@ -263,15 +270,20 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
     public async Task<IActionResult> BulkDeleteServices(BulkIdsRequest<Guid> request, CancellationToken cancellationToken)
     {
         var deletedCount = 0;
+        var softDeletedCount = 0;
         var skipped = new List<string>();
         foreach (var id in request.Ids.Distinct())
         {
-            var (success, error) = await TryDeleteServiceInternalAsync(id, cancellationToken);
-            if (success) deletedCount++;
+            var (success, error, isSoftDeleted) = await TryDeleteServiceInternalAsync(id, cancellationToken);
+            if (success)
+            {
+                if (isSoftDeleted) softDeletedCount++;
+                else deletedCount++;
+            }
             else if (!string.IsNullOrWhiteSpace(error)) skipped.Add(error);
         }
         await db.SaveChangesAsync(cancellationToken);
-        return Ok(new { deletedCount, skippedCount = skipped.Count, skipped });
+        return Ok(new { deletedCount, softDeletedCount, skippedCount = skipped.Count, skipped });
     }
 
     [HttpGet("slots")]
@@ -961,14 +973,14 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
         return (true, null);
     }
 
-    private async Task<(bool Success, string? Error)> TryDeleteServiceInternalAsync(Guid serviceId, CancellationToken cancellationToken)
+    private async Task<(bool Success, string? Error, bool IsSoftDeleted)> TryDeleteServiceInternalAsync(Guid serviceId, CancellationToken cancellationToken)
     {
         var service = await db.ServiceOfferings
             .Include(x => x.Venue).ThenInclude(v => v.ProviderProfile)
             .Include(x => x.DealSlots)
             .SingleOrDefaultAsync(x => x.Id == serviceId, cancellationToken);
 
-        if (service == null) return (false, "Không tìm thấy dịch vụ.");
+        if (service == null) return (false, "Không tìm thấy dịch vụ.", false);
 
         var activeBookingsCount = await db.Bookings.CountAsync(b =>
             b.DealSlot.ServiceOfferingId == serviceId &&
@@ -977,7 +989,7 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
 
         if (activeBookingsCount > 0)
         {
-            return (false, $"Dịch vụ “{service.Name}” còn {activeBookingsCount} booking đang hoạt động.");
+            return (false, $"Dịch vụ “{service.Name}” còn {activeBookingsCount} booking đang hoạt động.", false);
         }
 
         var now = DateTime.UtcNow;
@@ -989,7 +1001,7 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
 
         if (activeHoldsCount > 0)
         {
-            return (false, $"Dịch vụ “{service.Name}” đang có khách hàng giữ chỗ thanh toán.");
+            return (false, $"Dịch vụ “{service.Name}” đang có khách hàng giữ chỗ thanh toán.", false);
         }
 
         var futureSlots = service.DealSlots
@@ -1002,12 +1014,23 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
         }
 
         var hasHistoricalBookings = await db.Bookings.AnyAsync(b => b.DealSlot.ServiceOfferingId == serviceId, cancellationToken);
+        var isSoftDeleted = false;
         if (hasHistoricalBookings)
         {
             service.IsActive = false;
+            isSoftDeleted = true;
         }
         else
         {
+            var slotIds = service.DealSlots.Select(s => s.Id).ToList();
+            if (slotIds.Count > 0)
+            {
+                var relatedHolds = await db.SlotHolds.Where(h => slotIds.Contains(h.DealSlotId)).ToListAsync(cancellationToken);
+                if (relatedHolds.Count > 0)
+                {
+                    db.SlotHolds.RemoveRange(relatedHolds);
+                }
+            }
             db.DealSlots.RemoveRange(service.DealSlots);
             db.ServiceOfferings.Remove(service);
         }
@@ -1026,13 +1049,15 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
             db.Notifications.Add(new Notification
             {
                 UserId = service.Venue.ProviderProfile.UserId,
-                Title = "Dịch vụ đã bị xóa",
-                Message = $"Dịch vụ “{service.Name}” đã bị xóa bởi quản trị viên hệ thống.",
+                Title = isSoftDeleted ? "Dịch vụ đã ngưng hoạt động" : "Dịch vụ đã bị xóa",
+                Message = isSoftDeleted
+                    ? $"Dịch vụ “{service.Name}” đã được quản trị viên chuyển sang ngưng hoạt động do có lịch sử đặt chỗ."
+                    : $"Dịch vụ “{service.Name}” đã bị xóa bởi quản trị viên hệ thống.",
                 Link = "/provider"
             });
         }
 
-        return (true, null);
+        return (true, null, isSoftDeleted);
     }
 
     private async Task<(bool Success, string? Error)> TryReopenSlotInternalAsync(Guid slotId, CancellationToken cancellationToken)

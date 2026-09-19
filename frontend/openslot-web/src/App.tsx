@@ -560,12 +560,47 @@ function ProviderPage({ session }: { session: Session }) {
   const [detailSlot, setDetailSlot] = useState<ProviderSlot | null>(null)
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; confirmText?: string; variant?: 'danger' | 'warning' | 'primary'; onConfirm: () => Promise<void> } | null>(null)
   const [confirmLoading, setConfirmLoading] = useState(false)
+  const isMountedRef = useRef(true)
+  const lastRefreshTime = useRef(0)
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   // oxlint-disable-next-line react/set-state-in-effect -- loading belongs to the request lifecycle
-  const refresh = useCallback(() => { setLoading(true); return Promise.all([api.providerSlots(session.accessToken), api.providerServices(session.accessToken), api.providerResources(session.accessToken), api.providerProfile(session.accessToken)]).then(([slotData, serviceData, resourceData, profileData]) => { setSlots(slotData); setServices(serviceData); setResources(resourceData); setProfile(profileData) }).catch((e: Error) => setError(e.message)).finally(() => setLoading(false)) }, [session.accessToken])
+  const refresh = useCallback(() => {
+    setLoading(true)
+    return Promise.all([
+      api.providerSlots(session.accessToken),
+      api.providerServices(session.accessToken),
+      api.providerResources(session.accessToken),
+      api.providerProfile(session.accessToken)
+    ]).then(([slotData, serviceData, resourceData, profileData]) => {
+      if (isMountedRef.current) {
+        setSlots(slotData)
+        setServices(serviceData)
+        setResources(resourceData)
+        setProfile(profileData)
+      }
+    }).catch((e: Error) => {
+      if (isMountedRef.current) setError(e.message)
+    }).finally(() => {
+      if (isMountedRef.current) setLoading(false)
+    })
+  }, [session.accessToken])
+
   // oxlint-disable-next-line react/set-state-in-effect -- provider data is loaded from an external request lifecycle.
   useEffect(() => { void refresh() }, [refresh])
-  useSlotAvailability(useCallback(() => { void refresh() }, [refresh]))
+
+  useSlotAvailability(useCallback(() => {
+    const now = Date.now()
+    if (now - lastRefreshTime.current < 1500) return
+    lastRefreshTime.current = now
+    void refresh()
+  }, [refresh]))
   const publish = async (id: string) => { if (profile?.status !== 1) { setError('Hồ sơ cửa hàng đang chờ Manager duyệt nên chưa thể phát hành slot.'); return }; try { await api.publishProviderSlot(id, session.accessToken); setNotice('Slot đã được phát hành.'); refresh() } catch (e) { setError(e instanceof Error ? e.message : 'Không thể phát hành slot.') } }
   const resubmit = async () => { try { await api.resubmitProviderProfile(session.accessToken); setNotice('Đã gửi lại hồ sơ để Manager xét duyệt.'); refresh() } catch (e) { setError(e instanceof Error ? e.message : 'Không thể gửi lại hồ sơ.') } }
 
@@ -621,8 +656,36 @@ function ProviderCatalogPanel({ token, onServicesChanged }: { token: string; onS
   const [profile, setProfile] = useState<MyProviderProfile | null>(null); const [venues, setVenues] = useState<ProviderVenue[]>([]); const [resources, setResources] = useState<ProviderResource[]>([]); const [categories, setCategories] = useState<Category[]>([]); const [services, setServices] = useState<ProviderService[]>([]); const [mode, setMode] = useState<'none' | 'profile' | 'venue' | 'resource' | 'service'>('none'); const [editingResource, setEditingResource] = useState<ProviderResource | null>(null); const [message, setMessage] = useState(''); const [error, setError] = useState('')
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; confirmText?: string; variant?: 'danger' | 'warning' | 'primary'; onConfirm: () => Promise<void> } | null>(null)
   const [confirmLoading, setConfirmLoading] = useState(false)
-  const load = useCallback(() => Promise.all([api.providerProfile(token), api.providerVenues(token), api.providerResources(token), api.categories(), api.providerServices(token)]).then(([profileData, venueData, resourceData, categoryData, serviceData]) => { setProfile(profileData); setVenues(venueData); setResources(resourceData); setCategories(categoryData); setServices(serviceData) }).catch((e: Error) => setError(e.message)), [token])
-  useEffect(() => { load() }, [load])
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  const load = useCallback(() => {
+    return Promise.all([
+      api.providerProfile(token),
+      api.providerVenues(token),
+      api.providerResources(token),
+      api.categories(),
+      api.providerServices(token)
+    ]).then(([profileData, venueData, resourceData, categoryData, serviceData]) => {
+      if (isMountedRef.current) {
+        setProfile(profileData)
+        setVenues(venueData)
+        setResources(resourceData)
+        setCategories(categoryData)
+        setServices(serviceData)
+      }
+    }).catch((e: Error) => {
+      if (isMountedRef.current) setError(e.message)
+    })
+  }, [token])
+
+  useEffect(() => { void load() }, [load])
   const success = (text: string) => { setMode('none'); setEditingResource(null); setError(''); setMessage(text); load(); onServicesChanged() }
   const deactivate = (resource: ProviderResource) => {
     setConfirmModal({
@@ -659,24 +722,36 @@ function ProviderSetupPage({ session }: { session: Session }) {
   const [profile, setProfile] = useState<MyProviderProfile | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   const refreshProfile = useCallback(() => {
-    api.providerProfile(session.accessToken)
-      .then(setProfile)
-      .catch((e: Error) => setError(e.message))
+    return api.providerProfile(session.accessToken)
+      .then((data) => {
+        if (isMountedRef.current) setProfile(data)
+      })
+      .catch((e: Error) => {
+        if (isMountedRef.current) setError(e.message)
+      })
   }, [session.accessToken])
 
   useEffect(() => {
-    refreshProfile()
+    void refreshProfile()
   }, [refreshProfile])
 
   const resubmit = async () => {
     try {
       await api.resubmitProviderProfile(session.accessToken)
-      setNotice('Đã gửi lại hồ sơ để Manager xét duyệt.')
-      refreshProfile()
+      if (isMountedRef.current) setNotice('Đã gửi lại hồ sơ để Manager xét duyệt.')
+      void refreshProfile()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không thể gửi lại hồ sơ.')
+      if (isMountedRef.current) setError(e instanceof Error ? e.message : 'Không thể gửi lại hồ sơ.')
     }
   }
 
@@ -1051,8 +1126,15 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
       confirmText: 'Xóa dịch vụ',
       variant: 'danger',
       onConfirm: async () => {
-        await api.adminDeleteService(service.id, session.accessToken)
-        setMessage(`Đã xóa dịch vụ ${service.name}.`)
+        const res = await api.adminDeleteService(service.id, session.accessToken)
+        if (res.isSoftDeleted) {
+          setManagedServices((prev) => prev.map((s) => s.id === service.id ? { ...s, isActive: false } : s))
+          setMessage(res.message || `Dịch vụ "${service.name}" đã được chuyển sang trạng thái ngưng hoạt động do có lịch sử đặt chỗ.`)
+        } else {
+          setManagedServices((prev) => prev.filter((s) => s.id !== service.id))
+          setSelectedServices((prev) => prev.filter((id) => id !== service.id))
+          setMessage(res.message || `Đã xóa dịch vụ "${service.name}".`)
+        }
         refresh()
       }
     })
@@ -1067,7 +1149,7 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
       variant: 'danger',
       onConfirm: async () => {
         const res = await api.bulkDeleteServices(selectedServices, session.accessToken)
-        let msg = `Đã xóa hoặc ngưng hoạt động ${res.deletedCount} dịch vụ.`
+        let msg = `Đã xử lý: xóa ${res.deletedCount} dịch vụ, chuyển ngưng hoạt động ${res.softDeletedCount || 0} dịch vụ.`
         if (res.skippedCount > 0) msg += ` Bỏ qua ${res.skippedCount} dịch vụ do còn booking đang hoạt động.`
         setMessage(msg)
         setSelectedServices([])
@@ -1593,7 +1675,10 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
             </span>
             <span>
               <b>{service.name}</b>
-              <small>{service.categoryName} · {service.venueName}</small>
+              <small>
+                {service.categoryName} · {service.venueName}
+                {!service.isActive && <span className="text-warning ms-1">(Ngưng hoạt động)</span>}
+              </small>
             </span>
             <span>{service.providerName}</span>
             <span>{formatMoney(service.basePriceVnd)}</span>

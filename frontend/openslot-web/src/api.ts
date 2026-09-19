@@ -99,21 +99,34 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string, 
   if (token) headers.set('Authorization', `Bearer ${token}`)
 
   const controller = new AbortController()
-  const timeoutId = window.setTimeout(() => controller.abort(), 25_000)
+  if (init.signal) {
+    if (init.signal.aborted) {
+      controller.abort()
+    } else {
+      init.signal.addEventListener('abort', () => controller.abort(), { once: true })
+    }
+  }
+
+  const timeoutId = window.setTimeout(() => controller.abort(), 30_000)
   let response: Response
   try {
     response = await fetch(`${apiBase}${path}`, { ...init, headers, signal: controller.signal })
   } catch (error) {
     window.clearTimeout(timeoutId)
+    // If request was deliberately aborted by caller, do not retry
+    if (init.signal?.aborted) {
+      throw error
+    }
+    const isGet = !init.method || init.method.toUpperCase() === 'GET'
     if (error instanceof DOMException && error.name === 'AbortError') {
-      if (retryCount < 2) {
-        await new Promise(resolve => window.setTimeout(resolve, 1000 * (retryCount + 1)))
+      if (isGet && retryCount < 1) {
+        await new Promise(resolve => window.setTimeout(resolve, 800))
         return request<T>(path, init, token, retryCount + 1)
       }
       throw new Error('Yêu cầu đang mất quá lâu. Vui lòng thử lại.')
     }
-    if (error instanceof TypeError && retryCount < 2) {
-      await new Promise(resolve => window.setTimeout(resolve, 1000 * (retryCount + 1)))
+    if (error instanceof TypeError && isGet && retryCount < 1) {
+      await new Promise(resolve => window.setTimeout(resolve, 800))
       return request<T>(path, init, token, retryCount + 1)
     }
     throw new Error('Không thể kết nối OpenSlot. Vui lòng kiểm tra mạng và thử lại.')
@@ -206,7 +219,7 @@ export const api = {
   adminUsers: (token: string) => request<AdminUser[]>('/admin/users', {}, token),
   adminDeleteUser: (userId: string, token: string) => request<void>(`/admin/users/${encodeURIComponent(userId)}`, { method: 'DELETE' }, token),
   adminServices: (token: string) => request<AdminService[]>('/admin/services', {}, token),
-  adminDeleteService: (serviceId: string, token: string) => request<void>(`/admin/services/${serviceId}`, { method: 'DELETE' }, token),
+  adminDeleteService: (serviceId: string, token: string) => request<{ success: boolean; isSoftDeleted?: boolean; message?: string }>(`/admin/services/${serviceId}`, { method: 'DELETE' }, token),
   adminSlots: (token: string) => request<AdminSlot[]>('/admin/slots', {}, token),
   adminCategories: (token: string) => request<AdminCategory[]>('/admin/categories', {}, token),
   createAdminCategory: (payload: object, token: string) => request<AdminCategory>('/admin/categories', { method: 'POST', body: JSON.stringify(payload) }, token),
@@ -249,7 +262,7 @@ export const api = {
   bulkActivateCategories: (ids: number[], token: string) => request<{ updatedCount: number }>('/admin/categories/bulk-activate', { method: 'POST', body: JSON.stringify({ ids }) }, token),
   bulkDeactivateCategories: (ids: number[], token: string) => request<{ updatedCount: number; skippedCount: number; skipped: string[] }>('/admin/categories/bulk-deactivate', { method: 'POST', body: JSON.stringify({ ids }) }, token),
   bulkSetServicesActive: (ids: string[], isActive: boolean, token: string) => request<{ updatedCount: number }>('/admin/services/bulk-active', { method: 'POST', body: JSON.stringify({ ids, isActive }) }, token),
-  bulkDeleteServices: (ids: string[], token: string) => request<{ deletedCount: number; skippedCount: number; skipped: string[] }>('/admin/services/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) }, token),
+  bulkDeleteServices: (ids: string[], token: string) => request<{ deletedCount: number; softDeletedCount?: number; skippedCount: number; skipped: string[] }>('/admin/services/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) }, token),
   bulkCancelSlots: (ids: string[], token: string) => request<{ cancelledCount: number; skippedCount: number; skipped: string[] }>('/admin/slots/bulk-cancel', { method: 'POST', body: JSON.stringify({ ids }) }, token),
   bulkReopenSlots: (ids: string[], token: string) => request<{ reopenedCount: number; skippedCount: number; skipped: string[] }>('/admin/slots/bulk-reopen', { method: 'POST', body: JSON.stringify({ ids }) }, token),
   bulkSetUsersSuspended: (ids: string[], isSuspended: boolean, token: string) => request<{ updatedCount: number }>('/admin/users/bulk-suspend', { method: 'POST', body: JSON.stringify({ ids, isSuspended }) }, token),

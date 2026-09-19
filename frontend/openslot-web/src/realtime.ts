@@ -5,25 +5,46 @@ import type { ChatMessage, Conversation, SlotAvailabilityUpdate } from './types'
 
 /** Keeps marketplace pages synchronized when another customer holds, releases or books a slot. */
 export function useSlotAvailability(onChanged: (update: SlotAvailabilityUpdate) => void) {
+  const handlerRef = useRef(onChanged)
+
   useEffect(() => {
+    handlerRef.current = onChanged
+  }, [onChanged])
+
+  useEffect(() => {
+    let isStarted = false
+    let isStopped = false
+
     const connection = new HubConnectionBuilder()
       .withUrl(realtimeHubUrl)
       .withAutomaticReconnect([0, 2_000, 5_000, 10_000])
       .configureLogging(LogLevel.Warning)
       .build()
 
-    connection.on('slotAvailabilityChanged', onChanged)
-    void connection.start().catch(() => {
-      // The normal REST fetches remain a safe fallback if a network or proxy blocks WebSockets.
-    })
+    const handleSlotChanged = (update: SlotAvailabilityUpdate) => {
+      handlerRef.current(update)
+    }
+
+    connection.on('slotAvailabilityChanged', handleSlotChanged)
+    connection.start()
+      .then(() => {
+        isStarted = true
+        if (isStopped && connection.state !== HubConnectionState.Disconnected) {
+          void connection.stop().catch(() => {})
+        }
+      })
+      .catch(() => {
+        // The normal REST fetches remain a safe fallback if a network or proxy blocks WebSockets.
+      })
 
     return () => {
-      connection.off('slotAvailabilityChanged', onChanged)
-      if (connection.state !== HubConnectionState.Disconnected) {
-        void connection.stop()
+      isStopped = true
+      connection.off('slotAvailabilityChanged', handleSlotChanged)
+      if (isStarted && connection.state !== HubConnectionState.Disconnected) {
+        void connection.stop().catch(() => {})
       }
     }
-  }, [onChanged])
+  }, [])
 }
 
 /** Realtime chat events for Customer, Provider and Platform Support. */
@@ -38,6 +59,9 @@ export function useChatRealtime(
 
   useEffect(() => {
     if (!token) return
+
+    let isStarted = false
+    let isStopped = false
 
     const connection = new HubConnectionBuilder()
       .withUrl(chatHubUrl, {
@@ -59,7 +83,14 @@ export function useChatRealtime(
       })
     }
 
-    void connection.start().then(() => {
+    connection.start().then(() => {
+      isStarted = true
+      if (isStopped) {
+        if (connection.state !== HubConnectionState.Disconnected) {
+          void connection.stop().catch(() => {})
+        }
+        return
+      }
       const convId = activeConversationRef.current
       if (convId && connection.state === HubConnectionState.Connected) {
         void connection.invoke('JoinConversation', convId).catch(() => {})
@@ -67,10 +98,11 @@ export function useChatRealtime(
     }).catch(() => {})
 
     return () => {
+      isStopped = true
       connection.off('ReceiveMessage')
       connection.off('ConversationUpdated')
-      if (connection.state !== HubConnectionState.Disconnected) {
-        void connection.stop()
+      if (isStarted && connection.state !== HubConnectionState.Disconnected) {
+        void connection.stop().catch(() => {})
       }
     }
   }, [token, onMessageReceived, onConversationUpdated])
@@ -105,6 +137,9 @@ export function useRealtimeNotifications(
   useEffect(() => {
     if (!userId) return
 
+    let isStarted = false
+    let isStopped = false
+
     const connection = new HubConnectionBuilder()
       .withUrl(realtimeHubUrl)
       .withAutomaticReconnect([0, 2_000, 5_000, 10_000])
@@ -118,12 +153,18 @@ export function useRealtimeNotifications(
     }
 
     connection.on('userNotification', handleUserNotification)
-    void connection.start().catch(() => {})
+    connection.start().then(() => {
+      isStarted = true
+      if (isStopped && connection.state !== HubConnectionState.Disconnected) {
+        void connection.stop().catch(() => {})
+      }
+    }).catch(() => {})
 
     return () => {
+      isStopped = true
       connection.off('userNotification', handleUserNotification)
-      if (connection.state !== HubConnectionState.Disconnected) {
-        void connection.stop()
+      if (isStarted && connection.state !== HubConnectionState.Disconnected) {
+        void connection.stop().catch(() => {})
       }
     }
   }, [userId])
