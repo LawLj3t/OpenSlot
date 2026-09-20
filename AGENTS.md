@@ -39,8 +39,12 @@ Các tình huống "bất ổn" bắt buộc phải dừng và báo ngay:
 3. **Lập Kế hoạch Triển khai Chi tiết (Plan)**:
    - Phân rã task rõ ràng (Task độc lập / Task phụ thuộc).
    - Thống nhất trình tự thực hiện để tiết kiệm token và tránh sửa chéo.
-   - Trình bày kế hoạch cho người dùng duyệt (hoặc dùng Spec Mode / Todo List) trước khi đụng vào code.
-4. **Chỉ khi kế hoạch được chốt hoặc người dùng đồng ý mới bắt đầu thực thi.**
+   - **QUY TRÌNH XÁC NHẬN VÀ THỰC THI (QUAN TRỌNG):**
+     - Droid trình bày **Prompt rõ ràng** (mục tiêu, vấn đề, giải pháp) và **DỪNG LẠI** để người dùng xem.
+     - Người dùng chỉ cần thấy **Prompt hợp lý** là có thể xác nhận ("ok", "làm đi").
+     - **KHÔNG bắt người dùng phải xem hay duyệt plan chi tiết**, không hỏi "bạn có muốn xem plan không?". Droid tự lập plan chi tiết nội bộ là đủ.
+     - Khi người dùng xác nhận prompt, Droid tự động triển khai code cuốn chiếu ngay lập tức.
+4. **Chỉ khi prompt được người dùng xác nhận mới bắt đầu thực thi.**
 
 ### ⚙️ Thực Hiện Cuốn Chiếu & Chắc Chắn
 - Triển khai tuần tự theo từng task đã lập trong kế hoạch.
