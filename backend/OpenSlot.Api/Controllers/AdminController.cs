@@ -260,8 +260,8 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
             success = true,
             isSoftDeleted,
             message = isSoftDeleted
-                ? "Dịch vụ đã được chuyển sang trạng thái ngưng hoạt động do có lịch sử đặt chỗ."
-                : "Dịch vụ đã được xóa hoàn toàn khỏi hệ thống."
+                ? "Dịch vụ đã có lịch sử đặt chỗ trước đây. Hệ thống đã chuyển sang trạng thái ngưng hoạt động (ẩn) để bảo toàn dữ liệu giao dịch cho khách hàng và đối tác, đồng thời hủy các slot chưa diễn ra."
+                : "Dịch vụ đã được xóa hoàn toàn khỏi hệ thống do chưa có lịch sử đặt chỗ nào."
         });
     }
 
@@ -904,7 +904,7 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
 
         if (activeCustomerBookings > 0)
         {
-            return (false, $"Tài khoản “{user.DisplayName}” còn {activeCustomerBookings} booking đang hoạt động.");
+            return (false, $"Không thể xóa tài khoản “{user.DisplayName}” vì còn {activeCustomerBookings} lịch đặt chỗ đang hoạt động. Vui lòng đợi các booking hoàn tất hoặc sử dụng tính năng “Tạm khóa” để vô hiệu hóa tài khoản mà vẫn bảo toàn lịch sử.");
         }
 
         var now = DateTime.UtcNow;
@@ -916,7 +916,7 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
 
         if (activeCustomerHolds > 0)
         {
-            return (false, $"Tài khoản “{user.DisplayName}” đang có phiên giữ chỗ thanh toán.");
+            return (false, $"Không thể xóa tài khoản “{user.DisplayName}” vì đang có phiên giữ chỗ thanh toán chưa hoàn tất. Vui lòng thử lại sau ít phút.");
         }
 
         if (user.ProviderProfile != null)
@@ -929,7 +929,7 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
 
             if (providerActiveBookings > 0)
             {
-                return (false, $"Tài khoản đối tác “{user.DisplayName}” còn {providerActiveBookings} booking của khách hàng đang hoạt động.");
+                return (false, $"Không thể xóa tài khoản đối tác “{user.DisplayName}” vì còn {providerActiveBookings} lịch đặt chỗ của khách hàng đang hoạt động. Vui lòng xử lý các booking hoặc sử dụng tính năng “Tạm khóa” tài khoản.");
             }
 
             var providerActiveHolds = await db.SlotHolds.CountAsync(h =>
@@ -940,7 +940,7 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
 
             if (providerActiveHolds > 0)
             {
-                return (false, $"Tài khoản đối tác “{user.DisplayName}” đang có khách hàng giữ chỗ thanh toán.");
+                return (false, $"Không thể xóa tài khoản đối tác “{user.DisplayName}” vì đang có khách hàng giữ chỗ thanh toán. Vui lòng thử lại sau khi phiên giữ chỗ kết thúc.");
             }
 
             user.ProviderProfile.Status = ProviderStatus.Deleted;
@@ -989,7 +989,7 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
 
         if (activeBookingsCount > 0)
         {
-            return (false, $"Dịch vụ “{service.Name}” còn {activeBookingsCount} booking đang hoạt động.", false);
+            return (false, $"Không thể xóa dịch vụ “{service.Name}” vì còn {activeBookingsCount} lịch đặt chỗ đang hoạt động. Vui lòng hoàn tất hoặc hủy các booking trước, hoặc chọn “Ẩn” dịch vụ.", false);
         }
 
         var now = DateTime.UtcNow;
@@ -1001,7 +1001,7 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
 
         if (activeHoldsCount > 0)
         {
-            return (false, $"Dịch vụ “{service.Name}” đang có khách hàng giữ chỗ thanh toán.", false);
+            return (false, $"Không thể xóa dịch vụ “{service.Name}” vì đang có khách hàng giữ chỗ thanh toán. Vui lòng thử lại sau ít phút.", false);
         }
 
         var futureSlots = service.DealSlots
@@ -1051,8 +1051,8 @@ public sealed class AdminController(AppDbContext db, UserManager<ApplicationUser
                 UserId = service.Venue.ProviderProfile.UserId,
                 Title = isSoftDeleted ? "Dịch vụ đã ngưng hoạt động" : "Dịch vụ đã bị xóa",
                 Message = isSoftDeleted
-                    ? $"Dịch vụ “{service.Name}” đã được quản trị viên chuyển sang ngưng hoạt động do có lịch sử đặt chỗ."
-                    : $"Dịch vụ “{service.Name}” đã bị xóa bởi quản trị viên hệ thống.",
+                    ? $"Dịch vụ “{service.Name}” đã được quản trị viên chuyển sang ngưng hoạt động để bảo toàn dữ liệu lịch sử đặt chỗ của khách hàng."
+                    : $"Dịch vụ “{service.Name}” đã bị xóa hoàn toàn bởi quản trị viên hệ thống.",
                 Link = "/provider"
             });
         }

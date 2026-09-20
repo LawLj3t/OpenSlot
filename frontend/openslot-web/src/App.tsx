@@ -1026,7 +1026,7 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean
     title: string
-    message: string
+    message: string | React.ReactNode
     confirmText?: string
     variant?: 'danger' | 'warning' | 'primary'
     onConfirm: () => Promise<void>
@@ -1113,13 +1113,27 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
   const deleteUser = (user: AdminUser) => {
     setConfirmModal({
       isOpen: true,
-      title: 'Xóa tài khoản người dùng',
-      message: `Bạn có chắc muốn xóa vĩnh viễn tài khoản "${user.displayName}" (${user.email})? Thao tác này chỉ thành công khi tài khoản không còn lịch đặt chỗ hoặc giữ chỗ nào đang hoạt động.`,
-      confirmText: 'Xóa tài khoản',
+      title: 'Xóa vĩnh viễn tài khoản người dùng',
+      message: (
+        <div className="confirm-dialog-content">
+          <p className="mb-2">
+            Bạn có chắc muốn xóa vĩnh viễn tài khoản <b>{user.displayName}</b> ({user.email})?
+          </p>
+          <div className="alert alert-warning py-2 px-3 small mb-2">
+            <i className="bi bi-exclamation-triangle-fill me-1 text-warning" />
+            <strong>Lưu ý quan trọng:</strong> Hành động này sẽ xóa toàn bộ dữ liệu tài khoản và <u>không thể khôi phục</u>.
+          </div>
+          <p className="small text-secondary mb-0">
+            • Thao tác chỉ thực hiện được khi tài khoản không còn bất kỳ lịch đặt chỗ (booking) hoặc phiên giữ chỗ nào đang hoạt động.<br />
+            • Nếu bạn chỉ muốn vô hiệu hóa tài khoản tạm thời mà vẫn bảo lưu dữ liệu, hãy sử dụng tính năng <strong>Tạm khóa</strong>.
+          </p>
+        </div>
+      ),
+      confirmText: 'Xác nhận xóa vĩnh viễn',
       variant: 'danger',
       onConfirm: async () => {
         await api.adminDeleteUser(user.id, session.accessToken)
-        setMessage(`Đã xóa tài khoản ${user.email}.`)
+        setMessage(`Đã xóa vĩnh viễn tài khoản ${user.email} khỏi hệ thống.`)
         refresh()
       }
     })
@@ -1129,7 +1143,17 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
     setConfirmModal({
       isOpen: true,
       title: 'Xóa hàng loạt tài khoản',
-      message: `Xác nhận xóa ${selectedUsers.length} tài khoản đã chọn? Hệ thống sẽ bỏ qua tài khoản là Admin, chính bạn, hoặc đang có lịch đặt chỗ/giữ chỗ hoạt động.`,
+      message: (
+        <div className="confirm-dialog-content">
+          <p className="mb-2">
+            Xác nhận xóa vĩnh viễn <b>{selectedUsers.length}</b> tài khoản đã chọn?
+          </p>
+          <div className="alert alert-warning py-2 px-3 small mb-2">
+            <i className="bi bi-exclamation-triangle-fill me-1 text-warning" />
+            <strong>Lưu ý:</strong> Dữ liệu tài khoản bị xóa sẽ không thể khôi phục. Hệ thống sẽ tự động bỏ qua tài khoản là Admin, chính bạn, hoặc đang có lịch đặt chỗ/giữ chỗ hoạt động.
+          </div>
+        </div>
+      ),
       confirmText: 'Xóa các tài khoản đã chọn',
       variant: 'danger',
       onConfirm: async () => {
@@ -1147,18 +1171,33 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
     setConfirmModal({
       isOpen: true,
       title: 'Xóa dịch vụ',
-      message: `Bạn có chắc muốn xóa dịch vụ "${service.name}" (${service.providerName})? Dịch vụ sẽ bị xóa hoàn toàn nếu chưa có booking nào, hoặc chuyển sang trạng thái ngưng hoạt động nếu đã có lịch sử booking.`,
-      confirmText: 'Xóa dịch vụ',
+      message: (
+        <div className="confirm-dialog-content">
+          <p className="mb-2">
+            Bạn có chắc muốn xóa dịch vụ <b>{service.name}</b> ({service.providerName})?
+          </p>
+          <div className="alert alert-info py-2 px-3 small mb-2">
+            <i className="bi bi-shield-check me-1 text-primary" />
+            <strong>Quy tắc bảo vệ dữ liệu:</strong>
+            <ul className="mb-0 ps-3 mt-1">
+              <li><strong>Chưa từng có khách đặt:</strong> Dịch vụ sẽ được xóa hoàn toàn khỏi cơ sở dữ liệu.</li>
+              <li><strong>Đã có lịch sử đặt chỗ:</strong> Dịch vụ sẽ chuyển sang trạng thái <em>Ngưng hoạt động (Ẩn)</em> để bảo toàn lịch sử hóa đơn cho khách hàng và đối tác, đồng thời hủy các slot chưa diễn ra.</li>
+              <li><strong>Đang có booking hoạt động:</strong> Hệ thống sẽ từ chối xóa để đảm bảo quyền lợi khách hàng.</li>
+            </ul>
+          </div>
+        </div>
+      ),
+      confirmText: 'Xác nhận xóa',
       variant: 'danger',
       onConfirm: async () => {
         const res = await api.adminDeleteService(service.id, session.accessToken)
         if (res.isSoftDeleted) {
           setManagedServices((prev) => prev.map((s) => s.id === service.id ? { ...s, isActive: false } : s))
-          setMessage(res.message || `Dịch vụ "${service.name}" đã được chuyển sang trạng thái ngưng hoạt động do có lịch sử đặt chỗ.`)
+          setMessage(res.message || `Dịch vụ "${service.name}" đã được chuyển sang trạng thái ngưng hoạt động để bảo toàn lịch sử đặt chỗ.`)
         } else {
           setManagedServices((prev) => prev.filter((s) => s.id !== service.id))
           setSelectedServices((prev) => prev.filter((id) => id !== service.id))
-          setMessage(res.message || `Đã xóa dịch vụ "${service.name}".`)
+          setMessage(res.message || `Đã xóa hoàn toàn dịch vụ "${service.name}".`)
         }
         refresh()
       }
@@ -1169,12 +1208,22 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
     setConfirmModal({
       isOpen: true,
       title: 'Xóa hàng loạt dịch vụ',
-      message: `Xác nhận xóa ${selectedServices.length} dịch vụ đã chọn? Hệ thống sẽ bỏ qua nếu dịch vụ đang có lịch đặt chỗ/giữ chỗ hoạt động.`,
+      message: (
+        <div className="confirm-dialog-content">
+          <p className="mb-2">
+            Xác nhận xóa <b>{selectedServices.length}</b> dịch vụ đã chọn?
+          </p>
+          <div className="alert alert-info py-2 px-3 small mb-2">
+            <i className="bi bi-shield-check me-1 text-primary" />
+            <strong>Quy tắc bảo vệ dữ liệu:</strong> Hệ thống sẽ xóa hoàn toàn các dịch vụ chưa có booking, chuyển ngưng hoạt động các dịch vụ đã có lịch sử booking, và bỏ qua các dịch vụ đang có booking hoạt động.
+          </div>
+        </div>
+      ),
       confirmText: 'Xóa các dịch vụ đã chọn',
       variant: 'danger',
       onConfirm: async () => {
         const res = await api.bulkDeleteServices(selectedServices, session.accessToken)
-        let msg = `Đã xử lý: xóa ${res.deletedCount} dịch vụ, chuyển ngưng hoạt động ${res.softDeletedCount || 0} dịch vụ.`
+        let msg = `Đã xử lý: xóa hoàn toàn ${res.deletedCount} dịch vụ, chuyển ngưng hoạt động ${res.softDeletedCount || 0} dịch vụ để bảo toàn lịch sử.`
         if (res.skippedCount > 0) msg += ` Bỏ qua ${res.skippedCount} dịch vụ do còn booking đang hoạt động.`
         setMessage(msg)
         setSelectedServices([])
@@ -1601,17 +1650,29 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
               </span>
               <span className="admin-actions">
                 {canModerate && (
-                  <button onClick={() => toggleUser(user)} className={`btn btn-sm ${user.isSuspended ? 'btn-outline-success' : 'btn-outline-danger'}`}>
+                  <button
+                    onClick={() => toggleUser(user)}
+                    className={`btn btn-sm ${user.isSuspended ? 'btn-outline-success' : 'btn-outline-danger'}`}
+                    title={user.isSuspended ? 'Mở lại quyền truy cập cho tài khoản' : 'Tạm dừng quyền đăng nhập và đặt chỗ (vẫn bảo lưu toàn bộ dữ liệu)'}
+                  >
                     {user.isSuspended ? 'Mở khóa' : 'Tạm khóa'}
                   </button>
                 )}
                 {canChangeManager && (
-                  <button onClick={() => toggleManager(user)} className={`btn btn-sm ${targetIsManager ? 'btn-outline-secondary' : 'btn-outline-primary'}`}>
+                  <button
+                    onClick={() => toggleManager(user)}
+                    className={`btn btn-sm ${targetIsManager ? 'btn-outline-secondary' : 'btn-outline-primary'}`}
+                    title={targetIsManager ? 'Thu hồi quyền Manager' : 'Cấp quyền Manager'}
+                  >
                     {targetIsManager ? 'Thu hồi Manager' : 'Cấp Manager'}
                   </button>
                 )}
                 {isAdmin && user.id !== session.user.id && !targetIsAdmin && (
-                  <button onClick={() => deleteUser(user)} className="btn btn-sm btn-outline-danger" title="Xóa tài khoản">
+                  <button
+                    onClick={() => deleteUser(user)}
+                    className="btn btn-sm btn-outline-danger"
+                    title="Xóa vĩnh viễn tài khoản khỏi hệ thống (yêu cầu không có booking/giữ chỗ hoạt động)"
+                  >
                     <i className="bi bi-trash" /> Xóa
                   </button>
                 )}
@@ -1708,11 +1769,19 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
             <span>{service.providerName}</span>
             <span>{formatMoney(service.basePriceVnd)}</span>
             <span className="admin-actions">
-              <button onClick={() => toggleService(service)} className={`btn btn-sm ${service.isActive ? 'btn-outline-danger' : 'btn-outline-success'}`}>
+              <button
+                onClick={() => toggleService(service)}
+                className={`btn btn-sm ${service.isActive ? 'btn-outline-danger' : 'btn-outline-success'}`}
+                title={service.isActive ? 'Tạm ẩn dịch vụ khỏi trang tìm kiếm của khách' : 'Mở lại dịch vụ cho khách tìm kiếm và đặt chỗ'}
+              >
                 {service.isActive ? 'Ẩn' : 'Mở lại'}
               </button>
               {isAdmin && (
-                <button onClick={() => deleteService(service)} className="btn btn-sm btn-outline-danger" title="Xóa dịch vụ">
+                <button
+                  onClick={() => deleteService(service)}
+                  className="btn btn-sm btn-outline-danger"
+                  title="Xóa dịch vụ (xóa hoàn toàn nếu chưa có booking, hoặc chuyển ngưng hoạt động nếu đã có lịch sử booking)"
+                >
                   <i className="bi bi-trash" /> Xóa
                 </button>
               )}
@@ -1936,9 +2005,11 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
           onConfirm={async () => {
             try {
               setConfirmLoading(true)
+              setError('')
               await confirmModal.onConfirm()
               setConfirmModal(null)
             } catch (e) {
+              setMessage('')
               setError(e instanceof Error ? e.message : 'Thao tác không thành công.')
               setConfirmModal(null)
             } finally {
