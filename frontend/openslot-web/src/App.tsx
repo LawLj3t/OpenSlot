@@ -561,43 +561,52 @@ function ProviderPage({ session }: { session: Session }) {
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; confirmText?: string; variant?: 'danger' | 'warning' | 'primary'; onConfirm: () => Promise<void> } | null>(null)
   const [confirmLoading, setConfirmLoading] = useState(false)
   const isMountedRef = useRef(true)
+  const abortControllerRef = useRef<AbortController | null>(null)
   const lastRefreshTime = useRef(0)
-
-  useEffect(() => {
-    isMountedRef.current = true
-    return () => {
-      isMountedRef.current = false
-    }
-  }, [])
 
   // oxlint-disable-next-line react/set-state-in-effect -- loading belongs to the request lifecycle
   const refresh = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     setLoading(true)
     return Promise.all([
-      api.providerSlots(session.accessToken),
-      api.providerServices(session.accessToken),
-      api.providerResources(session.accessToken),
-      api.providerProfile(session.accessToken)
+      api.providerSlots(session.accessToken, { signal: controller.signal }),
+      api.providerServices(session.accessToken, { signal: controller.signal }),
+      api.providerResources(session.accessToken, { signal: controller.signal }),
+      api.providerProfile(session.accessToken, { signal: controller.signal })
     ]).then(([slotData, serviceData, resourceData, profileData]) => {
-      if (isMountedRef.current) {
+      if (isMountedRef.current && !controller.signal.aborted) {
         setSlots(slotData)
         setServices(serviceData)
         setResources(resourceData)
         setProfile(profileData)
       }
     }).catch((e: Error) => {
-      if (isMountedRef.current) setError(e.message)
+      if (!controller.signal.aborted && isMountedRef.current) setError(e.message)
     }).finally(() => {
-      if (isMountedRef.current) setLoading(false)
+      if (isMountedRef.current && !controller.signal.aborted) setLoading(false)
     })
   }, [session.accessToken])
 
   // oxlint-disable-next-line react/set-state-in-effect -- provider data is loaded from an external request lifecycle.
-  useEffect(() => { void refresh() }, [refresh])
+  useEffect(() => {
+    isMountedRef.current = true
+    void refresh()
+    return () => {
+      isMountedRef.current = false
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
+  }, [refresh])
 
   useSlotAvailability(useCallback(() => {
     const now = Date.now()
-    if (now - lastRefreshTime.current < 1500) return
+    if (now - lastRefreshTime.current < 2000) return
     lastRefreshTime.current = now
     void refresh()
   }, [refresh]))
@@ -636,7 +645,7 @@ function ProviderPage({ session }: { session: Session }) {
 
   const status = profile?.status
   const statusMessage = status === 2 ? 'Hồ sơ đối tác đang bị tạm khóa. Liên hệ quản trị viên để biết lý do và cách khôi phục tài khoản.' : ''
-  return <div className="container dashboard"><p className="eyebrow">Khu vực đối tác</p><div className="provider-heading"><div><h1>Quản lý slot & Check-in</h1><p className="dashboard-copy">Mỗi slot phải gắn với một sân, bàn, ghế hoặc phòng cụ thể để không bị trùng lịch. Nhấp vào từng dòng để xem chi tiết slot.</p></div><button disabled={status === 2} onClick={() => setShowForm(!showForm)} className="btn btn-primary rounded-pill"><i className="bi bi-plus-lg" /> {showForm ? 'Đóng form' : 'Tạo slot'}</button></div><ProviderNavTabs activeTab="slots" />{status === 0 && <div className="provider-approval-banner pending"><i className="bi bi-hourglass-split" /><div><b>Hồ sơ cửa hàng đang chờ Manager duyệt</b><span>Bạn có thể hoàn thiện địa điểm, dịch vụ và slot nháp. Chỉ slot của hồ sơ đã duyệt mới được công khai.</span></div></div>}{status === 3 && <div className="provider-approval-banner rejected"><i className="bi bi-exclamation-diamond" /><div><b>Hồ sơ cần bổ sung trước khi hoạt động</b><span>Hãy rà soát thông tin cửa hàng, sau đó gửi lại để Manager xét duyệt.</span></div><button onClick={resubmit} className="btn btn-sm btn-outline-danger">Gửi lại xét duyệt</button></div>}{status === 2 && <div className="provider-approval-banner suspended"><i className="bi bi-lock" /><div><b>Hồ sơ đối tác đang bị tạm khóa</b><span>{statusMessage}</span></div></div>}{showForm && <ProviderSlotForm services={services} resources={resources} token={session.accessToken} onDone={() => { setShowForm(false); setNotice('Đã tạo slot nháp. Hãy phát hành khi hồ sơ được duyệt.'); refresh() }} onError={setError} />}{error && <div className="alert alert-danger">{error}</div>}{notice && <div className="alert alert-success">{notice}</div>}{loading ? <div className="empty-state"><div className="spinner-border text-primary" /></div> : <><div className="provider-table"><div className="table-head"><span>Dịch vụ / đơn vị</span><span>Thời gian</span><span>Giá deal</span><span>Trạng thái</span><span>Chỗ còn</span><span>Thao tác</span></div>{slots.map((slot) => {
+  return <div className="container dashboard"><p className="eyebrow">Khu vực đối tác</p><div className="provider-heading"><div><h1>Quản lý slot & Check-in</h1><p className="dashboard-copy">Mỗi slot phải gắn với một sân, bàn, ghế hoặc phòng cụ thể để không bị trùng lịch. Nhấp vào từng dòng để xem chi tiết slot.</p></div><button disabled={status === 2} onClick={() => setShowForm(!showForm)} className="btn btn-primary rounded-pill"><i className="bi bi-plus-lg" /> {showForm ? 'Đóng form' : 'Tạo slot'}</button></div><ProviderNavTabs activeTab="slots" />{status === 0 && <div className="provider-approval-banner pending"><i className="bi bi-hourglass-split" /><div><b>Hồ sơ cửa hàng đang chờ Manager duyệt</b><span>Bạn có thể hoàn thiện địa điểm, dịch vụ và slot nháp. Chỉ slot của hồ sơ đã duyệt mới được công khai.</span></div></div>}{status === 3 && <div className="provider-approval-banner rejected"><i className="bi bi-exclamation-diamond" /><div><b>Hồ sơ cần bổ sung trước khi hoạt động</b><span>Hãy rà soát thông tin cửa hàng, sau đó gửi lại để Manager xét duyệt.</span></div><button onClick={resubmit} className="btn btn-sm btn-outline-danger">Gửi lại xét duyệt</button></div>}{status === 2 && <div className="provider-approval-banner suspended"><i className="bi bi-lock" /><div><b>Hồ sơ đối tác đang bị tạm khóa</b><span>{statusMessage}</span></div></div>}{showForm && <ProviderSlotForm services={services} resources={resources} token={session.accessToken} onDone={() => { setShowForm(false); setNotice('Đã tạo slot nháp. Hãy phát hành khi hồ sơ được duyệt.'); refresh() }} onError={setError} />}{error && <div className="alert alert-danger">{error}</div>}{notice && <div className="alert alert-success">{notice}</div>}{loading && slots.length === 0 ? <div className="empty-state"><div className="spinner-border text-primary" /></div> : <><div className="provider-table"><div className="table-head"><span>Dịch vụ / đơn vị</span><span>Thời gian</span><span>Giá deal</span><span>Trạng thái</span><span>Chỗ còn</span><span>Thao tác</span></div>{slots.map((slot) => {
     const isFuture = new Date(slot.startAtUtc).getTime() > Date.now()
     const canCancel = slot.status === 1 && slot.confirmedBookingCount === 0
     const canRepublish = (slot.status === 4 || slot.status === 0) && isFuture && status === 1
@@ -652,40 +661,50 @@ function ProviderSlotForm({ services, resources, token, onDone, onError }: { ser
   return <form onSubmit={submit} className="provider-form"><h3>Tạo slot nháp</h3><p className="form-hint">Dịch vụ không có thời lượng cố định. Hãy nhập khung giờ trống thực tế của đơn vị để khách biết chính xác thời điểm có thể đặt.</p><label>Dịch vụ<select required value={serviceId} onChange={(e) => chooseService(e.target.value)}><option value="">Chọn dịch vụ</option>{services.map((service) => <option key={service.id} value={service.id}>{service.name} · {service.venueName}</option>)}</select></label><label>Chỗ nhận đặt (Sân, Bàn, Ghế, Phòng)<select required disabled={!selected} value={resourceId} onChange={(e) => setResourceId(e.target.value)}><option value="">{selected ? 'Chọn sân, bàn, ghế hoặc phòng' : 'Chọn dịch vụ trước'}</option>{matchingResources.map((resource) => <option key={resource.id} value={resource.id}>{resource.name}{resource.code ? ` · ${resource.code}` : ''}{resource.floorOrZone ? ` · ${resource.floorOrZone}` : ''}</option>)}</select>{selected && !matchingResources.length && <small className="text-danger">Địa điểm này chưa có chỗ đặt nào. <NavLink to="/provider/setup" className="text-decoration-underline ms-1">Thêm chỗ đặt tại Thiết lập gian hàng</NavLink>.</small>}</label><label>Giờ bắt đầu<input required type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} /></label><label>Giờ kết thúc<input required type="datetime-local" min={start || undefined} value={end} onChange={(e) => setEnd(e.target.value)} /></label><label>Giá gốc (VND)<input required min="1" type="number" list="slot-price-suggestions" value={originalPrice} onChange={(e) => setOriginalPrice(e.target.value)} /></label><label>Giá deal (VND)<input required min="1" type="number" list="slot-price-suggestions" value={dealPrice} onChange={(e) => setDealPrice(e.target.value)} /></label><label>Số chỗ<input required min="1" max={selectedResource?.maxCapacity ?? 100} type="number" list="slot-capacity-suggestions" value={capacity} onChange={(e) => setCapacity(e.target.value)} />{selectedResource && <small>Tối đa {selectedResource.maxCapacity} chỗ cho {selectedResource.name}.</small>}</label><datalist id="slot-price-suggestions">{priceSuggestions.map((value) => <option value={value} key={value} />)}</datalist><datalist id="slot-capacity-suggestions">{capacitySuggestions.map((value) => <option value={value} key={value} />)}</datalist><button disabled={saving || !services.length || !resources.length || !resourceId} className="btn btn-primary rounded-pill">{saving ? 'Đang tạo...' : 'Lưu slot nháp'}</button><small>OpenSlot chặn hai slot trùng giờ trên cùng một đơn vị. Slot luôn đóng nhận đặt chỗ trước giờ bắt đầu tối thiểu 15 phút.</small></form>
 }
 
-function ProviderCatalogPanel({ token, onServicesChanged }: { token: string; onServicesChanged: () => void }) {
+function ProviderCatalogPanel({ token, onServicesChanged, onProfileLoaded }: { token: string; onServicesChanged: () => void; onProfileLoaded?: (profile: MyProviderProfile) => void }) {
   const [profile, setProfile] = useState<MyProviderProfile | null>(null); const [venues, setVenues] = useState<ProviderVenue[]>([]); const [resources, setResources] = useState<ProviderResource[]>([]); const [categories, setCategories] = useState<Category[]>([]); const [services, setServices] = useState<ProviderService[]>([]); const [mode, setMode] = useState<'none' | 'profile' | 'venue' | 'resource' | 'service'>('none'); const [editingResource, setEditingResource] = useState<ProviderResource | null>(null); const [message, setMessage] = useState(''); const [error, setError] = useState('')
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; confirmText?: string; variant?: 'danger' | 'warning' | 'primary'; onConfirm: () => Promise<void> } | null>(null)
   const [confirmLoading, setConfirmLoading] = useState(false)
   const isMountedRef = useRef(true)
-
-  useEffect(() => {
-    isMountedRef.current = true
-    return () => {
-      isMountedRef.current = false
-    }
-  }, [])
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const load = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     return Promise.all([
-      api.providerProfile(token),
-      api.providerVenues(token),
-      api.providerResources(token),
-      api.categories(),
-      api.providerServices(token)
+      api.providerProfile(token, { signal: controller.signal }),
+      api.providerVenues(token, { signal: controller.signal }),
+      api.providerResources(token, { signal: controller.signal }),
+      api.categories({ signal: controller.signal }),
+      api.providerServices(token, { signal: controller.signal })
     ]).then(([profileData, venueData, resourceData, categoryData, serviceData]) => {
-      if (isMountedRef.current) {
+      if (isMountedRef.current && !controller.signal.aborted) {
         setProfile(profileData)
+        onProfileLoaded?.(profileData)
         setVenues(venueData)
         setResources(resourceData)
         setCategories(categoryData)
         setServices(serviceData)
       }
     }).catch((e: Error) => {
-      if (isMountedRef.current) setError(e.message)
+      if (!controller.signal.aborted && isMountedRef.current) setError(e.message)
     })
-  }, [token])
+  }, [token, onProfileLoaded])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    isMountedRef.current = true
+    void load()
+    return () => {
+      isMountedRef.current = false
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
+  }, [load])
   const success = (text: string) => { setMode('none'); setEditingResource(null); setError(''); setMessage(text); load(); onServicesChanged() }
   const deactivate = (resource: ProviderResource) => {
     setConfirmModal({
@@ -723,27 +742,33 @@ function ProviderSetupPage({ session }: { session: Session }) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const isMountedRef = useRef(true)
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  const refreshProfile = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
+    return api.providerProfile(session.accessToken, { signal: controller.signal })
+      .then((data) => {
+        if (isMountedRef.current && !controller.signal.aborted) setProfile(data)
+      })
+      .catch((e: Error) => {
+        if (!controller.signal.aborted && isMountedRef.current) setError(e.message)
+      })
+  }, [session.accessToken])
 
   useEffect(() => {
     isMountedRef.current = true
     return () => {
       isMountedRef.current = false
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
     }
   }, [])
-
-  const refreshProfile = useCallback(() => {
-    return api.providerProfile(session.accessToken)
-      .then((data) => {
-        if (isMountedRef.current) setProfile(data)
-      })
-      .catch((e: Error) => {
-        if (isMountedRef.current) setError(e.message)
-      })
-  }, [session.accessToken])
-
-  useEffect(() => {
-    void refreshProfile()
-  }, [refreshProfile])
 
   const resubmit = async () => {
     try {
@@ -772,7 +797,7 @@ function ProviderSetupPage({ session }: { session: Session }) {
     {status === 2 && <div className="provider-approval-banner suspended"><i className="bi bi-lock" /><div><b>Hồ sơ đối tác đang bị tạm khóa</b><span>{statusMessage}</span></div></div>}
     {error && <div className="alert alert-danger">{error}</div>}
     {notice && <div className="alert alert-success">{notice}</div>}
-    <ProviderCatalogPanel token={session.accessToken} onServicesChanged={refreshProfile} />
+    <ProviderCatalogPanel token={session.accessToken} onServicesChanged={refreshProfile} onProfileLoaded={setProfile} />
   </div>
 }
 

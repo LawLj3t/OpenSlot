@@ -1,7 +1,59 @@
 import { HubConnectionBuilder, HubConnectionState, LogLevel, type HubConnection } from '@microsoft/signalr'
 import { useEffect, useRef } from 'react'
-import { chatHubUrl, realtimeHubUrl } from './api'
+import { chatHubUrl, clearApiCache, realtimeHubUrl } from './api'
 import type { ChatMessage, Conversation, SlotAvailabilityUpdate } from './types'
+
+let sharedAvailabilityConnection: HubConnection | null = null
+let isStartingAvailability = false
+const slotAvailabilityListeners = new Set<(update: SlotAvailabilityUpdate) => void>()
+const notificationListeners = new Set<(payload: RealtimeNotificationPayload) => void>()
+
+function ensureAvailabilityConnection(): HubConnection {
+  if (!sharedAvailabilityConnection) {
+    const connection = new HubConnectionBuilder()
+      .withUrl(realtimeHubUrl)
+      .withAutomaticReconnect([0, 2_000, 5_000, 10_000])
+      .configureLogging(LogLevel.Warning)
+      .build()
+
+    connection.on('slotAvailabilityChanged', (update: SlotAvailabilityUpdate) => {
+      clearApiCache('/slots')
+      clearApiCache('/provider/slots')
+      slotAvailabilityListeners.forEach((listener) => {
+        try {
+          listener(update)
+        } catch {
+          // ignore callback error
+        }
+      })
+    })
+
+    connection.on('userNotification', (payload: RealtimeNotificationPayload) => {
+      notificationListeners.forEach((listener) => {
+        try {
+          listener(payload)
+        } catch {
+          // ignore callback error
+        }
+      })
+    })
+
+    sharedAvailabilityConnection = connection
+  }
+
+  if (sharedAvailabilityConnection.state === HubConnectionState.Disconnected && !isStartingAvailability) {
+    isStartingAvailability = true
+    sharedAvailabilityConnection.start()
+      .catch(() => {
+        // Safe fallback if network or proxy blocks WebSockets
+      })
+      .finally(() => {
+        isStartingAvailability = false
+      })
+  }
+
+  return sharedAvailabilityConnection
+}
 
 /** Keeps marketplace pages synchronized when another customer holds, releases or books a slot. */
 export function useSlotAvailability(onChanged: (update: SlotAvailabilityUpdate) => void) {
@@ -12,37 +64,16 @@ export function useSlotAvailability(onChanged: (update: SlotAvailabilityUpdate) 
   }, [onChanged])
 
   useEffect(() => {
-    let isStarted = false
-    let isStopped = false
+    ensureAvailabilityConnection()
 
-    const connection = new HubConnectionBuilder()
-      .withUrl(realtimeHubUrl)
-      .withAutomaticReconnect([0, 2_000, 5_000, 10_000])
-      .configureLogging(LogLevel.Warning)
-      .build()
-
-    const handleSlotChanged = (update: SlotAvailabilityUpdate) => {
+    const listener = (update: SlotAvailabilityUpdate) => {
       handlerRef.current(update)
     }
 
-    connection.on('slotAvailabilityChanged', handleSlotChanged)
-    connection.start()
-      .then(() => {
-        isStarted = true
-        if (isStopped && connection.state !== HubConnectionState.Disconnected) {
-          void connection.stop().catch(() => {})
-        }
-      })
-      .catch(() => {
-        // The normal REST fetches remain a safe fallback if a network or proxy blocks WebSockets.
-      })
+    slotAvailabilityListeners.add(listener)
 
     return () => {
-      isStopped = true
-      connection.off('slotAvailabilityChanged', handleSlotChanged)
-      if (isStarted && connection.state !== HubConnectionState.Disconnected) {
-        void connection.stop().catch(() => {})
-      }
+      slotAvailabilityListeners.delete(listener)
     }
   }, [])
 }
@@ -56,6 +87,16 @@ export function useChatRealtime(
 ) {
   const connectionRef = useRef<HubConnection | null>(null)
   const activeConversationRef = useRef(activeConversationId)
+  const messageReceivedRef = useRef(onMessageReceived)
+  const conversationUpdatedRef = useRef(onConversationUpdated)
+
+  useEffect(() => {
+    messageReceivedRef.current = onMessageReceived
+  }, [onMessageReceived])
+
+  useEffect(() => {
+    conversationUpdatedRef.current = onConversationUpdated
+  }, [onConversationUpdated])
 
   useEffect(() => {
     if (!token) return
@@ -74,14 +115,12 @@ export function useChatRealtime(
     connectionRef.current = connection
 
     connection.on('ReceiveMessage', (msg: ChatMessage) => {
-      onMessageReceived(msg)
+      messageReceivedRef.current(msg)
     })
 
-    if (onConversationUpdated) {
-      connection.on('ConversationUpdated', (conv: Conversation) => {
-        onConversationUpdated(conv)
-      })
-    }
+    connection.on('ConversationUpdated', (conv: Conversation) => {
+      conversationUpdatedRef.current?.(conv)
+    })
 
     connection.start().then(() => {
       isStarted = true
@@ -105,7 +144,7 @@ export function useChatRealtime(
         void connection.stop().catch(() => {})
       }
     }
-  }, [token, onMessageReceived, onConversationUpdated])
+  }, [token])
 
   useEffect(() => {
     activeConversationRef.current = activeConversationId
@@ -129,43 +168,31 @@ export function useRealtimeNotifications(
   onNotification: (payload: RealtimeNotificationPayload) => void
 ) {
   const handlerRef = useRef(onNotification)
+  const userIdRef = useRef(userId)
 
   useEffect(() => {
     handlerRef.current = onNotification
   }, [onNotification])
 
   useEffect(() => {
+    userIdRef.current = userId
+  }, [userId])
+
+  useEffect(() => {
     if (!userId) return
 
-    let isStarted = false
-    let isStopped = false
+    ensureAvailabilityConnection()
 
-    const connection = new HubConnectionBuilder()
-      .withUrl(realtimeHubUrl)
-      .withAutomaticReconnect([0, 2_000, 5_000, 10_000])
-      .configureLogging(LogLevel.Warning)
-      .build()
-
-    const handleUserNotification = (payload: RealtimeNotificationPayload) => {
-      if (payload && payload.targetUserId === userId) {
+    const listener = (payload: RealtimeNotificationPayload) => {
+      if (payload && payload.targetUserId === userIdRef.current) {
         handlerRef.current(payload)
       }
     }
 
-    connection.on('userNotification', handleUserNotification)
-    connection.start().then(() => {
-      isStarted = true
-      if (isStopped && connection.state !== HubConnectionState.Disconnected) {
-        void connection.stop().catch(() => {})
-      }
-    }).catch(() => {})
+    notificationListeners.add(listener)
 
     return () => {
-      isStopped = true
-      connection.off('userNotification', handleUserNotification)
-      if (isStarted && connection.state !== HubConnectionState.Disconnected) {
-        void connection.stop().catch(() => {})
-      }
+      notificationListeners.delete(listener)
     }
   }, [userId])
 }

@@ -93,77 +93,134 @@ async function reverseGeocodeLocation(latitude: number, longitude: number): Prom
   return location
 }
 
-async function request<T>(path: string, init: RequestInit = {}, token?: string, retryCount = 0): Promise<T> {
-  const headers = new Headers(init.headers)
-  headers.set('Content-Type', 'application/json')
-  if (token) headers.set('Authorization', `Bearer ${token}`)
+const inFlightGets = new Map<string, Promise<unknown>>()
+const shortTermCache = new Map<string, { data: unknown; expiresAt: number }>()
 
-  const controller = new AbortController()
-  if (init.signal) {
-    if (init.signal.aborted) {
-      controller.abort()
-    } else {
-      init.signal.addEventListener('abort', () => controller.abort(), { once: true })
+export function clearApiCache(prefix?: string) {
+  if (!prefix) {
+    shortTermCache.clear()
+    return
+  }
+  for (const key of shortTermCache.keys()) {
+    if (key.startsWith(prefix) || key.includes(prefix)) {
+      shortTermCache.delete(key)
+    }
+  }
+}
+
+async function request<T>(path: string, init: RequestInit = {}, token?: string, retryCount = 0): Promise<T> {
+  const method = (init.method || 'GET').toUpperCase()
+  const isGet = method === 'GET'
+
+  if (!isGet) {
+    clearApiCache()
+  }
+
+  const cacheKey = `${path}::${token ?? ''}`
+  if (isGet) {
+    const cached = shortTermCache.get(cacheKey)
+    if (cached && Date.now() < cached.expiresAt) {
+      return Promise.resolve(cached.data as T)
+    }
+
+    if (!init.signal && inFlightGets.has(cacheKey)) {
+      return inFlightGets.get(cacheKey) as Promise<T>
     }
   }
 
-  const timeoutId = window.setTimeout(() => controller.abort(), 30_000)
-  let response: Response
-  try {
-    response = await fetch(`${apiBase}${path}`, { ...init, headers, signal: controller.signal })
-  } catch (error) {
-    window.clearTimeout(timeoutId)
-    // If request was deliberately aborted by caller, do not retry
-    if (init.signal?.aborted) {
-      throw error
+  const execute = async (): Promise<T> => {
+    const headers = new Headers(init.headers)
+    headers.set('Content-Type', 'application/json')
+    if (token) headers.set('Authorization', `Bearer ${token}`)
+
+    const controller = new AbortController()
+    if (init.signal) {
+      if (init.signal.aborted) {
+        controller.abort()
+      } else {
+        init.signal.addEventListener('abort', () => controller.abort(), { once: true })
+      }
     }
-    const isGet = !init.method || init.method.toUpperCase() === 'GET'
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      if (isGet && retryCount < 1) {
+
+    const timeoutId = window.setTimeout(() => controller.abort(), 30_000)
+    let response: Response
+    try {
+      response = await fetch(`${apiBase}${path}`, { ...init, headers, signal: controller.signal })
+    } catch (error) {
+      window.clearTimeout(timeoutId)
+      // If request was deliberately aborted by caller, do not retry
+      if (init.signal?.aborted) {
+        throw error
+      }
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        if (isGet && retryCount < 1) {
+          await new Promise(resolve => window.setTimeout(resolve, 800))
+          return request<T>(path, init, token, retryCount + 1)
+        }
+        throw new Error('Yêu cầu đang mất quá lâu. Vui lòng thử lại.')
+      }
+      if (error instanceof TypeError && isGet && retryCount < 1) {
         await new Promise(resolve => window.setTimeout(resolve, 800))
         return request<T>(path, init, token, retryCount + 1)
       }
-      throw new Error('Yêu cầu đang mất quá lâu. Vui lòng thử lại.')
+      throw new Error('Không thể kết nối OpenSlot. Vui lòng kiểm tra mạng và thử lại.')
+    } finally {
+      window.clearTimeout(timeoutId)
     }
-    if (error instanceof TypeError && isGet && retryCount < 1) {
-      await new Promise(resolve => window.setTimeout(resolve, 800))
-      return request<T>(path, init, token, retryCount + 1)
-    }
-    throw new Error('Không thể kết nối OpenSlot. Vui lòng kiểm tra mạng và thử lại.')
-  } finally {
-    window.clearTimeout(timeoutId)
-  }
-  if (!response.ok) {
-    const problem = await response.json().catch(() => null) as {
-      detail?: string
-      title?: string
-      errors?: Array<{ code?: string; description?: string }> | Record<string, string[]>
-    } | null
+    if (!response.ok) {
+      const problem = await response.json().catch(() => null) as {
+        detail?: string
+        title?: string
+        errors?: Array<{ code?: string; description?: string }> | Record<string, string[]>
+      } | null
 
-    const rawErrors = problem?.errors
-    const identityErrors = Array.isArray(rawErrors) ? rawErrors : []
-    const validationErrors = rawErrors && !Array.isArray(rawErrors) && typeof rawErrors === 'object'
-      ? rawErrors
-      : {}
-    if (response.status === 429) {
-      throw new Error(problem?.detail ?? 'Bạn đã gửi quá nhiều yêu cầu email. Vui lòng chờ ít phút rồi thử lại.')
+      const rawErrors = problem?.errors
+      const identityErrors = Array.isArray(rawErrors) ? rawErrors : []
+      const validationErrors = rawErrors && !Array.isArray(rawErrors) && typeof rawErrors === 'object'
+        ? rawErrors
+        : {}
+      if (response.status === 429) {
+        throw new Error(problem?.detail ?? 'Bạn đã gửi quá nhiều yêu cầu email. Vui lòng chờ ít phút rồi thử lại.')
+      }
+      if (validationErrors.ContactPhone?.length) {
+        throw new Error('Số điện thoại không hợp lệ, vui lòng nhập lại.')
+      }
+      if (identityErrors.find((error) => error.code === 'DuplicateEmail' || error.code === 'DuplicateUserName')) {
+        throw new Error('Email này đã được sử dụng. Hãy đăng nhập hoặc dùng email khác.')
+      }
+      if (identityErrors.find((error) => error.code?.startsWith('Password'))) {
+        throw new Error('Mật khẩu cần tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và số.')
+      }
+      if (response.status === 401) {
+        throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.')
+      }
+      if (response.status === 403) {
+        throw new Error('Bạn không có quyền thực hiện thao tác này.')
+      }
+      throw new Error(problem?.detail || problem?.title || 'Yêu cầu không thành công.')
     }
-    if (validationErrors.ContactPhone?.length) {
-      throw new Error('Số điện thoại không hợp lệ, vui lòng nhập lại.')
+    const data = (response.status === 204 ? undefined : await response.json().catch(() => ({}))) as T
+    if (isGet) {
+      const ttl = path.startsWith('/categories') ? 60_000 : 4_000
+      shortTermCache.set(cacheKey, { data, expiresAt: Date.now() + ttl })
     }
-    if (identityErrors.find((error) => error.code === 'DuplicateEmail' || error.code === 'DuplicateUserName')) {
-      throw new Error('Email này đã được sử dụng. Hãy đăng nhập hoặc dùng email khác.')
-    }
-    if (identityErrors.find((error) => error.code?.startsWith('Password'))) {
-      throw new Error('Mật khẩu cần tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và số.')
-    }
-    throw new Error(problem?.detail ?? Object.values(validationErrors).flat()[0] ?? problem?.title ?? identityErrors[0]?.description ?? 'Đã có lỗi xảy ra. Vui lòng thử lại.')
+    return data
   }
-  return response.status === 204 ? (undefined as T) : response.json() as Promise<T>
+
+  if (isGet && !init.signal) {
+    const p = execute().finally(() => {
+      inFlightGets.delete(cacheKey)
+    })
+    inFlightGets.set(cacheKey, p)
+    return p
+  }
+
+  return execute()
 }
 
 export const api = {
-  categories: () => request<Category[]>('/categories'),
+  clearCache: clearApiCache,
+  categories: (init?: RequestInit) => request<Category[]>('/categories', init),
   slots: (query = '') => request<DealSlot[]>(`/slots${query}`),
   geocodeLocation,
   reverseGeocodeLocation,
@@ -195,12 +252,12 @@ export const api = {
   cancelBooking: (bookingId: string, reason: string, token: string) => request<void>(`/bookings/${bookingId}/cancel`, {
     method: 'POST', body: JSON.stringify({ reason }),
   }, token),
-  providerSlots: (token: string) => request<ProviderSlot[]>('/provider/slots', {}, token),
-  providerServices: (token: string) => request<ProviderService[]>('/provider/slots/services', {}, token),
-  providerProfile: (token: string) => request<MyProviderProfile>('/provider/profile', {}, token),
+  providerSlots: (token: string, init?: RequestInit) => request<ProviderSlot[]>('/provider/slots', init, token),
+  providerServices: (token: string, init?: RequestInit) => request<ProviderService[]>('/provider/slots/services', init, token),
+  providerProfile: (token: string, init?: RequestInit) => request<MyProviderProfile>('/provider/profile', init, token),
   updateProviderProfile: (payload: object, token: string) => request<void>('/provider/profile', { method: 'PUT', body: JSON.stringify(payload) }, token),
-  providerVenues: (token: string) => request<ProviderVenue[]>('/provider/venues', {}, token),
-  providerResources: (token: string) => request<ProviderResource[]>('/provider/resources', {}, token),
+  providerVenues: (token: string, init?: RequestInit) => request<ProviderVenue[]>('/provider/venues', init, token),
+  providerResources: (token: string, init?: RequestInit) => request<ProviderResource[]>('/provider/resources', init, token),
   createProviderVenue: (payload: object, token: string) => request('/provider/venues', { method: 'POST', body: JSON.stringify(payload) }, token),
   createProviderResource: (payload: object, token: string) => request('/provider/resources', { method: 'POST', body: JSON.stringify(payload) }, token),
   updateProviderResource: (resourceId: string, payload: object, token: string) => request<void>(`/provider/resources/${resourceId}`, { method: 'PUT', body: JSON.stringify(payload) }, token),
