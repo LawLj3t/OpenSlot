@@ -13,6 +13,8 @@ import { CskhPage } from './CskhPage'
 import { OpenSlotWebChat } from './OpenSlotWebChat'
 import { ConfirmModal } from './ConfirmModal'
 import { ProviderSlotDetailModal } from './ProviderSlotDetailModal'
+import { useToast } from './ToastContext'
+import { SlotGridSkeleton, TableSkeleton } from './Skeleton'
 import './App.css'
 import './AuthExperience.css'
 import './EmailVerification.css'
@@ -266,7 +268,7 @@ function ExplorePage() {
         </form>
       </div>
     </section>
-    <section className="container content-section">{hasSearched && <NearbyResults slots={recommendationSlots} location={appliedLocation} loading={loading || locating} />}<div className="category-row"><button className={!activeCategory ? 'category active' : 'category'} onClick={() => setActiveCategory('')}><i className="bi bi-grid" />Tất cả</button>{categories.map((item) => <button key={item.id} className={activeCategory === item.slug ? 'category active' : 'category'} onClick={() => setActiveCategory(item.slug)}><i className={`bi ${item.icon || 'bi-tag'}`} />{item.name}</button>)}</div><div className="section-heading"><div><p className="eyebrow">Sắp diễn ra</p><h2>Slot đáng săn gần bạn</h2></div><button className="view-toggle" onClick={() => setMapMode(!mapMode)}><i className={`bi bi-${mapMode ? 'list-ul' : 'map'}`} /> {mapMode ? 'Xem danh sách' : 'Xem trên bản đồ'}</button></div>{error && <div className="alert alert-warning">{error}</div>}{loading ? <div className="empty-state"><div className="spinner-border text-primary" /><p>Đang tìm slot tốt nhất...</p></div> : mapMode ? <SlotMap slots={slots} location={appliedLocation} /> : <SlotGrid slots={slots} />}</section>
+    <section className="container content-section">{hasSearched && <NearbyResults slots={recommendationSlots} location={appliedLocation} loading={loading || locating} />}<div className="category-row"><button className={!activeCategory ? 'category active' : 'category'} onClick={() => setActiveCategory('')}><i className="bi bi-grid" />Tất cả</button>{categories.map((item) => <button key={item.id} className={activeCategory === item.slug ? 'category active' : 'category'} onClick={() => setActiveCategory(item.slug)}><i className={`bi ${item.icon || 'bi-tag'}`} />{item.name}</button>)}</div><div className="section-heading"><div><p className="eyebrow">Sắp diễn ra</p><h2>Slot đáng săn gần bạn</h2></div><button className="view-toggle" onClick={() => setMapMode(!mapMode)}><i className={`bi bi-${mapMode ? 'list-ul' : 'map'}`} /> {mapMode ? 'Xem danh sách' : 'Xem trên bản đồ'}</button></div>{error && <div className="alert alert-warning">{error}</div>}{loading ? <SlotGridSkeleton count={6} /> : mapMode ? <SlotMap slots={slots} location={appliedLocation} /> : <SlotGrid slots={slots} />}</section>
     <section className="how-it-works"><div className="container"><p className="eyebrow">Đơn giản, minh bạch</p><h2>Săn slot trong 3 bước</h2><div className="steps"><Step icon="bi-search-heart" number="01" title="Tìm đúng lúc" text="Lọc dịch vụ, địa điểm và giờ phù hợp với lịch của bạn." /><Step icon="bi-ticket-perforated" number="02" title="Giữ chỗ nhanh" text="Xác nhận slot trước khi hết chỗ; giá và điều kiện luôn rõ ràng." /><Step icon="bi-qr-code-scan" number="03" title="Check-in gọn" text="Dùng mã QR hoặc PIN tại địa điểm để bắt đầu trải nghiệm." /></div></div></section>
   </div>
 }
@@ -289,7 +291,37 @@ function serviceImageStyle(imageUrl: string | null | undefined, categorySlug: st
     return image.protocol === 'https:' ? { backgroundImage: `url("${image.href}")` } : undefined
   } catch { return undefined }
 }
-function SlotCard({ slot }: { slot: DealSlot }) { const discount = Math.round((1 - slot.dealPriceVnd / slot.originalPriceVnd) * 100); const visualStyle = serviceImageStyle(slot.imageUrl, slot.categorySlug, slot.serviceName); return <NavLink to={`/slots/${slot.id}`} state={{ slot }} className="slot-card"><div style={visualStyle} className={`slot-visual visual-${slot.categorySlug}${visualStyle ? ' has-service-image' : ''}`}><span className="discount">-{discount}%</span><span className="spot-label"><i className="bi bi-lightning-fill" /> Còn {slot.remainingCapacity} chỗ</span></div><div className="slot-body"><div className="slot-meta"><span>{slot.categoryName}</span><span><i className="bi bi-geo-alt" /> {slot.distanceKm == null ? slot.district : `${slot.distanceKm} km`}</span></div><h3>{slot.serviceName}</h3><p className="venue"><i className="bi bi-building" /> {slot.venueName}{slot.resourceName && <> · <i className="bi bi-pin-map" /> {slot.resourceName}{slot.resourceCode ? ` (${slot.resourceCode})` : ''}</>}</p><div className="time-row"><i className="bi bi-calendar-event" /> {formatSlotWindow(slot.startAtUtc, slot.endAtUtc)}</div><div className="price-row"><div><del>{formatMoney(slot.originalPriceVnd)}</del><strong>{formatMoney(slot.dealPriceVnd)}</strong></div><span className="arrow-circle"><i className="bi bi-arrow-up-right" /></span></div></div></NavLink> }
+function SlotCard({ slot }: { slot: DealSlot }) {
+  const discount = Math.round((1 - slot.dealPriceVnd / slot.originalPriceVnd) * 100)
+  const visualStyle = serviceImageStyle(slot.imageUrl, slot.categorySlug, slot.serviceName)
+  const remainingPercent = Math.max(0, Math.min(100, (slot.remainingCapacity / slot.capacity) * 100))
+  const capacityState = slot.remainingCapacity <= 1 ? 'danger' : slot.remainingCapacity <= 3 ? 'warning' : 'safe'
+
+  return <NavLink to={`/slots/${slot.id}`} state={{ slot }} className="slot-card">
+    <div style={visualStyle} className={`slot-visual visual-${slot.categorySlug}${visualStyle ? ' has-service-image' : ''}`}>
+      <span className="discount">-{discount}%</span>
+      <span className="spot-label"><i className="bi bi-lightning-fill" /> Còn {slot.remainingCapacity} chỗ</span>
+    </div>
+    <div className="slot-body">
+      <div className="slot-meta">
+        <span>{slot.categoryName}</span>
+        <span><i className="bi bi-geo-alt" /> {slot.distanceKm == null ? slot.district : `${slot.distanceKm} km`}</span>
+      </div>
+      <h3>{slot.serviceName}</h3>
+      <p className="venue"><i className="bi bi-building" /> {slot.venueName}{slot.resourceName && <> · <i className="bi bi-pin-map" /> {slot.resourceName}{slot.resourceCode ? ` (${slot.resourceCode})` : ''}</>}</p>
+      <div className="time-row"><i className="bi bi-calendar-event" /> {formatSlotWindow(slot.startAtUtc, slot.endAtUtc)}</div>
+      <div className="capacity-meter">
+        <div className="capacity-meter-bar">
+          <div className={`capacity-meter-fill ${capacityState}`} style={{ width: `${remainingPercent}%` }} />
+        </div>
+      </div>
+      <div className="price-row">
+        <div><del>{formatMoney(slot.originalPriceVnd)}</del><strong>{formatMoney(slot.dealPriceVnd)}</strong></div>
+        <span className="arrow-circle"><i className="bi bi-arrow-up-right" /></span>
+      </div>
+    </div>
+  </NavLink>
+}
 
 function NearbyResults({ slots, location, loading }: { slots: DealSlot[]; location: { label: string; latitude?: number; longitude?: number } | null; loading: boolean }) {
   return <section className="nearby-results" aria-live="polite"><div className="nearby-heading"><div><p className="eyebrow">Gợi ý quanh khu vực</p><h2>{location?.label ?? 'Các địa điểm phù hợp'}</h2></div>{!loading && <span><i className="bi bi-geo-alt-fill" /> {slots.length} lựa chọn gần nhất</span>}</div>{loading ? <div className="nearby-loading"><div className="spinner-border text-primary" /><p>Đang tìm địa điểm và ưu đãi phù hợp...</p></div> : slots.length ? <><SlotMap slots={slots} location={location} compact /><div className="nearby-strip">{slots.slice(0, 3).map((slot) => <NavLink key={slot.id} to={`/slots/${slot.id}`} state={{ slot }}><b>{slot.serviceName}</b><span>{slot.venueName} · {slot.distanceKm == null ? slot.district : `${slot.distanceKm} km`}</span><strong>{formatMoney(slot.dealPriceVnd)}</strong></NavLink>)}</div></> : <div className="nearby-empty"><i className="bi bi-map" /><div><b>Chưa có dịch vụ khả dụng quanh khu vực này</b><span>Thử một địa điểm lân cận hoặc bỏ trống ô địa điểm để xem tất cả.</span></div></div>}</section>
@@ -310,13 +342,20 @@ function SlotMap({ slots, location, compact = false }: { slots: DealSlot[]; loca
 
 function SlotDetailPage({ session }: { session: Session | null }) {
   const { slotId } = useParams(); const navigate = useNavigate(); const location = useLocation(); const locationSlot = (location.state as { slot?: DealSlot } | null)?.slot; const [slot, setSlot] = useState<DealSlot | null>(locationSlot ?? null); const [error, setError] = useState(''); const [holding, setHolding] = useState(false)
+  const toast = useToast()
   const canBook = hasRole(session, 'Customer') && activePortalRole(session) === 'Customer'
   const refreshSlot = useCallback(() => { if (!slotId) return Promise.resolve(); return api.slot(slotId).then(setSlot).catch((e: Error) => setError(e.message)) }, [slotId])
   useEffect(() => { void refreshSlot() }, [refreshSlot])
   useSlotAvailability(useCallback((update) => { if (update.slotId === slotId) void refreshSlot() }, [refreshSlot, slotId]))
   if (!slot) return <div className="container detail-shell"><div className="empty-state"><p>{error || 'Đang tải thông tin slot...'}</p></div></div>
   const beginPayment = async () => { if (!session) { navigate('/login'); return }; if (!canBook) return; setHolding(true); setError(''); try { const hold = await api.createHold(slot.id, session.accessToken); navigate(`/payment/${slot.id}`, { state: { slot, hold } }) } catch (e) { setError(e instanceof Error ? e.message : 'Không thể giữ chỗ lúc này. Vui lòng thử lại.'); void refreshSlot() } finally { setHolding(false) } }
-  const report = async () => { if (!session) { navigate('/login'); return }; const reason = window.prompt('Mô tả vấn đề bạn muốn báo cáo (tối thiểu 10 ký tự):'); if (!reason) return; try { await api.createReport('slot', slot.id, reason, session.accessToken); window.alert('Cảm ơn bạn. Báo cáo đã được gửi tới quản trị viên.') } catch (e) { setError(e instanceof Error ? e.message : 'Không thể gửi báo cáo.') } }
+  const report = async () => { if (!session) { navigate('/login'); return }; const reason = window.prompt('Mô tả vấn đề bạn muốn báo cáo (tối thiểu 10 ký tự):'); if (!reason) return; try { await api.createReport('slot', slot.id, reason, session.accessToken); toast.success('Báo cáo đã được gửi tới quản trị viên.') } catch (e) { setError(e instanceof Error ? e.message : 'Không thể gửi báo cáo.') } }
+  const shareDeal = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(window.location.href)
+      toast.success('Đã sao chép liên kết ưu đãi vào bộ nhớ tạm!')
+    }
+  }
   const startChatWithShop = () => {
     if (!session) { navigate('/login'); return }
     window.dispatchEvent(new CustomEvent('openslot:open-chat', {
@@ -335,15 +374,70 @@ function SlotDetailPage({ session }: { session: Session | null }) {
     }))
   }
   const visualStyle = serviceImageStyle(slot.imageUrl, slot.categorySlug, slot.serviceName)
-  return <div className="container detail-shell"><NavLink to="/" className="back-link"><i className="bi bi-arrow-left" /> Quay lại khám phá</NavLink><div className="detail-grid"><section className="detail-main"><div style={visualStyle} className={`detail-visual visual-${slot.categorySlug}${visualStyle ? ' has-service-image' : ''}`}><span className="discount">-{Math.round((1 - slot.dealPriceVnd / slot.originalPriceVnd) * 100)}%</span><i className="bi bi-lightning-charge-fill" /></div><p className="eyebrow mt-4">{slot.categoryName}</p><h1>{slot.serviceName}</h1><p className="detail-venue"><i className="bi bi-building" /> {slot.venueName} · {slot.district}, {slot.city}</p><div className="detail-facts"><Fact icon="bi-calendar-event" label="Bắt đầu" value={formatTime(slot.startAtUtc)} /><Fact icon="bi-clock" label="Kết thúc" value={formatTime(slot.endAtUtc)} /><Fact icon="bi-geo-alt" label="Địa điểm" value={`${slot.district}, ${slot.city}`} />{slot.resourceName && <Fact icon="bi-pin-map" label="Đơn vị đã đặt" value={`${slot.resourceName}${slot.resourceCode ? ` · ${slot.resourceCode}` : ''}${slot.resourceLocation ? ` · ${slot.resourceLocation}` : ''}`} />}</div><article className="info-box"><h3><i className="bi bi-shield-check" /> Chính sách OpenSlot</h3><p>Giữ chỗ chỉ hợp lệ trước giờ bắt đầu ít nhất 15 phút. Hủy sát giờ hoặc không đến có thể được tính strike để bảo vệ đối tác và cộng đồng.</p></article><button onClick={report} className="report-button"><i className="bi bi-flag" /> Báo cáo thông tin không chính xác</button></section><aside className="booking-panel"><p>Giá ưu đãi sát giờ</p><div className="detail-price"><del>{formatMoney(slot.originalPriceVnd)}</del><strong>{formatMoney(slot.dealPriceVnd)}</strong></div><div className="seat-note"><i className="bi bi-people" /> Còn <b>{slot.remainingCapacity}/{slot.capacity}</b> chỗ khả dụng</div>{error && <div className="alert alert-danger py-2 small">{error}</div>}<button disabled={holding || !slot.remainingCapacity || (!!session && !canBook)} onClick={beginPayment} className="btn btn-primary w-100 rounded-pill py-3">{holding ? 'Đang giữ chỗ...' : !session ? 'Đăng nhập để tiếp tục' : canBook ? 'Tiếp tục thanh toán' : 'Chỉ tài khoản khách hàng được đặt'} <i className="bi bi-arrow-right" /></button><button type="button" onClick={startChatWithShop} className="btn btn-outline-secondary w-100 rounded-pill py-2 mt-2"><i className="bi bi-chat-dots-fill me-2" /> Chat với cửa hàng</button><small className="d-block text-center mt-3">Vào thanh toán sẽ giữ chỗ cho bạn tối đa 10 phút.</small></aside></div></div>
+  return <div className="container detail-shell"><NavLink to="/" className="back-link"><i className="bi bi-arrow-left" /> Quay lại khám phá</NavLink><div className="detail-grid"><section className="detail-main"><div style={visualStyle} className={`detail-visual visual-${slot.categorySlug}${visualStyle ? ' has-service-image' : ''}`}><span className="discount">-{Math.round((1 - slot.dealPriceVnd / slot.originalPriceVnd) * 100)}%</span><i className="bi bi-lightning-charge-fill" /></div><p className="eyebrow mt-4">{slot.categoryName}</p><h1>{slot.serviceName}</h1><p className="detail-venue"><i className="bi bi-building" /> {slot.venueName} · {slot.district}, {slot.city}</p><div className="detail-facts"><Fact icon="bi-calendar-event" label="Bắt đầu" value={formatTime(slot.startAtUtc)} /><Fact icon="bi-clock" label="Kết thúc" value={formatTime(slot.endAtUtc)} /><Fact icon="bi-geo-alt" label="Địa điểm" value={`${slot.district}, ${slot.city}`} />{slot.resourceName && <Fact icon="bi-pin-map" label="Đơn vị đã đặt" value={`${slot.resourceName}${slot.resourceCode ? ` · ${slot.resourceCode}` : ''}${slot.resourceLocation ? ` · ${slot.resourceLocation}` : ''}`} />}</div><article className="info-box"><h3><i className="bi bi-shield-check" /> Chính sách OpenSlot</h3><p>Giữ chỗ chỉ hợp lệ trước giờ bắt đầu ít nhất 15 phút. Hủy sát giờ hoặc không đến có thể được tính strike để bảo vệ đối tác và cộng đồng.</p></article><button onClick={report} className="report-button"><i className="bi bi-flag" /> Báo cáo thông tin không chính xác</button></section><aside className="booking-panel sticky-panel"><p>Giá ưu đãi sát giờ</p><div className="detail-price"><del>{formatMoney(slot.originalPriceVnd)}</del><strong>{formatMoney(slot.dealPriceVnd)}</strong></div><div className="capacity-meter mb-3"><div className="capacity-meter-bar"><div className={`capacity-meter-fill ${slot.remainingCapacity <= 1 ? 'danger' : slot.remainingCapacity <= 3 ? 'warning' : 'safe'}`} style={{ width: `${Math.min(100, (slot.remainingCapacity / slot.capacity) * 100)}%` }} /></div><div className="capacity-text mt-1"><span>Đang mở bán</span><span>Còn {slot.remainingCapacity}/{slot.capacity} chỗ khả dụng</span></div></div>{error && <div className="alert alert-danger py-2 small">{error}</div>}<button disabled={holding || !slot.remainingCapacity || (!!session && !canBook)} onClick={beginPayment} className="btn btn-primary w-100 rounded-pill py-3">{holding ? 'Đang giữ chỗ...' : !session ? 'Đăng nhập để tiếp tục' : canBook ? 'Tiếp tục thanh toán' : 'Chỉ tài khoản khách hàng được đặt'} <i className="bi bi-arrow-right" /></button><button type="button" onClick={startChatWithShop} className="btn btn-outline-secondary w-100 rounded-pill py-2 mt-2"><i className="bi bi-chat-dots-fill me-2" /> Chat với cửa hàng</button><button type="button" onClick={shareDeal} className="share-deal-btn w-100 mt-2"><i className="bi bi-share-fill" /> Chia sẻ ưu đãi này</button><small className="d-block text-center mt-3">Vào thanh toán sẽ giữ chỗ cho bạn tối đa 10 phút.</small></aside></div></div>
 }
 
 function BookingConfirmationPage({ confirmation, venueName }: { confirmation: BookingConfirmation; venueName: string }) {
-  return <div className="container confirmation-page"><div className="confirmation-card"><span className="success-mark"><i className="bi bi-check-lg" /></span><p className="eyebrow">Đã ghi nhận thanh toán demo</p><h1>Hẹn gặp bạn tại<br />{venueName}!</h1><p>Giữ chỗ đã được tạo. Đưa QR hoặc PIN bên dưới khi check-in; lịch đã có trong “Lịch của tôi”.</p><div className="qr-wrap"><QRCodeSVG value={confirmation.qrPayload} size={180} /><strong>{confirmation.publicCode}</strong><span>PIN check-in: <b>{confirmation.checkInPin}</b></span></div><NavLink to="/bookings" className="btn btn-primary rounded-pill px-4">Xem lịch của tôi</NavLink></div></div>
+  const toast = useToast()
+  const copyPin = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(confirmation.checkInPin)
+      toast.success('Đã sao chép mã PIN check-in!')
+    }
+  }
+
+  return (
+    <div className="container confirmation-page py-5">
+      <div className="e-ticket-wrap">
+        <div className="e-ticket-card">
+          <div className="e-ticket-header">
+            <div className="d-flex justify-content-between align-items-center">
+              <span className="e-ticket-badge">
+                <i className="bi bi-check-circle-fill" /> Đã xác nhận thành công
+              </span>
+              <span className="text-white-50 small fw-bold">OpenSlot E-Ticket</span>
+            </div>
+            <h2 className="e-ticket-title mt-2">{venueName}</h2>
+            <p className="e-ticket-venue">
+              <i className="bi bi-geo-alt-fill text-danger" /> Xuất trình mã này tại quầy để check-in
+            </p>
+          </div>
+
+          <div className="e-ticket-tear-line">
+            <div className="e-ticket-dashed" />
+          </div>
+
+          <div className="e-ticket-body">
+            <div className="e-ticket-qr-zone">
+              <QRCodeSVG value={confirmation.qrPayload} size={190} />
+              <div className="e-ticket-pin-display mt-3">
+                <span className="text-muted small fw-bold text-uppercase me-2">MÃ PIN:</span>
+                <span className="e-ticket-pin-digits">{confirmation.checkInPin}</span>
+                <button type="button" className="btn btn-sm btn-link text-decoration-none p-0 ms-2" onClick={copyPin} title="Sao chép PIN">
+                  <i className="bi bi-clipboard fs-5 text-dark" />
+                </button>
+              </div>
+              <small className="text-muted mt-2">Mã đặt chỗ: <b>{confirmation.publicCode}</b></small>
+            </div>
+
+            <div className="e-ticket-actions">
+              <button type="button" onClick={() => window.print()} className="btn btn-outline-secondary rounded-pill px-4">
+                <i className="bi bi-printer me-1" /> In / Lưu vé
+              </button>
+              <NavLink to="/bookings" className="btn btn-primary rounded-pill px-4">
+                <i className="bi bi-calendar-check me-1" /> Xem lịch của tôi
+              </NavLink>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function PaymentPage({ session }: { session: Session | null }) {
   const { slotId } = useParams(); const location = useLocation(); const navigate = useNavigate(); const locationState = (location.state as { slot?: DealSlot; hold?: SlotHold } | null); const locationSlot = locationState?.slot; const [slot, setSlot] = useState<DealSlot | null>(locationSlot ?? null); const [hold, setHold] = useState<SlotHold | null>(locationState?.hold ?? null); const [status, setStatus] = useState<'idle' | 'holding' | 'loading'>('idle'); const [error, setError] = useState(''); const [confirmation, setConfirmation] = useState<BookingConfirmation | null>(null); const [secondsLeft, setSecondsLeft] = useState(0); const expirationReleaseSent = useRef(false); const isMounted = useRef(true)
+  const toast = useToast()
   const canBook = hasRole(session, 'Customer') && activePortalRole(session) === 'Customer'
   const refreshSlot = useCallback(() => { if (!slotId) return Promise.resolve(); return api.slot(slotId).then(setSlot).catch((e: Error) => setError(e.message)) }, [slotId])
   useEffect(() => { void refreshSlot() }, [refreshSlot])
@@ -357,10 +451,20 @@ function PaymentPage({ session }: { session: Session | null }) {
   if (!canBook) return <Navigate to={homeFor(session)} replace />
   if (!slot) return <div className="container payment-page"><div className="empty-state"><p>{error || 'Đang tải thông tin thanh toán...'}</p></div></div>
   const expired = Boolean(hold && secondsLeft <= 0)
+  const isCritical = Boolean(hold && secondsLeft > 0 && secondsLeft < 120)
+
+  const copyText = (text: string, label: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text)
+      toast.success(`Đã sao chép ${label}!`)
+    }
+  }
+
   const confirmPayment = async () => { if (!hold) return; setStatus('loading'); setError(''); try { const result = await api.confirmHold(hold.holdId, session.accessToken); expirationReleaseSent.current = true; setConfirmation(result) } catch (e) { setError(e instanceof Error ? e.message : 'Không thể xác nhận giữ chỗ. Vui lòng thử lại.'); void refreshSlot() } finally { setStatus('idle') } }
   const cancelPayment = async () => { if (expirationReleaseSent.current) { navigate(`/slots/${slot.id}`, { replace: true }); return }; expirationReleaseSent.current = true; setStatus('loading'); try { if (hold) await api.releaseHold(hold.holdId, session.accessToken); navigate(`/slots/${slot.id}`, { replace: true }) } catch (e) { setError(e instanceof Error ? e.message : 'Không thể hủy giữ chỗ. Vui lòng thử lại.') } finally { setStatus('idle') } }
   if (confirmation) return <BookingConfirmationPage confirmation={confirmation} venueName={slot.venueName} />
-  return <div className="container payment-page"><button type="button" onClick={cancelPayment} disabled={status === 'loading'} className="back-link border-0 bg-transparent"><i className="bi bi-arrow-left" /> Hủy và quay lại ưu đãi</button><div className="payment-layout"><section className="payment-card"><p className="eyebrow">Bước cuối cùng</p><h1>Thanh toán giữ chỗ</h1><p className="payment-copy">Quét mã QR bằng ứng dụng VietinBank iPay Mobile và chuyển đúng số tiền trước khi xác nhận.</p>{hold ? <div className={`alert ${expired ? 'alert-danger' : 'alert-info'} mb-3`}><i className={`bi bi-${expired ? 'clock-history' : 'shield-check'} me-2`} />{expired ? 'Thời gian giữ chỗ đã hết. Hãy quay lại chọn slot.' : <>Chỗ này đang được giữ riêng cho bạn trong <b>{formatCountdown(secondsLeft)}</b>.</>}</div> : <div className="alert alert-info mb-3"><i className="bi bi-hourglass-split me-2" />Đang giữ chỗ cho bạn...</div>}<div className="payment-qr"><img src="/payment/vietinbank-qr.png" alt="Mã QR VietinBank để thanh toán" /></div><div className="bank-details"><div><span>Ngân hàng</span><b>VietinBank</b></div><div><span>Số tài khoản</span><b>108883701569</b></div><div><span>Số tiền</span><b>{formatMoney(slot.dealPriceVnd)}</b></div></div><div className="payment-demo-note"><i className="bi bi-info-circle" /><span>Đây là thanh toán mô phỏng cho bản demo. OpenSlot chưa thể tự kiểm tra giao dịch ngân hàng.</span></div>{error && <div className="alert alert-danger mb-0">{error}</div>}<button disabled={status !== 'idle' || !hold || expired} onClick={confirmPayment} className="btn btn-primary w-100 rounded-pill py-3">{status === 'holding' ? 'Đang giữ chỗ...' : status === 'loading' ? 'Đang xác nhận...' : 'Tôi đã thanh toán'} <i className="bi bi-check2-circle" /></button><button type="button" disabled={status !== 'idle'} onClick={cancelPayment} className="btn btn-outline-secondary w-100 rounded-pill mt-2">Hủy thanh toán</button></section><aside className="payment-summary"><p className="eyebrow">Thông tin ưu đãi</p><h2>{slot.serviceName}</h2><p><i className="bi bi-building" /> {slot.venueName}</p><p><i className="bi bi-calendar-event" /> {formatSlotWindow(slot.startAtUtc, slot.endAtUtc)}</p><p><i className="bi bi-geo-alt" /> {slot.district}, {slot.city}</p>{slot.resourceName && <p><i className="bi bi-pin-map" /> {slot.resourceName}{slot.resourceCode ? ` · ${slot.resourceCode}` : ''}</p>}<hr /><div><span>Giá gốc</span><del>{formatMoney(slot.originalPriceVnd)}</del></div><div className="payment-total"><span>Thanh toán</span><strong>{formatMoney(slot.dealPriceVnd)}</strong></div></aside></div></div>
+
+  return <div className="container payment-page"><button type="button" onClick={cancelPayment} disabled={status === 'loading'} className="back-link border-0 bg-transparent"><i className="bi bi-arrow-left" /> Hủy và quay lại ưu đãi</button><div className="payment-layout"><section className="payment-card"><p className="eyebrow">Bước cuối cùng</p><h1>Thanh toán giữ chỗ</h1><p className="payment-copy">Quét mã QR bằng ứng dụng VietinBank iPay Mobile hoặc ứng dụng ngân hàng của bạn và chuyển đúng số tiền trước khi xác nhận.</p>{hold ? <div className={`urgent-timer-box ${isCritical || expired ? 'is-critical' : ''}`}><i className={`bi bi-${expired ? 'x-circle-fill' : isCritical ? 'exclamation-triangle-fill' : 'hourglass-split'} fs-3`} /><div className="flex-grow-1"><div className="d-flex justify-content-between align-items-center mb-1"><span className="fw-bold small">{expired ? 'Hết thời gian giữ chỗ!' : isCritical ? 'SẮP HẾT HẠN GIỮ CHỖ!' : 'Thời gian giữ chỗ còn lại:'}</span><span className="urgent-timer-digits">{formatCountdown(secondsLeft)}</span></div><div className="capacity-meter-bar" style={{ height: '4px' }}><div className={`capacity-meter-fill ${expired || isCritical ? 'danger' : 'safe'}`} style={{ width: `${Math.max(0, Math.min(100, (secondsLeft / 600) * 100))}%` }} /></div></div></div> : <div className="urgent-timer-box"><div className="spinner-border spinner-border-sm me-2" /><span>Đang kết nối hệ thống giữ chỗ...</span></div>}<div className="payment-qr"><img src="/payment/vietinbank-qr.png" alt="Mã QR VietinBank để thanh toán" /></div><div className="bank-details"><div className="bank-detail-box"><span>Ngân hàng</span><b>VietinBank</b></div><div className="bank-detail-box"><span>Số tài khoản</span><b>108883701569</b><button type="button" className="copy-badge-btn" onClick={() => copyText('108883701569', 'Số tài khoản')} title="Sao chép"><i className="bi bi-clipboard" /> Chép</button></div><div className="bank-detail-box"><span>Số tiền</span><b>{formatMoney(slot.dealPriceVnd)}</b><button type="button" className="copy-badge-btn" onClick={() => copyText(String(slot.dealPriceVnd), 'Số tiền')} title="Sao chép"><i className="bi bi-clipboard" /> Chép</button></div></div><div className="payment-demo-note"><i className="bi bi-info-circle" /><span>Đây là thanh toán mô phỏng cho bản demo. OpenSlot chưa thể tự kiểm tra giao dịch ngân hàng.</span></div>{error && <div className="alert alert-danger mb-0">{error}</div>}<button disabled={status !== 'idle' || !hold || expired} onClick={confirmPayment} className="btn btn-primary w-100 rounded-pill py-3">{status === 'holding' ? 'Đang giữ chỗ...' : status === 'loading' ? 'Đang xác nhận...' : 'Tôi đã thanh toán'} <i className="bi bi-check2-circle" /></button><button type="button" disabled={status !== 'idle'} onClick={cancelPayment} className="btn btn-outline-secondary w-100 rounded-pill mt-2">Hủy thanh toán</button></section><aside className="payment-summary"><p className="eyebrow">Thông tin ưu đãi</p><h2>{slot.serviceName}</h2><p><i className="bi bi-building" /> {slot.venueName}</p><p><i className="bi bi-calendar-event" /> {formatSlotWindow(slot.startAtUtc, slot.endAtUtc)}</p><p><i className="bi bi-geo-alt" /> {slot.district}, {slot.city}</p>{slot.resourceName && <p><i className="bi bi-pin-map" /> {slot.resourceName}{slot.resourceCode ? ` · ${slot.resourceCode}` : ''}</p>}<hr /><div><span>Giá gốc</span><del>{formatMoney(slot.originalPriceVnd)}</del></div><div className="payment-total"><span>Thanh toán</span><strong>{formatMoney(slot.dealPriceVnd)}</strong></div></aside></div></div>
 }
 function Fact({ icon, label, value }: { icon: string; label: string; value: string }) { return <div><i className={`bi ${icon}`} /><span><small>{label}</small><b>{value}</b></span></div> }
 
@@ -517,6 +621,7 @@ function ProviderApplicationPage({ session, onAuthenticated }: { session: Sessio
 
 function BookingsPage({ session }: { session: Session }) {
   const [bookings, setBookings] = useState<Booking[]>([]); const [error, setError] = useState(''); const [loading, setLoading] = useState(true)
+  const [selectedBookingForTicket, setSelectedBookingForTicket] = useState<Booking | null>(null)
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; confirmText?: string; variant?: 'danger' | 'warning' | 'primary'; onConfirm: () => Promise<void> } | null>(null)
   const [confirmLoading, setConfirmLoading] = useState(false)
   // oxlint-disable-next-line react/set-state-in-effect -- loading belongs to the request lifecycle
@@ -541,7 +646,25 @@ function BookingsPage({ session }: { session: Session }) {
       }
     })
   }
-  return <div className="container dashboard"><p className="eyebrow">Tài khoản của bạn</p><h1>Lịch trải nghiệm</h1><p className="dashboard-copy">Mã QR/check-in PIN được mở khi bạn giữ chỗ. Hãy đến đúng giờ để giữ lịch sử tốt.</p>{error && <div className="alert alert-danger">{error}</div>}{loading ? <div className="empty-state"><div className="spinner-border text-primary" /></div> : bookings.length ? <div className="booking-list">{bookings.map((booking) => <article className="booking-item" key={booking.id}><div className="booking-date"><b>{new Intl.DateTimeFormat('vi-VN', { day: '2-digit' }).format(new Date(booking.startAtUtc))}</b><span>thg {new Intl.DateTimeFormat('vi-VN', { month: '2-digit' }).format(new Date(booking.startAtUtc))}</span></div><div className="booking-info"><span className="status-pill">{booking.status === 0 ? 'Đã xác nhận' : booking.status === 3 ? 'Đã hủy' : 'Đã cập nhật'}</span><h3>{booking.serviceName}</h3><p><i className="bi bi-building" /> {booking.venueName}{booking.resourceName ? ` · ${booking.resourceName}${booking.resourceCode ? ` (${booking.resourceCode})` : ''}` : ''} · <i className="bi bi-clock" /> {formatTime(booking.startAtUtc)}</p><b>{formatMoney(booking.dealPriceVnd)}</b></div><div className="booking-actions"><code>{booking.publicCode}</code>{booking.status === 0 && <button onClick={() => cancel(booking)} className="btn btn-outline-danger btn-sm rounded-pill">Hủy chỗ</button>}</div></article>)}</div> : <div className="empty-state"><i className="bi bi-calendar-heart" /><h3>Chưa có lịch nào</h3><NavLink className="btn btn-primary rounded-pill" to="/">Khám phá slot ngay</NavLink></div>}{confirmModal && <ConfirmModal isOpen={confirmModal.isOpen} title={confirmModal.title} message={confirmModal.message} confirmText={confirmModal.confirmText} variant={confirmModal.variant} loading={confirmLoading} onConfirm={async () => { try { setConfirmLoading(true); await confirmModal.onConfirm(); setConfirmModal(null) } catch (e) { setError(e instanceof Error ? e.message : 'Thao tác không thành công.'); setConfirmModal(null) } finally { setConfirmLoading(false) } }} onCancel={() => { if (!confirmLoading) setConfirmModal(null) }} />}</div>
+
+  const getStatusBadge = (status: number) => {
+    switch (status) {
+      case 0:
+        return <span className="os-badge os-badge-open"><i className="bi bi-check-circle-fill" /> Đã xác nhận</span>
+      case 1:
+        return <span className="os-badge os-badge-pending"><i className="bi bi-hourglass-split" /> Đang check-in</span>
+      case 2:
+        return <span className="os-badge os-badge-expired"><i className="bi bi-check-all" /> Đã hoàn thành</span>
+      case 3:
+        return <span className="os-badge os-badge-cancelled"><i className="bi bi-x-circle-fill" /> Đã hủy</span>
+      case 4:
+        return <span className="os-badge os-badge-expired"><i className="bi bi-person-x-fill" /> Vắng mặt (No-show)</span>
+      default:
+        return <span className="os-badge os-badge-draft">Khác</span>
+    }
+  }
+
+  return <div className="container dashboard"><p className="eyebrow">Tài khoản của bạn</p><h1>Lịch trải nghiệm</h1><p className="dashboard-copy">Mã QR/check-in PIN được mở khi bạn giữ chỗ. Hãy đến đúng giờ để giữ lịch sử tốt.</p>{error && <div className="alert alert-danger">{error}</div>}{loading ? <div className="empty-state"><div className="spinner-border text-primary" /></div> : bookings.length ? <div className="booking-list">{bookings.map((booking) => <article className="booking-item" key={booking.id}><div className="booking-date"><b>{new Intl.DateTimeFormat('vi-VN', { day: '2-digit' }).format(new Date(booking.startAtUtc))}</b><span>thg {new Intl.DateTimeFormat('vi-VN', { month: '2-digit' }).format(new Date(booking.startAtUtc))}</span></div><div className="booking-info">{getStatusBadge(booking.status)}<h3>{booking.serviceName}</h3><p><i className="bi bi-building" /> {booking.venueName}{booking.resourceName ? ` · ${booking.resourceName}${booking.resourceCode ? ` (${booking.resourceCode})` : ''}` : ''} · <i className="bi bi-clock" /> {formatTime(booking.startAtUtc)}</p><b>{formatMoney(booking.dealPriceVnd)}</b></div><div className="booking-actions d-flex flex-column align-items-end gap-2"><button type="button" className="booking-qr-thumb" onClick={() => setSelectedBookingForTicket(booking)} title="Nhấp để phóng to vé điện tử & QR"><QRCodeSVG value={booking.publicCode} size={42} /></button><code>{booking.publicCode}</code>{booking.status === 0 && <button onClick={() => cancel(booking)} className="btn btn-outline-danger btn-sm rounded-pill">Hủy chỗ</button>}</div></article>)}</div> : <div className="empty-state"><i className="bi bi-calendar-heart" /><h3>Chưa có lịch nào</h3><NavLink className="btn btn-primary rounded-pill" to="/">Khám phá slot ngay</NavLink></div>}{selectedBookingForTicket && (<div className="confirm-modal-backdrop" onClick={() => setSelectedBookingForTicket(null)} role="dialog" aria-modal="true"><div className="confirm-modal-body p-0" style={{ maxWidth: '520px', background: 'transparent', border: 'none' }} onClick={(e) => e.stopPropagation()}><div className="e-ticket-wrap"><div className="e-ticket-card"><div className="e-ticket-header"><div className="d-flex justify-content-between align-items-center"><span className="e-ticket-badge"><i className="bi bi-check-circle-fill" /> Vé điện tử OpenSlot</span><button type="button" className="btn-close btn-close-white" onClick={() => setSelectedBookingForTicket(null)} aria-label="Đóng" /></div><h3 className="e-ticket-title mt-2">{selectedBookingForTicket.serviceName}</h3><p className="e-ticket-venue mb-0"><i className="bi bi-building" /> {selectedBookingForTicket.venueName}</p></div><div className="e-ticket-tear-line"><div className="e-ticket-dashed" /></div><div className="e-ticket-body"><div className="e-ticket-qr-zone"><QRCodeSVG value={selectedBookingForTicket.publicCode} size={180} /><div className="mt-3 text-center"><small className="text-muted text-uppercase fw-bold">MÃ ĐẶT CHỖ</small><div className="e-ticket-pin-digits mt-1">{selectedBookingForTicket.publicCode}</div></div></div><div className="e-ticket-grid"><div className="e-ticket-field"><small>Thời gian</small><b>{formatSlotWindow(selectedBookingForTicket.startAtUtc, selectedBookingForTicket.endAtUtc)}</b></div><div className="e-ticket-field"><small>Giá deal</small><b className="text-coral">{formatMoney(selectedBookingForTicket.dealPriceVnd)}</b></div></div><div className="e-ticket-actions"><button type="button" onClick={() => window.print()} className="btn btn-outline-secondary rounded-pill px-4"><i className="bi bi-printer me-1" /> In vé</button><button type="button" onClick={() => setSelectedBookingForTicket(null)} className="btn btn-primary rounded-pill px-4">Đóng</button></div></div></div></div></div></div>)}{confirmModal && <ConfirmModal isOpen={confirmModal.isOpen} title={confirmModal.title} message={confirmModal.message} confirmText={confirmModal.confirmText} variant={confirmModal.variant} loading={confirmLoading} onConfirm={async () => { try { setConfirmLoading(true); await confirmModal.onConfirm(); setConfirmModal(null) } catch (e) { setError(e instanceof Error ? e.message : 'Thao tác không thành công.'); setConfirmModal(null) } finally { setConfirmLoading(false) } }} onCancel={() => { if (!confirmLoading) setConfirmModal(null) }} />}</div>
 }
 
 function ProviderNavTabs({ activeTab }: { activeTab: 'slots' | 'setup' }) {
@@ -645,11 +768,11 @@ function ProviderPage({ session }: { session: Session }) {
 
   const status = profile?.status
   const statusMessage = status === 2 ? 'Hồ sơ đối tác đang bị tạm khóa. Liên hệ quản trị viên để biết lý do và cách khôi phục tài khoản.' : ''
-  return <div className="container dashboard"><p className="eyebrow">Khu vực đối tác</p><div className="provider-heading"><div><h1>Quản lý slot & Check-in</h1><p className="dashboard-copy">Mỗi slot phải gắn với một sân, bàn, ghế hoặc phòng cụ thể để không bị trùng lịch. Nhấp vào từng dòng để xem chi tiết slot.</p></div><button disabled={status === 2} onClick={() => setShowForm(!showForm)} className="btn btn-primary rounded-pill"><i className="bi bi-plus-lg" /> {showForm ? 'Đóng form' : 'Tạo slot'}</button></div><ProviderNavTabs activeTab="slots" />{status === 0 && <div className="provider-approval-banner pending"><i className="bi bi-hourglass-split" /><div><b>Hồ sơ cửa hàng đang chờ Manager duyệt</b><span>Bạn có thể hoàn thiện địa điểm, dịch vụ và slot nháp. Chỉ slot của hồ sơ đã duyệt mới được công khai.</span></div></div>}{status === 3 && <div className="provider-approval-banner rejected"><i className="bi bi-exclamation-diamond" /><div><b>Hồ sơ cần bổ sung trước khi hoạt động</b><span>Hãy rà soát thông tin cửa hàng, sau đó gửi lại để Manager xét duyệt.</span></div><button onClick={resubmit} className="btn btn-sm btn-outline-danger">Gửi lại xét duyệt</button></div>}{status === 2 && <div className="provider-approval-banner suspended"><i className="bi bi-lock" /><div><b>Hồ sơ đối tác đang bị tạm khóa</b><span>{statusMessage}</span></div></div>}{showForm && <ProviderSlotForm services={services} resources={resources} token={session.accessToken} onDone={() => { setShowForm(false); setNotice('Đã tạo slot nháp. Hãy phát hành khi hồ sơ được duyệt.'); refresh() }} onError={setError} />}{error && <div className="alert alert-danger">{error}</div>}{notice && <div className="alert alert-success">{notice}</div>}{loading && slots.length === 0 ? <div className="empty-state"><div className="spinner-border text-primary" /></div> : <><div className="provider-table"><div className="table-head"><span>Dịch vụ / đơn vị</span><span>Thời gian</span><span>Giá deal</span><span>Trạng thái</span><span>Chỗ còn</span><span>Thao tác</span></div>{slots.map((slot) => {
+  return <div className="container dashboard"><p className="eyebrow">Khu vực đối tác</p><div className="provider-heading"><div><h1>Quản lý slot & Check-in</h1><p className="dashboard-copy">Mỗi slot phải gắn với một sân, bàn, ghế hoặc phòng cụ thể để không bị trùng lịch. Nhấp vào từng dòng để xem chi tiết slot.</p></div><button disabled={status === 2} onClick={() => setShowForm(!showForm)} className="btn btn-primary rounded-pill"><i className="bi bi-plus-lg" /> {showForm ? 'Đóng form' : 'Tạo slot'}</button></div><ProviderNavTabs activeTab="slots" />{status === 0 && <div className="provider-approval-banner pending"><i className="bi bi-hourglass-split" /><div><b>Hồ sơ cửa hàng đang chờ Manager duyệt</b><span>Bạn có thể hoàn thiện địa điểm, dịch vụ và slot nháp. Chỉ slot của hồ sơ đã duyệt mới được công khai.</span></div></div>}{status === 3 && <div className="provider-approval-banner rejected"><i className="bi bi-exclamation-diamond" /><div><b>Hồ sơ cần bổ sung trước khi hoạt động</b><span>Hãy rà soát thông tin cửa hàng, sau đó gửi lại để Manager xét duyệt.</span></div><button onClick={resubmit} className="btn btn-sm btn-outline-danger">Gửi lại xét duyệt</button></div>}{status === 2 && <div className="provider-approval-banner suspended"><i className="bi bi-lock" /><div><b>Hồ sơ đối tác đang bị tạm khóa</b><span>{statusMessage}</span></div></div>}{showForm && <ProviderSlotForm services={services} resources={resources} token={session.accessToken} onDone={() => { setShowForm(false); setNotice('Đã tạo slot nháp. Hãy phát hành khi hồ sơ được duyệt.'); refresh() }} onError={setError} />}{error && <div className="alert alert-danger">{error}</div>}{notice && <div className="alert alert-success">{notice}</div>}{loading && slots.length === 0 ? <TableSkeleton rows={4} columns={6} /> : <><div className="provider-table"><div className="table-head"><span>Dịch vụ / đơn vị</span><span>Thời gian</span><span>Giá deal</span><span>Trạng thái</span><span>Chỗ còn</span><span>Thao tác</span></div>{slots.map((slot) => {
     const isFuture = new Date(slot.startAtUtc).getTime() > Date.now()
     const canCancel = slot.status === 1 && slot.confirmedBookingCount === 0
     const canRepublish = (slot.status === 4 || slot.status === 0) && isFuture && status === 1
-    return <div className="table-row" key={slot.id} onClick={() => setDetailSlot(slot)} style={{ cursor: 'pointer' }} title="Nhấp để xem chi tiết slot"><span><b>{slot.serviceName}</b><small>{slot.venueName} · {slot.resourceName}{slot.resourceCode ? ` (${slot.resourceCode})` : ''}</small></span><span>{formatSlotWindow(slot.startAtUtc, slot.endAtUtc)}</span><span><b>{formatMoney(slot.dealPriceVnd)}</b></span><span>{slot.status === 0 && <span className="badge bg-secondary">Nháp</span>}{slot.status === 1 && <span className="badge bg-success">Đang mở</span>}{slot.status === 2 && <span className="badge bg-warning text-dark">Kín chỗ</span>}{slot.status === 3 && <span className="badge bg-dark">Hết hạn</span>}{slot.status === 4 && <span className="badge bg-danger">Đã dừng / hủy</span>}</span><span>{Math.max(0, slot.capacity - slot.confirmedBookingCount - slot.activeHoldCount)}/{slot.capacity}{slot.activeHoldCount > 0 && <small className="slot-awaiting-approval"> · {slot.activeHoldCount} đang thanh toán</small>}</span><span className="d-flex gap-1 align-items-center" onClick={(e) => e.stopPropagation()}><button type="button" onClick={() => setDetailSlot(slot)} className="btn btn-sm btn-outline-info" title="Xem chi tiết slot"><i className="bi bi-eye" /></button>{slot.status === 0 && (status === 1 ? <button onClick={() => publish(slot.id)} className="btn btn-sm btn-outline-primary">Phát hành</button> : <small className="slot-awaiting-approval">Chờ duyệt</small>)}{canCancel && <button onClick={() => handleCancelSlot(slot)} className="btn btn-sm btn-outline-danger">Dừng / Hủy</button>}{slot.status === 1 && slot.confirmedBookingCount > 0 && <small className="text-muted">Đã có khách đặt</small>}{slot.status === 4 && canRepublish && <button onClick={() => handleRepublishSlot(slot)} className="btn btn-sm btn-outline-success">Đăng lại</button>}</span></div>
+    return <div className="table-row" key={slot.id} onClick={() => setDetailSlot(slot)} style={{ cursor: 'pointer' }} title="Nhấp để xem chi tiết slot"><span><b>{slot.serviceName}</b><small>{slot.venueName} · {slot.resourceName}{slot.resourceCode ? ` (${slot.resourceCode})` : ''}</small></span><span>{formatSlotWindow(slot.startAtUtc, slot.endAtUtc)}</span><span><b>{formatMoney(slot.dealPriceVnd)}</b></span><span>{slot.status === 0 && <span className="os-badge os-badge-draft">Nháp</span>}{slot.status === 1 && <span className="os-badge os-badge-open">Đang mở</span>}{slot.status === 2 && <span className="os-badge os-badge-full">Kín chỗ</span>}{slot.status === 3 && <span className="os-badge os-badge-expired">Hết hạn</span>}{slot.status === 4 && <span className="os-badge os-badge-cancelled">Đã dừng / hủy</span>}</span><span>{Math.max(0, slot.capacity - slot.confirmedBookingCount - slot.activeHoldCount)}/{slot.capacity}{slot.activeHoldCount > 0 && <small className="slot-awaiting-approval"> · {slot.activeHoldCount} đang thanh toán</small>}</span><span className="d-flex gap-1 align-items-center" onClick={(e) => e.stopPropagation()}><button type="button" onClick={() => setDetailSlot(slot)} className="btn btn-sm btn-outline-info" title="Xem chi tiết slot"><i className="bi bi-eye" /></button>{slot.status === 0 && (status === 1 ? <button onClick={() => publish(slot.id)} className="btn btn-sm btn-outline-primary">Phát hành</button> : <small className="slot-awaiting-approval">Chờ duyệt</small>)}{canCancel && <button onClick={() => handleCancelSlot(slot)} className="btn btn-sm btn-outline-danger">Dừng / Hủy</button>}{slot.status === 1 && slot.confirmedBookingCount > 0 && <small className="text-muted">Đã có khách đặt</small>}{slot.status === 4 && canRepublish && <button onClick={() => handleRepublishSlot(slot)} className="btn btn-sm btn-outline-success">Đăng lại</button>}</span></div>
   })}</div><CheckInPanel token={session.accessToken} /></>}{detailSlot && <ProviderSlotDetailModal slot={detailSlot} onClose={() => setDetailSlot(null)} />}{confirmModal && <ConfirmModal isOpen={confirmModal.isOpen} title={confirmModal.title} message={confirmModal.message} confirmText={confirmModal.confirmText} variant={confirmModal.variant} loading={confirmLoading} onConfirm={async () => { try { setConfirmLoading(true); await confirmModal.onConfirm(); setConfirmModal(null) } catch (e) { setError(e instanceof Error ? e.message : 'Thao tác không thành công.'); setConfirmModal(null) } finally { setConfirmLoading(false) } }} onCancel={() => { if (!confirmLoading) setConfirmModal(null) }} />}</div>
 }
 
@@ -1010,7 +1133,116 @@ function ServiceForm({ token, venues, categories, profile, onDone, onError }: { 
   return <form className="provider-form catalog-form" onSubmit={submit}><h3>Thêm dịch vụ</h3><p className="form-hint">Ảnh thuộc về dịch vụ; mọi slot tạo từ dịch vụ này sẽ tự dùng cùng ảnh. Nếu không nhập, OpenSlot tự gán ảnh theo danh mục.</p><label>Địa điểm<select required value={venueId} onChange={(e) => setVenueId(e.target.value)}><option value="">Chọn địa điểm</option>{venues.map((venue) => <option value={venue.id} key={venue.id}>{venue.name}</option>)}</select></label>{lockedCategoryId ? <label><span>Danh mục dịch vụ <span className="category-locked-badge"><i className="bi bi-lock-fill" /> Đã khóa theo cửa hàng</span></span><input type="text" readOnly disabled value={profile?.categoryName || selectedCategory?.name || 'Danh mục đã khóa'} /></label> : <label>Danh mục<select required value={categoryId} onChange={(e) => setCategoryId(e.target.value)}><option value="">Chọn danh mục</option>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>}<label>Tên dịch vụ<input required minLength={2} list="service-form-suggestions" value={name} onChange={(e) => setName(e.target.value)} /></label><label>Mô tả<input maxLength={2000} list="service-description-suggestions" value={description} onChange={(e) => setDescription(e.target.value)} /></label><label>Giá niêm yết tham khảo (VND)<input required type="number" min="1" list="service-price-suggestions" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} /></label><label>Link ảnh đại diện (không bắt buộc)<input type="url" inputMode="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." /><small>{imageUrl.trim() ? 'Ảnh này sẽ hiển thị cho mọi slot của dịch vụ.' : 'Chưa có ảnh riêng: OpenSlot sẽ tự gán ảnh theo danh mục.'}</small></label><datalist id="service-form-suggestions">{popularServiceSearches.map((value) => <option value={value} key={value} />)}</datalist><datalist id="service-description-suggestions">{descriptionSuggestions.map((value) => <option value={value} key={value} />)}</datalist><datalist id="service-price-suggestions">{priceSuggestions.map((value) => <option value={value} key={value} />)}</datalist><button disabled={saving || !venues.length} className="btn btn-primary rounded-pill">{saving ? 'Đang lưu...' : 'Lưu dịch vụ'}</button>{!venues.length && <small>Hãy tạo địa điểm trước khi thêm dịch vụ.</small>}</form>
 }
 
-function CheckInPanel({ token }: { token: string }) { const [code, setCode] = useState(''); const [pin, setPin] = useState(''); const [message, setMessage] = useState(''); const checkIn = async (event: React.FormEvent) => { event.preventDefault(); if (!/^[A-Z0-9-]{10,15}$/.test(code)) { setMessage('Mã booking không hợp lệ.'); return }; if (!/^\d{6}$/.test(pin)) { setMessage('PIN phải có đúng 6 chữ số.'); return }; try { await api.checkIn(code, pin, token); setMessage('Check-in thành công. Giữ mã để hoàn tất dịch vụ.') } catch (e) { setMessage(e instanceof Error ? e.message : 'Không thể check-in.') } }; const complete = async () => { if (!code) { setMessage('Nhập mã booking cần hoàn tất.'); return }; try { await api.completeBooking(code, token); setMessage('Dịch vụ đã được đánh dấu hoàn tất.'); setCode(''); setPin('') } catch (e) { setMessage(e instanceof Error ? e.message : 'Không thể hoàn tất booking.') } }; return <form onSubmit={checkIn} className="checkin-panel"><div><b><i className="bi bi-qr-code-scan" /> Check-in khách</b><span>Nhập mã OpenSlot và PIN của khách.</span></div><input required value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="OS-XXXXXXXX" /><input required value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" placeholder="PIN 6 số" maxLength={6} /><button className="btn btn-outline-primary rounded-pill">Check-in</button><button type="button" onClick={complete} className="btn btn-outline-success rounded-pill">Hoàn tất</button>{message && <small>{message}</small>}</form> }
+function CheckInPanel({ token }: { token: string }) {
+  const [code, setCode] = useState('')
+  const [pin, setPin] = useState('')
+  const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(false)
+  const toast = useToast()
+
+  const handlePinChange = (val: string) => {
+    setPin(val.replace(/\D/g, '').slice(0, 6))
+  }
+
+  const checkIn = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setMessage('')
+    if (!/^[A-Z0-9-]{10,15}$/.test(code.trim())) {
+      setMessage('Mã booking không hợp lệ.')
+      toast.error('Mã booking không hợp lệ.')
+      return
+    }
+    if (!/^\d{6}$/.test(pin.trim())) {
+      setMessage('PIN phải có đúng 6 chữ số.')
+      toast.error('PIN phải có đúng 6 chữ số.')
+      return
+    }
+    setLoading(true)
+    try {
+      await api.checkIn(code.trim(), pin.trim(), token)
+      setMessage('Check-in thành công! Giữ mã để hoàn tất dịch vụ khi khách trải nghiệm xong.')
+      toast.success('Check-in khách thành công!')
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : 'Không thể check-in.'
+      setMessage(errMsg)
+      toast.error(errMsg)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const complete = async () => {
+    setMessage('')
+    if (!code.trim()) {
+      setMessage('Nhập mã booking cần hoàn tất.')
+      toast.warning('Vui lòng nhập mã booking trước.')
+      return
+    }
+    setLoading(true)
+    try {
+      await api.completeBooking(code.trim(), token)
+      setMessage('Dịch vụ đã được đánh dấu hoàn tất.')
+      toast.success('Ca dịch vụ đã hoàn tất thành công!')
+      setCode('')
+      setPin('')
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : 'Không thể hoàn tất booking.'
+      setMessage(errMsg)
+      toast.error(errMsg)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="enhanced-checkin-card">
+      <div className="checkin-header-box">
+        <div className="checkin-header-icon">
+          <i className="bi bi-qr-code-scan" />
+        </div>
+        <div>
+          <h3 className="m-0 fs-5 fw-bold text-dark">Điểm Check-in Khách hàng</h3>
+          <p className="text-muted m-0 small">Nhập mã đặt chỗ OpenSlot và mã PIN 6 số của khách để xác nhận trải nghiệm.</p>
+        </div>
+      </div>
+      <form onSubmit={checkIn} className="d-flex flex-wrap align-items-end gap-3">
+        <div className="flex-grow-1" style={{ minWidth: '220px' }}>
+          <label className="form-label small fw-bold text-muted mb-1">Mã Đặt Chỗ</label>
+          <input
+            required
+            className="form-control"
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="OS-XXXXXXXX"
+            autoComplete="off"
+          />
+        </div>
+        <div style={{ width: '180px' }}>
+          <label className="form-label small fw-bold text-muted mb-1">Mã PIN (6 số)</label>
+          <input
+            required
+            className="form-control text-center fw-bold fs-5"
+            value={pin}
+            onChange={(e) => handlePinChange(e.target.value)}
+            inputMode="numeric"
+            placeholder="······"
+            maxLength={6}
+            autoComplete="off"
+          />
+        </div>
+        <div className="d-flex gap-2">
+          <button disabled={loading || !code || pin.length < 6} className="btn btn-primary rounded-pill px-4">
+            <i className="bi bi-check2-circle me-1" /> Check-in
+          </button>
+          <button type="button" disabled={loading || !code} onClick={complete} className="btn btn-outline-success rounded-pill px-4">
+            <i className="bi bi-flag-fill me-1" /> Hoàn tất ca
+          </button>
+        </div>
+      </form>
+      {message && <div className="mt-3 small text-muted"><i className="bi bi-info-circle me-1" /> {message}</div>}
+    </div>
+  )
+}
 
 function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manager' }) {
   const [providers, setProviders] = useState<ProviderProfile[]>([])
@@ -1452,7 +1684,45 @@ function AdminPage({ session, mode }: { session: Session; mode: 'admin' | 'manag
 
   return <div className="container dashboard">
     <p className="eyebrow">{isAdmin ? 'Quản trị hệ thống' : 'Vận hành nền tảng'}</p><h1>{isAdmin ? 'Tổng quan OpenSlot' : 'Trung tâm vận hành'}</h1><p className="dashboard-copy">{isAdmin ? 'Quản lý toàn hệ thống, phân quyền Manager và theo dõi mọi hoạt động.' : 'Theo dõi vận hành, duyệt đối tác và xử lý vi phạm trên OpenSlot.'}</p>
-    {stats && <div className="admin-stats admin-stats-wide"><div><span>Người dùng</span><b>{stats.users}</b></div><div><span>Slot đang mở</span><b>{stats.publishedSlots}</b></div><div><span>Booking</span><b>{stats.bookings}</b></div><div><span>Tỷ lệ lấp đầy</span><b>{stats.fillRatePercent}%</b></div><div><span>No-show</span><b>{stats.noShows}</b></div></div>}
+    {stats && (
+      <div className="admin-bento-grid my-4">
+        <div className="bento-kpi-card">
+          <div className="bento-kpi-icon users-icon"><i className="bi bi-people-fill" /></div>
+          <div>
+            <span className="bento-kpi-label">Người dùng</span>
+            <b className="bento-kpi-value">{stats.users}</b>
+          </div>
+        </div>
+        <div className="bento-kpi-card">
+          <div className="bento-kpi-icon slots-icon"><i className="bi bi-calendar-range-fill" /></div>
+          <div>
+            <span className="bento-kpi-label">Slot đang mở</span>
+            <b className="bento-kpi-value">{stats.publishedSlots}</b>
+          </div>
+        </div>
+        <div className="bento-kpi-card">
+          <div className="bento-kpi-icon bookings-icon"><i className="bi bi-ticket-perforated-fill" /></div>
+          <div>
+            <span className="bento-kpi-label">Lượt đặt chỗ</span>
+            <b className="bento-kpi-value">{stats.bookings}</b>
+          </div>
+        </div>
+        <div className="bento-kpi-card">
+          <div className="bento-kpi-icon rate-icon"><i className="bi bi-graph-up-arrow" /></div>
+          <div>
+            <span className="bento-kpi-label">Tỷ lệ lấp đầy</span>
+            <b className="bento-kpi-value">{stats.fillRatePercent}%</b>
+          </div>
+        </div>
+        <div className="bento-kpi-card">
+          <div className="bento-kpi-icon noshow-icon"><i className="bi bi-person-x-fill" /></div>
+          <div>
+            <span className="bento-kpi-label">Vắng mặt (No-show)</span>
+            <b className="bento-kpi-value">{stats.noShows}</b>
+          </div>
+        </div>
+      </div>
+    )}
     {error && <div className="alert alert-danger">{error}</div>}{message && <div className="alert alert-success">{message}</div>}
     <div className="admin-section-title"><h2>Quản lý đối tác</h2><div className="admin-filter"><button className={filter === undefined ? 'active' : ''} onClick={() => setFilter(undefined)}>Tất cả</button><button className={filter === 0 ? 'active' : ''} onClick={() => setFilter(0)}>Chờ duyệt</button><button className={filter === 1 ? 'active' : ''} onClick={() => setFilter(1)}>Đã duyệt</button><button className={filter === 3 ? 'active' : ''} onClick={() => setFilter(3)}>Cần bổ sung</button><button className={filter === 2 ? 'active' : ''} onClick={() => setFilter(2)}>Tạm khóa</button><button className={filter === 4 ? 'active' : ''} onClick={() => setFilter(4)}>Đã xóa</button></div></div>
     {loading ? <div className="empty-state"><div className="spinner-border text-primary" /></div> : <>

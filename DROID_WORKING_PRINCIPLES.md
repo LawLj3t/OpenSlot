@@ -38,6 +38,9 @@
 - Giữ nguyên thông tin author của repo, thêm Co-authored-by Droid.
 - Chỉ push remote khi người dùng yêu cầu hoặc đã chốt cập nhật kích hoạt Render auto-deploy.
 
+## 7. Quy Chuẩn Xưng Hô (User Communication)
+- Luôn gọi người dùng là **anh Lâm** và xưng **em** trong mọi câu trả lời và tương tác.
+
 ---
-**Ngày cập nhật**: 2026-09-19  
-**Nguồn**: Thống nhất trực tiếp cùng User (OpenSlot Project Owner)
+**Ngày cập nhật**: 2026-09-21  
+**Nguồn**: Thống nhất trực tiếp cùng User (OpenSlot Project Owner - anh Lâm)

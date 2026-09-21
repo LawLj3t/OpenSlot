@@ -44,17 +44,17 @@ export const ProviderSlotDetailModal: React.FC<ProviderSlotDetailModalProps> = (
   const getStatusBadge = (status: number) => {
     switch (status) {
       case 0:
-        return <span className="badge bg-secondary fs-6">Nháp</span>
+        return <span className="os-badge os-badge-draft fs-6">Nháp</span>
       case 1:
-        return <span className="badge bg-success fs-6">Đang mở bán</span>
+        return <span className="os-badge os-badge-open fs-6">Đang mở bán</span>
       case 2:
-        return <span className="badge bg-warning text-dark fs-6">Kín chỗ</span>
+        return <span className="os-badge os-badge-full fs-6">Kín chỗ</span>
       case 3:
-        return <span className="badge bg-dark fs-6">Hết hạn</span>
+        return <span className="os-badge os-badge-expired fs-6">Hết hạn</span>
       case 4:
-        return <span className="badge bg-danger fs-6">Đã dừng / hủy</span>
+        return <span className="os-badge os-badge-cancelled fs-6">Đã dừng / hủy</span>
       default:
-        return <span className="badge bg-secondary fs-6">Không xác định</span>
+        return <span className="os-badge os-badge-draft fs-6">Không xác định</span>
     }
   }
 

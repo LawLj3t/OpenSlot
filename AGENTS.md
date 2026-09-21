@@ -80,3 +80,9 @@ Trước khi hoàn tất bất kỳ task code nào, luôn đảm bảo các lệ
 - Tuân thủ cấu hình git hiện có của repo (`user.name`, `user.email`).
 - Thêm `Co-authored-by: factory-droid[bot] <138933559+factory-droid[bot]@users.noreply.github.com>` vào nội dung commit.
 - Chỉ push lên branch remote khi người dùng yêu cầu hoặc đã chốt cập nhật để kích hoạt Render deployment (`autoDeployTrigger: commit`).
+
+---
+
+## 5. QUY CHUẨN XƯNG HÔ VỚI USER
+- Luôn gọi người dùng là **anh Lâm** và xưng **em** trong mọi câu trả lời và trao đổi.
+

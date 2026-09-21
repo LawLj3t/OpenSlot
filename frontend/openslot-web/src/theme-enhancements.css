@@ -1,0 +1,547 @@
+/* OpenSlot Theme Enhancements - Super Beautiful UI/UX */
+
+/* ============================================================
+   1. CAPACITY METER & DEAL BADGES
+   ============================================================ */
+.capacity-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.capacity-meter-bar {
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+.capacity-meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+.capacity-meter-fill.safe {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+.capacity-meter-fill.warning {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+.capacity-meter-fill.danger {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+.capacity-text {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+/* ============================================================
+   2. STICKY BOOKING PANEL
+   ============================================================ */
+@media (min-width: 901px) {
+  .booking-panel.sticky-panel {
+    position: sticky;
+    top: 88px;
+    z-index: 10;
+    transition: box-shadow 0.2s ease;
+  }
+}
+
+.share-deal-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--os-text-secondary);
+  background: #f8fafc;
+  border: 1px solid var(--os-line);
+  border-radius: 999px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: var(--os-transition-fast);
+  margin-top: 8px;
+}
+.share-deal-btn:hover {
+  background: #f1f5f9;
+  color: var(--os-navy-900);
+  border-color: #cbd5e1;
+}
+
+/* ============================================================
+   3. PAYMENT HOLD URGENCY TIMER & BANK DETAILS
+   ============================================================ */
+.urgent-timer-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: var(--os-radius-md);
+  margin-bottom: 20px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  color: #0369a1;
+  transition: all 0.3s ease;
+}
+
+.urgent-timer-box.is-critical {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+  animation: urgentPulse 1.8s infinite ease-in-out;
+}
+
+@keyframes urgentPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.15);
+  }
+}
+
+.urgent-timer-digits {
+  font-family: var(--os-font-display);
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: inherit;
+  line-height: 1;
+}
+
+.bank-detail-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  background: #ffffff;
+  border: 1px solid var(--os-line);
+  border-radius: var(--os-radius-sm);
+}
+
+.copy-badge-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.copy-badge-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* ============================================================
+   4. E-TICKET & BOARDING PASS EXPERIENCE
+   ============================================================ */
+.e-ticket-wrap {
+  max-width: 580px;
+  width: 100%;
+  margin: 0 auto;
+  filter: drop-shadow(0 16px 36px rgba(15, 23, 42, 0.12));
+}
+
+.e-ticket-card {
+  background: #ffffff;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  position: relative;
+}
+
+.e-ticket-header {
+  background: linear-gradient(135deg, var(--os-navy-900) 0%, var(--os-navy-800) 100%);
+  color: #ffffff;
+  padding: 26px 30px;
+  position: relative;
+}
+
+.e-ticket-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.e-ticket-title {
+  font-family: var(--os-font-display);
+  font-size: 24px;
+  font-weight: 800;
+  margin: 0 0 4px;
+  color: #ffffff;
+}
+
+.e-ticket-venue {
+  color: #cbd5e1;
+  font-size: 13.5px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Tear Line */
+.e-ticket-tear-line {
+  position: relative;
+  height: 24px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.e-ticket-tear-line::before,
+.e-ticket-tear-line::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--os-bg);
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.1);
+  z-index: 2;
+}
+.e-ticket-tear-line::before { left: -11px; }
+.e-ticket-tear-line::after { right: -11px; }
+
+.e-ticket-dashed {
+  width: 100%;
+  border-top: 2px dashed #cbd5e1;
+}
+
+.e-ticket-body {
+  padding: 24px 30px 32px;
+  background: #ffffff;
+}
+
+.e-ticket-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.e-ticket-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.e-ticket-field small {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+.e-ticket-field b {
+  font-size: 14.5px;
+  color: var(--os-navy-900);
+}
+
+.e-ticket-qr-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--os-radius-lg);
+  margin-bottom: 20px;
+}
+
+.e-ticket-pin-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 8px 18px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+}
+
+.e-ticket-pin-digits {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--os-coral-500);
+  letter-spacing: 0.18em;
+}
+
+.e-ticket-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+/* ============================================================
+   5. BOOKINGS LIST QR THUMBNAIL & QUICK VIEW
+   ============================================================ */
+.booking-qr-thumb {
+  width: 52px;
+  height: 52px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+.booking-qr-thumb:hover {
+  border-color: var(--os-coral-500);
+  transform: scale(1.08);
+  box-shadow: var(--os-shadow-sm);
+}
+
+/* ============================================================
+   6. 6-DIGIT OTP / PIN CHECK-IN INPUT FOR PROVIDERS
+   ============================================================ */
+.pin-input-container {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin: 12px 0;
+}
+.pin-input-digit {
+  width: 44px;
+  height: 52px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 800;
+  border: 2px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--os-navy-900);
+  outline: none;
+  transition: all 0.15s ease;
+}
+.pin-input-digit:focus {
+  border-color: var(--os-coral-500);
+  box-shadow: 0 0 0 3px rgba(255, 87, 34, 0.15);
+}
+
+/* Print Mode for E-Ticket */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .e-ticket-wrap,
+  .e-ticket-wrap * {
+    visibility: visible;
+  }
+  .e-ticket-wrap {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    filter: none;
+  }
+  .e-ticket-actions,
+  .site-header,
+  footer,
+  .openslot-chat-trigger,
+  .openslot-chat-window {
+    display: none !important;
+  }
+}
+
+/* ============================================================
+   7. ADMIN & MANAGER BENTO-GRID KPI CARDS
+   ============================================================ */
+.admin-bento-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+@media (max-width: 1024px) {
+  .admin-bento-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 650px) {
+  .admin-bento-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bento-kpi-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  background: #ffffff;
+  border: 1px solid var(--os-line);
+  border-radius: var(--os-radius-md);
+  box-shadow: var(--os-shadow-xs);
+  transition: var(--os-transition-base);
+}
+.bento-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--os-shadow-md);
+  border-color: #cbd5e1;
+}
+.bento-kpi-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.bento-kpi-icon.users-icon { background: #e0f2fe; color: #0284c7; }
+.bento-kpi-icon.slots-icon { background: #ecfdf5; color: #059669; }
+.bento-kpi-icon.bookings-icon { background: #fff5f2; color: #ff5722; }
+.bento-kpi-icon.rate-icon { background: #fef3c7; color: #d97706; }
+.bento-kpi-icon.noshow-icon { background: #fef2f2; color: #dc2626; }
+
+.bento-kpi-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--os-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+.bento-kpi-value {
+  display: block;
+  font-family: var(--os-font-display);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--os-navy-900);
+  line-height: 1.1;
+}
+
+/* ============================================================
+   8. ENHANCED CHECK-IN PANEL FOR PROVIDER
+   ============================================================ */
+.enhanced-checkin-card {
+  margin-top: 30px;
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid var(--os-line);
+  border-radius: var(--os-radius-lg);
+  box-shadow: var(--os-shadow-sm);
+}
+
+.checkin-header-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.checkin-header-icon {
+  width: 44px;
+  height: 44px;
+  background: #fff5f2;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--os-coral-500);
+  font-size: 22px;
+}
+
+/* ============================================================
+   9. MOBILE RESPONSIVE POLISH & MICRO-INTERACTIONS
+   ============================================================ */
+/* Header Glassmorphism */
+.site-header {
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+/* Category Row Scrollbar */
+.category-row {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+.category-row::-webkit-scrollbar {
+  height: 4px;
+}
+.category-row::-webkit-scrollbar-track {
+  background: transparent;
+}
+.category-row::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+/* Search Box Focus State */
+.search-box > div:focus-within {
+  box-shadow: 0 0 0 2px rgba(255, 87, 34, 0.25);
+  border-radius: 12px;
+  background: #fff;
+}
+
+/* Mobile Table to Card Transformation */
+@media (max-width: 650px) {
+  .provider-table {
+    border: none !important;
+    background: transparent !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+  .provider-table .table-head {
+    display: none !important;
+  }
+  .provider-table .table-row {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    padding: 16px !important;
+    background: #ffffff !important;
+    border: 1px solid var(--os-line) !important;
+    border-radius: var(--os-radius-md) !important;
+    box-shadow: var(--os-shadow-sm) !important;
+  }
+  .provider-table .table-row span:first-child {
+    width: 100%;
+  }
+
+  .e-ticket-card {
+    border-radius: 16px;
+  }
+  .e-ticket-header,
+  .e-ticket-body {
+    padding: 18px 20px;
+  }
+  .e-ticket-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+
