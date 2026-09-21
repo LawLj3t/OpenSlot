@@ -46,6 +46,7 @@ builder.Services.AddDataProtection()
     .SetApplicationName("OpenSlot");
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
+    options.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
     if (usesPostgreSql)
     {
         // Booking uses an explicit transaction to prevent two customers from
